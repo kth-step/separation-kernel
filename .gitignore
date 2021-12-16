@@ -1,0 +1,4 @@
+build
+*.o
+offsets.h
+
