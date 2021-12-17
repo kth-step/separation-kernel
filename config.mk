@@ -1,9 +1,7 @@
 # See LICENSE file for copyright and license details.
 
 # Prefix of GNU toolchain
-# Arch Linux: riscv64-elf-
-# From Git:   riscv64-unknown-elf-
-RISCV_PREFIX=riscv64-elf-
+RISCV_PREFIX=riscv64-unknown-elf-
 
 # Set tool variables
 AR=$(RISCV_PREFIX)ar

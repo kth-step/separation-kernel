@@ -1,10 +1,10 @@
-/* See LICENSE file for copyright and license details. */
+# See LICENSE file for copyright and license details.
 
-/* Boot code */
+# Boot code {{{
 .section .init
 .globl _start
 _start:
-        la      t0,AsmTrapHandler
+        la      t0,AsmTrapTrampoline
         ori     t0,t0,1
         csrw    mtvec,t0
 
@@ -20,3 +20,4 @@ _start:
         csrw    pmpcfg0,t0
         csrw    pmpaddr0,t1
         mret
+# }}}
