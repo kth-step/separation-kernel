@@ -42,7 +42,7 @@ size:
 
 debug-qemu: $(ELF)
 	GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) \
-	scripts/qemu-debug.sh
+	scripts/debug-qemu.sh
 
 # Build instructions
 

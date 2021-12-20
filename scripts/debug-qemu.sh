@@ -1,7 +1,8 @@
 #!/bin/bash
 
 $QEMU_SYSTEM -machine virt -kernel $ELF \
-      -nographic -bios none -s -S &
+             -nographic                 \
+             -bios none -s -S &
 QEMU_PID=$!
 
 if [[ -z $QEMU_PID ]]; then
@@ -9,9 +10,10 @@ if [[ -z $QEMU_PID ]]; then
         exit 10
 fi
 
+x-terminal-emulator -e                       \
 $GDB $ELF -ex "target remote localhost:1234" \
-          -ex "b _start" \
-          -ex "c" \
+          -ex "b _start"                     \
+          -ex "c"                            \
           -ex "layout split"
 
 kill -s SIGTERM $QEMU_PID
