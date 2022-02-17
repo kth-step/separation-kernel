@@ -38,7 +38,7 @@ settings:
 	@echo "LDFLAGS	= $(LDFLAGS)"
 
 clean:
-	rm -f $(OBJS) $(DEPS) $(ELF) offsets.h
+	rm -f $(OBJS) $(DEPS) $(ELF) include/offsets.h
 
 size:
 	$(SIZE) $(ELF)
