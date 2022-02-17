@@ -5,10 +5,11 @@ BUILD_DIR=build
 
 include config.mk
 
-ASM_SRCS=boot.S entry.S syscall.S user.S
-C_SRCS=
+ASM_SRCS=$(wildcard *.S)
+C_SRCS=$(filter-out offsets.c,$(wildcard *.c))
 
 OBJS=$(addprefix $(BUILD_DIR)/, $(ASM_SRCS:.S=.o) $(C_SRCS:.c=.o))
+DEPS=$(addprefix $(BUILD_DIR)/, $(ASM_SRCS:.S=.d) $(C_SRCS:.c=.d))
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
 DA=$(BUILD_DIR)/$(PROGRAM).da
 
@@ -35,7 +36,7 @@ settings:
 	@echo "LDFLAGS	= $(LDFLAGS)"
 
 clean:
-	rm -f $(OBJS) $(ELF) offsets.h
+	rm -f $(OBJS) $(DEPS) $(ELF) offsets.h
 
 size:
 	$(SIZE) $(ELF)
@@ -51,17 +52,19 @@ $(BUILD_DIR):
 
 $(OBJS) $(ELF): | $(BUILD_DIR) offsets.h
 
-offsets.h: offsets.c
+offsets.h: offsets.c types.h
 	CC=$(CC) scripts/gen-offsets.sh
 
 $(BUILD_DIR)/%.o: %.S
-	$(CC) $(ASFLAGS) -c -o $@ $<
+	$(CC) $(ASFLAGS) -MD -c -o $@ $<
 
 $(BUILD_DIR)/%.o: %.c
-	$(CC) $(CFLAGS)  -c -o $@ $<
+	$(CC) $(CFLAGS) -MD -c -o $@ $<
 
 $(BUILD_DIR)/%.elf: $(OBJS)
 	$(LD) $(LDFLAGS) -T $(LDS) -o $@ $(OBJS)
 
 $(BUILD_DIR)/%.da: $(ELF)
 	$(OBJDUMP) -d $< > $@
+
+-include $(DEPS)
