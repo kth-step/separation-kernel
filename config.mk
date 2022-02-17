@@ -29,4 +29,4 @@ QEMU=qemu-riscv64
 # Set architecture, ABI and code model (march, mabi, mcmodel)
 ARCH=rv64imac
 ABI=lp64
-CMODEL=medlow
+CMODEL=medany

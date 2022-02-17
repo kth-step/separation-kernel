@@ -20,7 +20,7 @@ CFLAGS+=-Og -g
 ASFLAGS=-march=$(ARCH) -mabi=$(ABI)
 ASFLAGS+=-g
 
-LDFLAGS=-nostdlib --no-relax 
+LDFLAGS=-nostdlib
 
 # Commands
 
