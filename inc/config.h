@@ -7,4 +7,4 @@
 #define N_TICKS 256
 
 #define N_PROC 2
-#define STACK_SIZE 512
+#define STACK_SIZE 512/8

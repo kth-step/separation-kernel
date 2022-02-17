@@ -35,11 +35,11 @@ typedef struct process {
         PmpConfig pmpConfig;
         Lock lock;
         Capability **capabilities;
-        uint8_t *kernelSP;
-        uint8_t *userPC;
+        uintptr_t *kernelSP;
+        uintptr_t *userPC;
 } Process;
 
 extern Process processes[N_PROC];
-extern uint8_t stack[N_PROC][STACK_SIZE];
+extern uintptr_t stack[N_PROC][STACK_SIZE];
 
 // }}}
