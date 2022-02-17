@@ -75,8 +75,10 @@ AsmExcptHandler:
         sd      a5,(15*8)(sp)
         sd      a6,(16*8)(sp)
         sd      a7,(17*8)(sp)
+        sd      gp,(18*8)(sp)
 
         ld      s0,(-1*8)(sp)           # Load pointer to proc struct.
+        ld      gp,(-2*8)(sp)           # Load global pointer.
         
         csrr    t0,mcause               # Fetch cause of exception.
         li      t1,8                    # 8 is system call.
@@ -106,9 +108,11 @@ __syscall:
         jalr    ra,0(ra)                # Jump to the trampoline entry
 
 __restore_user:      
+        sd      gp,(-2*8)(sp)           # Save global pointer.
         sd      s0,(-1*8)(sp)           # Save pointer to proc struct.
 
-        ld      a7,(17*8)(sp)           # Load part of user context.
+        ld      gp,(18*8)(sp)           # Load part of user context.
+        ld      a7,(17*8)(sp)
         ld      a6,(16*8)(sp)
         ld      a5,(15*8)(sp)
         ld      a4,(14*8)(sp)

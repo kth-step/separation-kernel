@@ -18,11 +18,14 @@ _start:
 
         la      t0,user_code
         csrw    mepc,t0
-        csrw    mscratch,sp
         csrw    mstatus,x0
         li      t0,0xF
         li      t1,-1
         csrw    pmpcfg0,t0
         csrw    pmpaddr0,t1
+        addi    sp,sp,(-8*20)
+        csrw    mscratch,sp
+        sd      s0,(-1*8)(sp)
+        sd      gp,(-2*8)(sp)
         mret
 # }}}
