@@ -30,13 +30,16 @@ typedef struct pmp_config {
 } PmpConfig;
 
 typedef struct process {
-        uintptr_t *kernelStack;
+        uintptr_t pid;
         TrapRegisters *trapRegisters;
         PmpConfig pmpConfig;
         Lock lock;
         Capability **capabilities;
+        uint8_t *kernelSP;
+        uint8_t *userPC;
 } Process;
 
-extern Process *processes;
+extern Process processes[N_PROC];
+extern uint8_t stack[N_PROC][STACK_SIZE];
 
 // }}}

@@ -7,7 +7,8 @@
         __asm__("#define "#NAME"\t%0\n"::"i"(__builtin_offsetof(STRUCT, MEMBER)))
 
 void foo(void) {
-        OFFSET(PROC_KERNEL_STACK,   Process, kernelStack); 
+        OFFSET(PROC_KERNEL_STACK,   Process, kernelSP); 
+        OFFSET(PROC_USER_PC,        Process, userPC); 
         OFFSET(PROC_TRAP_REGISTERS, Process, trapRegisters);
         OFFSET(PROC_CAPABILITIES,   Process, capabilities);
         OFFSET(PROC_PMPCFG0,  Process, pmpConfig.pmpcfg0);

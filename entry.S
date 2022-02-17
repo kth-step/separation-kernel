@@ -1,7 +1,7 @@
 # See LICENSE file for copyright and license details.
 
 .globl AsmTrapTrampoline
-.extern AsmSyscallHandler
+.globl AsmRestoreUser
 
 .section .text.entry
 
@@ -10,7 +10,7 @@ AsmTrapTrampoline:
         .option push
         .option norvc
         .align 4
-        j       AsmExcptHandler         #  0: Reserved
+        j       __exception_handler     #  0: Reserved
         j       __dummy                 #  1: Supervisor software interrupt
         j       __dummy                 #  2: Reserved
         j       __dummy                 #  3: Machine software interrupt
@@ -30,7 +30,7 @@ AsmTrapTrampoline:
 # }}}
 
 # System Call Trampoline {{{
-AsmSyscallTrampoline:
+__syscall_trampoline:
         .option push
         .option norvc
         j       __dummy                 #  0:
@@ -54,30 +54,27 @@ AsmSyscallTrampoline:
 
 
 # Exception Handler {{{
-AsmExcptHandler:
+__exception_handler:
         csrrw   sp,mscratch,sp          # Save user sp and load kernel sp.
 
-        sd      ra,(0*8)(sp)            # Save part of user context.
-        sd      t0,(1*8)(sp)
-        sd      t1,(2*8)(sp)
-        sd      t2,(3*8)(sp)
-        sd      t3,(4*8)(sp)
-        sd      t4,(5*8)(sp)
-        sd      t5,(6*8)(sp)
-        sd      t6,(7*8)(sp)
-        sd      s0,(8*8)(sp)
-        sd      s1,(9*8)(sp)
-        sd      a0,(10*8)(sp)
-        sd      a1,(11*8)(sp)
-        sd      a2,(12*8)(sp)
-        sd      a3,(13*8)(sp)
-        sd      a4,(14*8)(sp)
-        sd      a5,(15*8)(sp)
-        sd      a6,(16*8)(sp)
-        sd      a7,(17*8)(sp)
-        sd      gp,(18*8)(sp)
+        sd      a0,(0*8)(sp)
+        sd      a1,(1*8)(sp)
+        sd      a2,(2*8)(sp)
+        sd      a3,(3*8)(sp)
+        sd      a4,(4*8)(sp)
+        sd      a5,(5*8)(sp)
+        sd      a6,(6*8)(sp)
+        sd      a7,(7*8)(sp)
+        sd      t0,(8*8)(sp)
+        sd      t1,(9*8)(sp)
+        sd      t2,(10*8)(sp)
+        sd      t3,(11*8)(sp)
+        sd      t4,(12*8)(sp)
+        sd      ra,(13*8)(sp)            # Save part of user context.
+        sd      tp,(14*8)(sp)
+        sd      gp,(15*8)(sp)
 
-        ld      s0,(-1*8)(sp)           # Load pointer to proc struct.
+        ld      tp,(-1*8)(sp)           # Load pointer to proc struct.
         ld      gp,(-2*8)(sp)           # Load global pointer.
         
         csrr    t0,mcause               # Fetch cause of exception.
@@ -96,7 +93,7 @@ __exception:
         # TODO: Handle user exceptions
         j       __restore_user          # Goto label 1 forward.
 __syscall:
-        la      ra,AsmSyscallTrampoline # Load base address to syscall trampoline.
+        la      ra,__syscall_trampoline # Load base address to syscall trampoline.
         addi    a0,sp,(10*8)            # Pointer to arguments
 
         csrr    t0,mepc                 # Increment pc by 4.
@@ -107,29 +104,27 @@ __syscall:
         add     ra,ra,t0                # Add offset to trampoline base address.
         jalr    ra,0(ra)                # Jump to the trampoline entry
 
-__restore_user:      
+AsmRestoreUser:      
+__restore_user:
         sd      gp,(-2*8)(sp)           # Save global pointer.
-        sd      s0,(-1*8)(sp)           # Save pointer to proc struct.
+        sd      tp,(-1*8)(sp)           # Save pointer to proc struct.
 
-        ld      gp,(18*8)(sp)           # Load part of user context.
-        ld      a7,(17*8)(sp)
-        ld      a6,(16*8)(sp)
-        ld      a5,(15*8)(sp)
-        ld      a4,(14*8)(sp)
-        ld      a3,(13*8)(sp)
-        ld      a2,(12*8)(sp)
-        ld      a1,(11*8)(sp)
-        ld      a0,(10*8)(sp)
-        ld      s1,(9*8)(sp)
-        ld      s0,(8*8)(sp)
-        ld      t6,(7*8)(sp)
-        ld      t5,(6*8)(sp)
-        ld      t4,(5*8)(sp)
-        ld      t3,(4*8)(sp)
-        ld      t2,(3*8)(sp)
-        ld      t1,(2*8)(sp)
-        ld      t0,(1*8)(sp)
-        ld      ra,(0*8)(sp)
+        ld      gp,(15*8)(sp)           # Load part of user context.
+        ld      tp,(14*8)(sp)
+        ld      ra,(13*8)(sp)
+        ld      t4,(12*8)(sp)
+        ld      t3,(11*8)(sp)
+        ld      t2,(10*8)(sp)
+        ld      t1,(9*8)(sp)
+        ld      t0,(8*8)(sp)
+        ld      a7,(7*8)(sp)
+        ld      a6,(6*8)(sp)
+        ld      a5,(5*8)(sp)
+        ld      a4,(4*8)(sp)
+        ld      a3,(3*8)(sp)
+        ld      a2,(2*8)(sp)
+        ld      a1,(1*8)(sp)
+        ld      a0,(0*8)(sp)
 
         csrrw   sp,mscratch,sp          # Save kernel sp and load user sp from scratch.
         mret                            # Return to user proc.

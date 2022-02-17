@@ -5,27 +5,25 @@
 .extern stack
 .globl _start
 _start:
-        la      t0,AsmTrapTrampoline
-        ori     t0,t0,1
-        csrw    mtvec,t0
 
+        # Initialize global pointer and stack pointer.
         .option push
         .option norelax
         la      gp,__global_pointer$
         .option pop
-
         la      sp,_sp
-
-        la      t0,user_code
-        csrw    mepc,t0
-        csrw    mstatus,x0
+        
+        # Remove memory protection
         li      t0,0xF
         li      t1,-1
         csrw    pmpcfg0,t0
         csrw    pmpaddr0,t1
-        addi    sp,sp,(-8*20)
-        csrw    mscratch,sp
-        sd      s0,(-1*8)(sp)
-        sd      gp,(-2*8)(sp)
-        mret
+
+        # Setup trap handler 
+        la      t0,AsmTrapTrampoline
+        ori     t0,t0,1
+        csrw    mtvec,t0
+        csrw    mstatus,x0
+
+        call    init
 # }}}
