@@ -2,7 +2,7 @@
 
 TMP=$(mktemp)
 
-$CC -Iinclude -S offsets.c -o $TMP
-grep "#define" $TMP | sed -e "s/^\s*//" > include/offsets.h
+$CC -Iinc -S offsets.c -o $TMP
+grep "#define" $TMP | sed -e "s/^\s*//" > inc/offsets.h
 
 rm $TMP

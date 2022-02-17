@@ -14,12 +14,12 @@ ELF=$(BUILD_DIR)/$(PROGRAM).elf
 DA=$(BUILD_DIR)/$(PROGRAM).da
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
-CFLAGS+=-Iinclude
+CFLAGS+=-Iinc
 CFLAGS+=-std=gnu18
 CFLAGS+=-Og -g
 
 ASFLAGS=-march=$(ARCH) -mabi=$(ABI)
-ASFLAGS+=-Iinclude
+ASFLAGS+=-Iinc
 ASFLAGS+=-g
 
 LDFLAGS=-nostdlib
@@ -38,7 +38,7 @@ settings:
 	@echo "LDFLAGS	= $(LDFLAGS)"
 
 clean:
-	rm -f $(OBJS) $(DEPS) $(ELF) include/offsets.h
+	rm -f $(OBJS) $(DEPS) $(ELF) inc/offsets.h
 
 size:
 	$(SIZE) $(ELF)
@@ -52,9 +52,9 @@ debug-qemu: $(ELF)
 $(BUILD_DIR):
 	mkdir -p $@
 
-$(OBJS) $(ELF): | $(BUILD_DIR) include/offsets.h
+$(OBJS) $(ELF): | $(BUILD_DIR) inc/offsets.h
 
-include/offsets.h: offsets.c include/types.h
+inc/offsets.h: offsets.c inc/types.h
 	CC=$(CC) scripts/gen-offsets.sh
 
 $(BUILD_DIR)/%.o: %.S
