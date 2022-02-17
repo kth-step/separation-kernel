@@ -33,10 +33,10 @@ SECTIONS {
 		*(.bss.*)
 	}
 	
-	PROVIDE(__stack_size = 2048);
+	PROVIDE(__stack_size = 512);
 	.stack : {
-		. = ALIGN(16) + __stack_size;
-		_sp = .;
+		. = ALIGN(64 / 8);
+		_sp = . + __stack_size;
 	} >RAM
 }
 
