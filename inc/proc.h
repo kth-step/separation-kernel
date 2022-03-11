@@ -1,5 +1,4 @@
 // See LICENSE file for copyright and license details.
-
 #pragma once
 
 #include "config.h"
@@ -31,15 +30,14 @@ typedef struct pmp_config {
 
 typedef struct process {
         uintptr_t pid;
-        TrapRegisters *trapRegisters;
         PmpConfig pmpConfig;
         Lock lock;
+        TrapRegisters *trapRegisters;
         Capability **capabilities;
         uintptr_t *kernelSP;
         uintptr_t *userPC;
 } Process;
 
 extern Process processes[N_PROC];
-extern uintptr_t stack[N_PROC][STACK_SIZE];
 
 // }}}

@@ -11,6 +11,8 @@ void foo(void) {
         OFFSET(PROC_USER_PC,        Process, userPC); 
         OFFSET(PROC_TRAP_REGISTERS, Process, trapRegisters);
         OFFSET(PROC_CAPABILITIES,   Process, capabilities);
+        OFFSET(PROC_LOCK,           Process, lock);
+
         OFFSET(PROC_PMPCFG0,  Process, pmpConfig.pmpcfg0);
         OFFSET(PROC_PMPADDR0, Process, pmpConfig.pmpaddr0);
         OFFSET(PROC_PMPADDR1, Process, pmpConfig.pmpaddr1);

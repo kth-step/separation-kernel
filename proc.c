@@ -1,5 +1,6 @@
-#include "config.h"
-#include "proc.h"
+// See LICENSE file for copyright and license details.
+#include "inc/config.h"
+#include "inc/proc.h"
 
 Process processes[N_PROC];
-uintptr_t stack[N_PROC][STACK_SIZE];
+Process current __asm__("tp");

@@ -1,11 +1,18 @@
-#!/bin/bash
+#!/bin/bash -e
 
-$QEMU_SYSTEM -machine virt -kernel $ELF \
+# Kill QEMU_SYSTEM 
+function cleanup {
+        kill $(jobs -p)
+}
+trap cleanup SIGINT SIGTERM EXIT
+
+$QEMU_SYSTEM -M virt -smp 2, -m 8G \
+             -kernel $ELF \
              -nographic                 \
              -bios none -s -S &
-QEMU_PID=$!
 
-if [[ -z $QEMU_PID ]]; then
+if $(test -z $!)
+then
         echo "Failed to launch QEMU."
         exit 10
 fi
@@ -15,5 +22,3 @@ $GDB $ELF -ex "target remote localhost:1234" \
           -ex "b _start"                     \
           -ex "c"                            \
           -ex "layout split"
-
-kill -s SIGTERM $QEMU_PID

@@ -5,24 +5,19 @@ BUILD_DIR=build
 
 include config.mk
 
-ASM_SRCS=$(wildcard *.S)
-C_SRCS=$(filter-out offsets.c,$(wildcard *.c))
+SRCS=$(wildcard *.S) $(filter-out offsets.c,$(wildcard *.c)) 
+HDRS=$(wildcard inc/*.h) inc/offsets.h
 
-OBJS=$(addprefix $(BUILD_DIR)/, $(ASM_SRCS:.S=.o) $(C_SRCS:.c=.o))
-DEPS=$(addprefix $(BUILD_DIR)/, $(ASM_SRCS:.S=.d) $(C_SRCS:.c=.d))
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
 DA=$(BUILD_DIR)/$(PROGRAM).da
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
-CFLAGS+=-Iinc
 CFLAGS+=-std=gnu18
 CFLAGS+=-Og -g
-
-ASFLAGS=-march=$(ARCH) -mabi=$(ABI)
-ASFLAGS+=-Iinc
-ASFLAGS+=-g
-
-LDFLAGS=-nostdlib
+CFLAGS+= -T$(LDS) -static -nostartfiles
+# Treat registers t5 and t6 as saved registers
+#CFLAGS+= -fcall-saved-t5 -fcall-saved-t6
+CFLAGS+= -ffixed-t5 -ffixed-t6
 
 # Commands
 
@@ -30,43 +25,38 @@ LDFLAGS=-nostdlib
 all: settings $(ELF) $(DA)
 
 settings:
-	@echo build options:
-	@echo "CC  	= $(CC)"
-	@echo "LD    	= $(LD)"
-	@echo "CFLAGS	= $(CFLAGS)"
-	@echo "ASFLAGS	= $(ASFLAGS)"
-	@echo "LDFLAGS	= $(LDFLAGS)"
+	@echo "Build options:"
+	@echo "  CC      = $(CC)"
+	@echo "  OBJDUMP = $(OBJDUMP)"
+	@echo "  CFLAGS  = $(CFLAGS)"
+	@echo ""
 
 clean:
-	rm -f $(OBJS) $(DEPS) $(ELF) inc/offsets.h
+	@echo "Cleaning"
+	@rm -f $(ELF) $(DA) inc/offsets.h
 
 size:
-	$(SIZE) $(ELF)
+	@echo "Size of binary:"
+	@$(SIZE) $(ELF)
 
 debug-qemu: $(ELF)
-	GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) \
-	scripts/debug-qemu.sh
+	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
 
 # Build instructions
 
 $(BUILD_DIR):
-	mkdir -p $@
+	@mkdir -p $@
 
-$(OBJS) $(ELF): | $(BUILD_DIR) inc/offsets.h
+$(ELF): Makefile config.mk | $(BUILD_DIR)
 
-inc/offsets.h: offsets.c inc/types.h
-	CC=$(CC) scripts/gen-offsets.sh
+inc/offsets.h: offsets.c $(filter-out inc/offsets.h, $(HDRS)) scripts/gen-offsets.sh
+	@echo "Generating offsets:\t$< ==> $@"
+	@CC=$(CC) scripts/gen-offsets.sh $< $@
 
-$(BUILD_DIR)/%.o: %.S
-	$(CC) $(ASFLAGS) -MD -c -o $@ $<
-
-$(BUILD_DIR)/%.o: %.c
-	$(CC) $(CFLAGS) -MD -c -o $@ $<
-
-$(BUILD_DIR)/%.elf: $(OBJS)
-	$(LD) $(LDFLAGS) -T $(LDS) -o $@ $(OBJS)
+$(BUILD_DIR)/%.elf: $(HDRS) $(SRCS) config.lds
+	@echo "Linking ELF file:\t$(SRCS) ==> $@"
+	@$(CC) $(CFLAGS) -o $@ $(SRCS)
 
 $(BUILD_DIR)/%.da: $(ELF)
-	$(OBJDUMP) -d $< > $@
-
--include $(DEPS)
+	@echo "Producing DA file:\t$^ ==> $@"
+	@$(OBJDUMP) -d $< > $@

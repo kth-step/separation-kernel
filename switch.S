@@ -1,48 +1,23 @@
 # See LICENSE file for copyright and license details.
 
-#include "offsets.h"
+#include "inc/config.h"
+#include "inc/offsets.h"
 
-.globl AsmSwitchProc
-.globl AsmStartProc
+.globl AsmAcquireProc
+.globl AsmReleaseProc
 
 .section .text.switch
 
-
-# AsmSwitchProc {{{
-AsmSwitchProc:
-        # Switches Process
-        # Push context to process stack, gets new process stack and load new 
-        # context from that process stack.
-        # - tp: old process
-        # - a0: new process
-
-        # Push context to stack.
-        addi    sp,sp,-(16*8)
-        sd      ra,(0*8)(sp)
-        csrr    t0,mscratch
-        sd      t0,(1*8)(sp)      # Save kernel stack
-        sd      s0,(2*8)(sp)
-        sd      s1,(3*8)(sp) 
-        sd      s2,(4*8)(sp) 
-        sd      s3,(5*8)(sp) 
-        sd      s4,(6*8)(sp) 
-        sd      s5,(7*8)(sp) 
-        sd      s6,(8*8)(sp) 
-        sd      s7,(9*8)(sp) 
-        sd      s8,(10*8)(sp) 
-        sd      s9,(11*8)(sp) 
-        sd      s10,(12*8)(sp) 
-        sd      s11,(13*8)(sp) 
-        sd      t5,(14*8)(sp) 
-        sd      t6,(15*8)(sp) 
-
-        # Save kernel stack to Process struct.
-        csrr    t0,mepc
-        sd      t0,(PROC_USER_PC)(tp)      # Save user pc
-        sd      sp,(PROC_KERNEL_STACK)(tp) # Save kernel stack
-
-AsmStartProc:
+# AsmAcquireProc {{{
+AsmAcquireProc:
+        # Acquire lock
+        addi    t3,a0,PROC_LOCK
+1:      lr.d.aq t0,(t3)
+        bnez    t0,2f
+        sc.d    t0,tp,(t3)
+        bnez    t0,1b
         mv      tp,a0
+
         # Get new kernel stack from Process struct
         ld      sp,(PROC_KERNEL_STACK)(tp) # Load kernel stack
         ld      t0,(PROC_USER_PC)(tp)      # Load user pc
@@ -86,6 +61,45 @@ AsmStartProc:
         csrw    mscratch,t0
         ld      ra,(0*8)(sp)
         addi    sp,sp,(16*8)
+2:      ret
+# }}}
 
-        ret
+# AsmReleaseProc {{{
+AsmReleaseProc:
+        addi    sp,sp,-(16*8)
+        sd      ra,(0*8)(sp)
+        csrr    t0,mscratch
+        sd      t0,(1*8)(sp)      # Save kernel stack
+        sd      s0,(2*8)(sp)
+        sd      s1,(3*8)(sp) 
+        sd      s2,(4*8)(sp) 
+        sd      s3,(5*8)(sp) 
+        sd      s4,(6*8)(sp) 
+        sd      s5,(7*8)(sp) 
+        sd      s6,(8*8)(sp) 
+        sd      s7,(9*8)(sp) 
+        sd      s8,(10*8)(sp) 
+        sd      s9,(11*8)(sp) 
+        sd      s10,(12*8)(sp) 
+        sd      s11,(13*8)(sp) 
+        sd      t5,(14*8)(sp) 
+        sd      t6,(15*8)(sp) 
+
+        # Save kernel stack to Process struct.
+        csrr    t0,mepc
+        sd      t0,(PROC_USER_PC)(tp)      # Save user pc
+        sd      sp,(PROC_KERNEL_STACK)(tp) # Save kernel stack
+
+        # Release Lock
+        fence   w,w
+        sd      zero,(PROC_LOCK)(tp)
+        mv      tp,zero
+        
+        csrr    t0,mhartid
+        addi    t0,t0,1
+        li      t1,STACK_SIZE
+        mul     t0,t0,t1
+        la      sp,core_stack
+        add     sp,sp,t0
+        tail    sched
 # }}}

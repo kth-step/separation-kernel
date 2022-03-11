@@ -1,29 +1,38 @@
+# See LICENSE file for copyright and license details.
 # Dummy user code 
 .globl user_code
-user_code:
+.extern main
+#include "inc/config.h"
 
+#define USER_DATA_SIZE 4096
+
+user_code:
+        // Load global pointer
         .option push
         .option norelax
         la      gp,__global_pointer$
         .option pop
-        # UART address
-        li s0, 0x10000000
 
-        # ptr to hello world
-1:      la s1, hw_begin
-        la s2, hw_end
-        # Write Hello, world
-2:      lb s3, 0(s1)
-        lb s4, 1(s1)
-        sb s3, 0(s0)
-        sb s4, 0(s0)
-        addi s1,s1,2
-        bne s1,s2,2b
-        # Restart
-        ecall
-        j 1b
+        // Do syscall, get_pid
+        li      a7,0
+        ecall                           // Fetch process ID to a0                    
 
-.section .data
-hw_begin:
-.string "Hello, world\n"
-hw_end:
+        // Prepare user data
+        la      a1,user_data            // a2=user_data
+        li      a2,USER_DATA_SIZE       // t0=USER_DATA_SIZE
+        mul     t0,a0,a2
+        add     a1,a1,t0
+        add     a2,a1,a2
+        mv      sp,a2
+        // Zero register
+        mv      t0,zero
+
+        // Call main with (pid, user data start, user data end)
+        mv      t3,a0
+        call    main
+        j       user_code
+
+.section .bss.user_data
+// This is data for all processes
+user_data: .fill (USER_DATA_SIZE * N_PROC)
+
