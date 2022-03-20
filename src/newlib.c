@@ -8,7 +8,6 @@
  */
 #include <string.h>
 #include <sys/stat.h>
-#include "lock.h"
 
 typedef struct uart {
         unsigned long long txdata;
@@ -38,13 +37,10 @@ int _open(const char* name, int flags, int mode)
 }
 int _write(int file, char* c, int len)
 {
-    static Lock l;
-    acquire_lock(&l);
     for (int i = 0; i < len; ++i) {
         while(UART0->txdata < 0);
         UART0->txdata = c[i];
     }
-    release_lock(&l);
     return len;
 }
 
@@ -57,16 +53,12 @@ char* _sbrk(int r)
 {
     extern char _heap; /* Defined by the linker */
     extern char _eheap; /* Defined by the linker */
-    static Lock l;
-    acquire_lock(&l);
 
     static char* heap_ptr = &_heap;
     if (heap_ptr + r <= &_eheap) {
         char* base = heap_ptr;
         heap_ptr += r;
-    release_lock(&l);
         return base;
     }
-    release_lock(&l);
     return (char*)-1;
 }
