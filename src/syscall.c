@@ -1,6 +1,6 @@
 // See LICENSE file for copyright and license details.
 
-#include "types.h"
+#include <stdint.h>
 #include "proc.h"
 
 void ecall_get_pid(uintptr_t a[8]) {

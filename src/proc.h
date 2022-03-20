@@ -1,7 +1,7 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-#include "types.h"
+#include <stdint.h>
 #include "config.h"
 #include "capabilities.h"
 #include "lock.h"

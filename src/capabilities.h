@@ -1,6 +1,6 @@
 // See LICENSE file for copyright and license details.
 #pragma once
-#include "types.h"
+#include <stdint.h>
 
 typedef enum cap_type {
         CAP_INVALID, CAP_PMP_ENTRY, CAP_MEMORY_SLICE, CAP_TIME_SLICE
