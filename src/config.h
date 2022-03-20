@@ -7,4 +7,6 @@
 #define N_SLACK_TICKS (N_TICKS/16)
 
 #define N_PROC 4
+
 #define STACK_SIZE 4096 
+#define LOG_STACK_SIZE 12
