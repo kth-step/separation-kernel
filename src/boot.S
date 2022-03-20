@@ -19,7 +19,7 @@ _start:
         add     sp,sp,t0
 
         // Initialize core csr
-        la      t0,asm_trap_entry
+        la      t0,AsmTrapEntry
         csrw    mtvec,t0
         li      t0,128
         csrw    mie,t0
@@ -27,7 +27,7 @@ _start:
         csrr    t0,mhartid
         bnez    t0,1f
 
-        call    init_proc
+        call    InitProc
 
         fence   rw,rw
         la      t0,lock
@@ -36,9 +36,9 @@ _start:
 1:      la      t0,lock
         ld      t1,(t0)
         bnez    t1,1b
-        la      ra,asm_switch_to_proc
+        la      ra,AsmSwitchToProc
         li      tp,0
-        tail    sched
+        tail    Sched
 
 .section .data.init
 lock: .dword 1

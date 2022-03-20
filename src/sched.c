@@ -18,7 +18,7 @@ static Process* get_proc(uintptr_t hartid, uint64_t time) {
         return &processes[pid];
 }
 
-void sched(void) {
+void Sched(void) {
         uintptr_t hartid = read_csr(mhartid);
         uint64_t time, timeout;
         Process *proc;

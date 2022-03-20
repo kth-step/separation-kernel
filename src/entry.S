@@ -1,11 +1,11 @@
 # See LICENSE file for copyright and license details.
 
-.globl asm_trap_entry
-.globl asm_restore_user
+.globl AsmTrapEntry
+.globl AsmTrapExit
 
 .section .text.entry
 .balign 16
-asm_trap_entry:
+AsmTrapEntry:
         /* Load kernel sp, store user sp. */
         csrrw   sp,mscratch,sp
         beqz    sp,__hang
@@ -71,9 +71,9 @@ __exception:
         jalr    ra,0(ra)
         csrr    t1,mip
         andi    t1,t1,128
-        bnez    t1,asm_switch_from_proc
+        bnez    t1,AsmSwitchToSched
 
-asm_restore_user:
+AsmTrapExit:
         ld      t0,(10*8)(sp)
         csrw    mscratch,t0
         ld      t3,(11*8)(tp)
@@ -105,7 +105,6 @@ asm_restore_user:
         /* Load process sp, store kernel sp. */
         csrrw   sp,mscratch,sp
         /* Go to user mode. */
-asm_mret:
         mret
 
 __exception_trampoline:
@@ -137,14 +136,14 @@ __interrupt_trampoline:
         j       __hang  /*  4: User timer interrupt */
         j       __hang  /*  5: Supervisor timer interrupt */
         j       __hang  /*  6: Reserved */
-        j       asm_switch_from_proc /*  7: Machine timer interrupt */
+        j       AsmSwitchToSched /*  7: Machine timer interrupt */
         j       __hang  /*  8: User external interrupt */
         j       __hang  /*  9: Supervisor external interrupt */
         j       __hang  /* 10: Reserved */
         j       __hang  /* 11: Machine external interrupt */
 __syscall_trampoline:
         /* System calls */
-        j       ecall_get_pid
+        j       EcallPid
         j       __hang
         j       __hang
         j       __hang

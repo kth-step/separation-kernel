@@ -3,6 +3,6 @@
 #include <stdint.h>
 #include "proc.h"
 
-void ecall_get_pid(uintptr_t a[8]) {
+void EcallPid(uintptr_t a[8]) {
         current->args[0] = current->pid;
 }

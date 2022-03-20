@@ -1,9 +1,9 @@
-.globl asm_switch_from_proc
-.globl asm_switch_to_proc
+.globl AsmSwitchToSched
+.globl AsmSwitchToProc
 
 .section .text.switch
 
-asm_switch_from_proc:
+AsmSwitchToSched:
         addi    sp,sp,-14*8
         sd      ra,(0*8)(sp)
         csrr    t0,mscratch
@@ -24,10 +24,10 @@ asm_switch_from_proc:
         /* Swap process sp with core sp */
         amoswap.d sp,sp,(tp)
 
-        /* void sched(void) */
-        call    sched
+        /* void Sched(void) */
+        call    Sched
 
-asm_switch_to_proc:
+AsmSwitchToProc:
 
         /* Swap process sp with core sp */
         amoswap.d sp,sp,(tp)

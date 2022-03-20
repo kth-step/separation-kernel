@@ -7,4 +7,4 @@
 #include "proc.h"
 #include "timer.h"
 
-void sched(void);
+void Sched(void);
