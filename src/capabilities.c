@@ -1,5 +1,5 @@
 // See LICENSE file for copyright and license details.
-#include "inc/capabilities.h"
+#include "capabilities.h"
 
 static inline int cap_is_type(Capability *c, CapType t) {
         return c->type == t;

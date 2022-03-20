@@ -1,5 +1,5 @@
 # See LICENSE file for copyright and license details.
-#include "inc/config.h"
+#include "config.h"
 
 # Boot code {{{
 .section .init

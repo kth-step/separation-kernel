@@ -1,7 +1,7 @@
 # See LICENSE file for copyright and license details.
 
-#include "inc/config.h"
-#include "inc/offsets.h"
+#include "config.h"
+#include "offsets.h"
 
 .globl AsmAcquireProc
 .globl AsmReleaseProc

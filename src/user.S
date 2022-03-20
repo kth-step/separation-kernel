@@ -2,7 +2,7 @@
 # Dummy user code 
 .globl user_code
 .extern main
-#include "inc/config.h"
+#include "config.h"
 
 #define USER_DATA_SIZE 4096
 

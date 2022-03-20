@@ -1,9 +1,9 @@
 // See LICENSE file for copyright and license details.
-#include "inc/config.h"
-#include "inc/proc.h"
-#include "inc/lock.h"
-#include "inc/sched.h"
-#include "inc/stack.h"
+#include "config.h"
+#include "proc.h"
+#include "lock.h"
+#include "sched.h"
+#include "stack.h"
 
 #define INIT_STACK_OFFSET 33
 extern void AsmStartProc(Process*);

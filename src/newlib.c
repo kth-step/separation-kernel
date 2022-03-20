@@ -8,7 +8,7 @@
  */
 #include <string.h>
 #include <sys/stat.h>
-#include "inc/lock.h"
+#include "lock.h"
 
 typedef struct uart {
         unsigned long long txdata;
@@ -53,7 +53,7 @@ int _read(int file, char* c, int len)
     return -1;
 }
 
-char* _sbrk(int incr)
+char* _sbrk(int r)
 {
     extern char _heap; /* Defined by the linker */
     extern char _eheap; /* Defined by the linker */
@@ -61,9 +61,9 @@ char* _sbrk(int incr)
     acquire_lock(&l);
 
     static char* heap_ptr = &_heap;
-    if (heap_ptr + incr <= &_eheap) {
+    if (heap_ptr + r <= &_eheap) {
         char* base = heap_ptr;
-        heap_ptr += incr;
+        heap_ptr += r;
     release_lock(&l);
         return base;
     }

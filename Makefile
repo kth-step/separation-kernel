@@ -5,8 +5,8 @@ BUILD_DIR=build
 
 include config.mk
 
-SRCS=$(wildcard *.S) $(filter-out offsets.c,$(wildcard *.c)) 
-HDRS=$(wildcard inc/*.h) inc/offsets.h
+SRCS=$(wildcard src/*.S) $(filter-out src/offsets.c,$(wildcard src/*.c)) 
+HDRS=$(wildcard src/*.h) src/offsets.h
 
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
 DA=$(BUILD_DIR)/$(PROGRAM).da
@@ -49,7 +49,7 @@ $(BUILD_DIR):
 
 $(ELF): Makefile config.mk | $(BUILD_DIR)
 
-inc/offsets.h: offsets.c $(filter-out inc/offsets.h, $(HDRS)) scripts/gen-offsets.sh
+src/offsets.h: src/offsets.c $(filter-out src/offsets.h, $(HDRS)) scripts/gen-offsets.sh
 	@echo "Generating offsets:\t$< ==> $@"
 	@CC=$(CC) scripts/gen-offsets.sh $< $@
 

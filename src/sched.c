@@ -1,11 +1,11 @@
 // See LICENSE file for copyright and license details.
 
-#include "inc/types.h"
-#include "inc/sched.h"
-#include "inc/timer.h"
-#include "inc/csr.h"
-#include "inc/proc.h"
-#include "inc/lock.h"
+#include "types.h"
+#include "sched.h"
+#include "timer.h"
+#include "csr.h"
+#include "proc.h"
+#include "lock.h"
 
 volatile Scheduler scheduler;
 
