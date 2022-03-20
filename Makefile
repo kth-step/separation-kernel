@@ -5,19 +5,16 @@ BUILD_DIR=build
 
 include config.mk
 
-SRCS=$(wildcard src/*.S) $(filter-out src/offsets.c,$(wildcard src/*.c)) 
-HDRS=$(wildcard src/*.h) src/offsets.h
+SRCS=$(wildcard src/*.S) $(wildcard src/*.c)
+HDRS=$(wildcard src/*.h)
 
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
 DA=$(BUILD_DIR)/$(PROGRAM).da
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
-CFLAGS+=-Og -g
-CFLAGS+= -T$(LDS) -static -nostartfiles
-# Treat registers t5 and t6 as saved registers
-#CFLAGS+= -fcall-saved-t5 -fcall-saved-t6
-CFLAGS+= -ffixed-t5 -ffixed-t6
+CFLAGS+=-O2 -g
+CFLAGS+= -T$(LDS) -nostartfiles
 
 # Commands
 
@@ -48,10 +45,6 @@ $(BUILD_DIR):
 	@mkdir -p $@
 
 $(ELF): Makefile config.mk | $(BUILD_DIR)
-
-src/offsets.h: src/offsets.c $(filter-out src/offsets.h, $(HDRS)) scripts/gen-offsets.sh
-	@echo "Generating offsets:\t$< ==> $@"
-	@CC=$(CC) scripts/gen-offsets.sh $< $@
 
 $(BUILD_DIR)/%.elf: $(HDRS) $(SRCS) config.lds
 	@echo "Linking ELF file:\t$(SRCS) ==> $@"
