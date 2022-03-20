@@ -3,6 +3,9 @@ OUTPUT_ARCH("riscv")
 
 ENTRY(_start)
 
+mtimecmp = 0x2004000;
+mtime = 0x200bff8;
+
 MEMORY { 
 	RAM(rwx) : ORIGIN = 0x80000000, LENGTH = 2000M
 }

@@ -1,19 +1,19 @@
 // See LICENSE file for copyright and license details.
 #pragma once
+#include <stdint.h>
 
 #include "config.h"
-#include "types.h"
 #include "csr.h"
 
-uint64_t *const mtime = (uint64_t*)0x200bff8;
-uint64_t *const mtimecmp = (uint64_t*)0x2004000;
+uint64_t mtime;
+uint64_t mtimecmp[N_CORES];
 
 inline uint64_t read_time(void) {
-        return *mtime;
+        return mtime;
 }
 
 inline void write_time(uint64_t time) {
-        *mtime = time;
+        mtime = time;
 }
 
 inline uint64_t read_timeout(uintptr_t hartid) {
