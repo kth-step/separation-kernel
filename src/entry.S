@@ -1,119 +1,166 @@
 # See LICENSE file for copyright and license details.
 
-.globl AsmTrapHandler
-.globl AsmRestoreUser
-
-.extern ecall_get_pid
+.globl asm_trap_entry
+.globl asm_restore_user
 
 .section .text.entry
-
-# System Call Trampoline {{{
-__syscall_trampoline:
-        .option push
-        .option norvc
-        j       ecall_get_pid           #  0:
-        j       __dummy                 #  1:
-        j       __dummy                 #  2:
-        j       __dummy                 #  3:
-        j       __dummy                 #  4:
-        j       __dummy                 #  5:
-        j       __dummy                 #  6:
-        j       __dummy                 #  7:
-        j       __dummy                 #  8:
-        j       __dummy                 #  9:
-        j       __dummy                 # 10:
-        j       __dummy                 # 11:
-        j       __dummy                 # 12:
-        j       __dummy                 # 13:
-        j       __dummy                 # 14:
-        j       __dummy                 # 15:
-        .option pop
-# }}}
-
-
-# Exception Handler {{{
 .balign 16
-AsmTrapHandler:
-        csrrw   sp,mscratch,sp          # Save user sp and load kernel sp.
-        sd      a0,(0*8)(sp)
-        sd      a1,(1*8)(sp)
-        sd      a2,(2*8)(sp)
-        sd      a3,(3*8)(sp)
-        sd      a4,(4*8)(sp)
-        sd      a5,(5*8)(sp)
-        sd      a6,(6*8)(sp)
-        sd      a7,(7*8)(sp)
-        sd      t0,(8*8)(sp)
-        sd      t1,(9*8)(sp)
-        sd      t2,(10*8)(sp)
-        sd      t3,(11*8)(sp)
-        sd      t4,(12*8)(sp)
-        sd      ra,(13*8)(sp)            # Save part of user context.
-        sd      tp,(14*8)(sp)
-        sd      gp,(15*8)(sp)
-        ld      tp,(-1*8)(sp)           # Load pointer to proc struct.
-        ld      gp,(-2*8)(sp)           # Load global pointer.
-        csrr    t0,mip
-        andi    t0,t0,(1<<7)
-        beqz    t0,1f
-        call    AsmReleaseProc    
-1:      csrr    t0,mcause               # Fetch cause of exception.
-        li      t1,8
-        beq     t0,t1,__syscall         # If cause is syscall, goto __syscall, else __exception.
-        li      t1,2                    # 2 is illegal instruction.
-        csrr    t2,mtval                # Load trap value
-        bne     t0,t1,__exception       
-__illegal_instruction:
-        li      t1,0                    # Load op code of uret
-        bne     t1,t2,__exception       # If not uret, do user exception.
-__handle_uret:
-        # TODO: Handler uret
-        j       __restore_user
-__exception:
-        # TODO: Handle user exceptions
-        j       __restore_user          # Goto label 1 forward.
+asm_trap_entry:
+        /* Load kernel sp, store user sp. */
+        csrrw   sp,mscratch,sp
+        beqz    sp,__hang
+        /* Store user gp, tp registers. */
+        sd      gp,(0*8)(sp)
+        sd      tp,(1*8)(sp)    /* Load tp early for optimization */
+        /* Load kernel gp and tp. */
+        ld      gp,(-1*8)(sp)
+        ld      tp,(-2*8)(sp)
+        /* Store user t0-t6, ra registers. */
+        sd      t0,(2*8)(sp)
+        sd      t1,(3*8)(sp)
+        sd      t2,(4*8)(sp)
+        sd      t3,(5*8)(sp)
+        sd      t4,(6*8)(sp)
+        sd      t5,(7*8)(sp)
+        sd      t6,(8*8)(sp)
+        sd      ra,(9*8)(sp)
+        csrrw   t3,mscratch,zero
+        sd      t3,(10*8)(sp)
+
+        /* Save user a0-a7. */
+        sd      a0,(3*8)(tp)
+        sd      a1,(4*8)(tp)
+        sd      a2,(5*8)(tp)
+        sd      a3,(6*8)(tp)
+        sd      a4,(7*8)(tp)
+        sd      a5,(8*8)(tp)
+        sd      a6,(9*8)(tp)
+        sd      a7,(10*8)(tp)
+        csrr    t3,mepc
+        sd      t3,(11*8)(tp)
+
+        /* Check trap type. */
+        csrr    t1,mcause
+        bge     t1,zero,1f
+
+__interrupt:
+        la      ra,__interrupt_trampoline
+        j       2f
+
+1:      li      t2,8
+        bne     t1,t2,__exception
+
 __syscall:
-        la      ra,__syscall_trampoline # Load base address to syscall trampoline.
-        mv      a0,sp
+        li      t2,16
+        bge     t0,t2,__exception
+        la      ra,__syscall_trampoline
+        addi    t3,t3,4
+        sd      t3,(11*8)(tp)
+        slli    t1,t0,2
+        j       3f
 
-        csrr    t0,mepc                 # Increment pc by 4.
-        addi    t0,t0,4
-        csrw    mepc,t0
-        andi    t0,a7,0xF               # Mask syscall number so we get t0=[0-15].
-        slli    t0,t0,2                 # Shift 2 left, t0 becomes offset to trampoline.
-        add     ra,ra,t0                # Add offset to trampoline base address.
-        jalr    ra,0(ra)                # Jump to the trampoline entry
+__exception:
+        la      ra,__exception_trampoline
+        mv      a0,t1
+        csrr    a1,mtval
+        csrr    a2,mepc
 
-AsmRestoreUser:      
-__restore_user:
-        csrr    t0,mip
-        andi    t0,t0,(1<<7)
-        beqz    t0,1f
-        call    AsmReleaseProc
-1:      sd      gp,(-2*8)(sp)           # Save global pointer.
-        sd      tp,(-1*8)(sp)           # Save pointer to proc struct.
-        ld      gp,(15*8)(sp)           # Load part of user context.
-        ld      tp,(14*8)(sp)
-        ld      ra,(13*8)(sp)
-        ld      t4,(12*8)(sp)
-        ld      t3,(11*8)(sp)
-        ld      t2,(10*8)(sp)
-        ld      t1,(9*8)(sp)
-        ld      t0,(8*8)(sp)
-        ld      a7,(7*8)(sp)
-        ld      a6,(6*8)(sp)
-        ld      a5,(5*8)(sp)
-        ld      a4,(4*8)(sp)
-        ld      a3,(3*8)(sp)
-        ld      a2,(2*8)(sp)
-        ld      a1,(1*8)(sp)
-        ld      a0,(0*8)(sp)
+        /* Jump to trampoline */
+2:      slli    t1,t1,2
+3:      add     ra,ra,t1
+        jalr    ra,0(ra)
+        csrr    t1,mip
+        andi    t1,t1,128
+        bnez    t1,asm_switch_from_proc
 
-        csrrw   sp,mscratch,sp          # Save kernel sp and load user sp from scratch.
-        mret                            # Return to user proc.
-# }}}
+asm_restore_user:
+        ld      t0,(10*8)(sp)
+        csrw    mscratch,t0
+        ld      t3,(11*8)(tp)
+        csrw    mepc,t3
+        /* Load user a0-a7. */
+        ld      a7,(10*8)(tp)
+        ld      a6,(9*8)(tp)
+        ld      a5,(8*8)(tp)
+        ld      a4,(7*8)(tp)
+        ld      a3,(6*8)(tp)
+        ld      a2,(5*8)(tp)
+        ld      a1,(4*8)(tp)
+        ld      a0,(3*8)(tp)
+        /* Load process ra,t0-t6 register. */
+        ld      ra,(9*8)(sp)
+        ld      t6,(8*8)(sp)
+        ld      t5,(7*8)(sp)
+        ld      t4,(6*8)(sp)
+        ld      t3,(5*8)(sp)
+        ld      t2,(4*8)(sp)
+        ld      t1,(3*8)(sp)
+        ld      t0,(2*8)(sp)
+        /* Store kernel gp and tp. */
+        sd      tp,(-2*8)(sp)
+        sd      gp,(-1*8)(sp)
+        /* Load user gp and tp. */
+        ld      tp,(1*8)(sp)
+        ld      gp,(0*8)(sp)
+        /* Load process sp, store kernel sp. */
+        csrrw   sp,mscratch,sp
+        /* Go to user mode. */
+asm_mret:
+        mret
 
-# Dummy {{{
-__dummy:
-        ret
-# }}}
+__exception_trampoline:
+        .option push
+        .option norvc   /* Prevent compressed instructions */
+        /* Exceptions */
+        j       __hang  /* 0: Instruction address misaligned */
+        j       __hang  /* 1: Instruction access fault */
+        j       __hang  /* 2: Illegal instruction */
+        j       __hang  /* 3: Breakpoint */
+        j       __hang  /* 4: Load address misaligned */
+        j       __hang  /* 5: Load access fault */
+        j       __hang  /* 6: Store/AMO address misaligned */
+        j       __hang  /* 7: Store/AMO access fault */
+        j       __hang  /* 8: Environment call from U-mode */
+        j       __hang  /* 9: Environment call from S-mode */
+        j       __hang  /* 10: Reserved */
+        j       __hang  /* 11: Environment call from M-mode */
+        j       __hang  /* 12: Instruction page fault */
+        j       __hang  /* 13: Load page fault */
+        j       __hang  /* 14: Reserved */
+        j       __hang  /* 15: Store/AMO page fault */
+__interrupt_trampoline:
+        /* Interrupts */
+        j       __hang  /*  0: User software interrupt */
+        j       __hang  /*  1: Supervisor software interrupt */
+        j       __hang  /*  2: Reserved */
+        j       __hang  /*  3: Machine software interrupt */
+        j       __hang  /*  4: User timer interrupt */
+        j       __hang  /*  5: Supervisor timer interrupt */
+        j       __hang  /*  6: Reserved */
+        j       asm_switch_from_proc /*  7: Machine timer interrupt */
+        j       __hang  /*  8: User external interrupt */
+        j       __hang  /*  9: Supervisor external interrupt */
+        j       __hang  /* 10: Reserved */
+        j       __hang  /* 11: Machine external interrupt */
+__syscall_trampoline:
+        /* System calls */
+        j       ecall_get_pid
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        j       __hang
+        .option pop
+
+__hang: 
+        j       __hang

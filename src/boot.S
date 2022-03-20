@@ -1,41 +1,44 @@
-# See LICENSE file for copyright and license details.
 #include "config.h"
 
-# Boot code {{{
-.section .init
-.extern stack
 .globl _start
-_start:
 
-        # Initialize global pointer and stack pointer.
+.section .init
+
+_start:
+        // Initialize the global pointer
         .option push
         .option norelax
         la      gp,__global_pointer$
         .option pop
+
+        // Initialize the core stack pointer
+        la      sp,core_stack
         csrr    t0,mhartid
         addi    t0,t0,1
-        li      t1,STACK_SIZE
-        mul     t0,t0,t1
-        la      sp,core_stack
+        slli    t0,t0,LOG_STACK_SIZE
         add     sp,sp,t0
-        
-        # Remove memory protection
-        li      t0,0xF
-        li      t1,-1
-        csrw    pmpcfg0,t0
-        csrw    pmpaddr0,t1
 
-        # Setup trap handler 
-        la      t0,AsmTrapHandler
+        // Initialize core csr
+        la      t0,asm_trap_entry
         csrw    mtvec,t0
-        csrw    mstatus,x0
-        li      t0,(1 << 7)
+        li      t0,128
         csrw    mie,t0
 
         csrr    t0,mhartid
         bnez    t0,1f
-        call    init
-1:      ld      t1,init_lock
-        bge     t0,t1,1b
+
+        call    init_proc
+
+        fence   rw,rw
+        la      t0,lock
+        sd      zero,(t0)
+       
+1:      la      t0,lock
+        ld      t1,(t0)
+        bnez    t1,1b
+        la      ra,asm_switch_to_proc
+        li      tp,0
         tail    sched
-# }}}
+
+.section .data.init
+lock: .dword 1
