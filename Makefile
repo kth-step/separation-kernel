@@ -5,8 +5,9 @@ BUILD_DIR=build
 
 include config.mk
 
-SRCS=$(wildcard src/*.S) $(wildcard src/*.c)
-HDRS=$(wildcard src/*.h)
+S_SRCS=$(wildcard src/*.S) 
+C_SRCS=$(wildcard src/*.c)
+C_HDRS=$(wildcard src/*.h)
 
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
 DA=$(BUILD_DIR)/$(PROGRAM).da
@@ -18,7 +19,7 @@ CFLAGS+= -T$(LDS) -nostartfiles
 
 # Commands
 
-.PHONY: all settings clean size
+.PHONY: all settings format clean size
 all: settings $(ELF) $(DA)
 
 settings:
@@ -27,6 +28,10 @@ settings:
 	@echo "  OBJDUMP = $(OBJDUMP)"
 	@echo "  CFLAGS  = $(CFLAGS)"
 	@echo ""
+
+format:
+	@echo "Formatting code"
+	@clang-format -i $(H_HDRS) $(C_SRCS) 
 
 clean:
 	@echo "Cleaning"
@@ -46,9 +51,9 @@ $(BUILD_DIR):
 
 $(ELF): Makefile config.mk | $(BUILD_DIR)
 
-$(BUILD_DIR)/%.elf: $(HDRS) $(SRCS) config.lds
-	@echo "Linking ELF file:\t$(SRCS) ==> $@"
-	@$(CC) $(CFLAGS) -o $@ $(SRCS)
+$(BUILD_DIR)/%.elf: $(C_HDRS) $(C_SRCS) $(S_SRCS) config.lds
+	@echo "Linking ELF file:\t$(S_SRCS)$(C_SRCS) ==> $@"
+	@$(CC) $(CFLAGS) -o $@ $(S_SRCS) $(C_SRCS)
 
 $(BUILD_DIR)/%.da: $(ELF)
 	@echo "Producing DA file:\t$^ ==> $@"

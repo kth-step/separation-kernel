@@ -1,6 +1,7 @@
 // See LICENSE file for copyright and license details.
-#include "config.h"
 #include "proc.h"
+
+#include "config.h"
 #include "stack.h"
 
 /** Initial stack offset.
@@ -32,11 +33,11 @@ static void init_proc(int pid) {
         /* Set the process id to */
         proc->pid = pid;
         /* Set the process's kernel stack. */
-        proc->ksp = &proc_stack[pid][STACK_SIZE/8-INIT_STACK_OFFSET];
+        proc->ksp = &proc_stack[pid][STACK_SIZE / 8 - INIT_STACK_OFFSET];
         /* Set the return address located as first element on the stack. */
         *proc->ksp = (uintptr_t)AsmTrapExit;
         /* Set the user program counter, this will be the entry point. */
-        proc->pc = (uintptr_t*)user_code;
+        proc->pc = (uintptr_t *)user_code;
 }
 
 /* Defined in proc.h */

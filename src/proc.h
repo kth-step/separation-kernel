@@ -2,8 +2,9 @@
 #pragma once
 
 #include <stdint.h>
-#include "config.h"
+
 #include "capabilities.h"
+#include "config.h"
 #include "lock.h"
 
 /** Process
@@ -11,22 +12,22 @@
  * register and process's state in this struct.
  */
 typedef struct process {
-        /** Kernel stack pointer. 
+        /** Kernel stack pointer.
          *
-         * When a process is running, we store the core's stack pointer 
+         * When a process is running, we store the core's stack pointer
          * (pointer to core_stack) to ksp.
          *
-         * When the process is not running, i.e., when the scheduler or some 
-         * other process is running, then we store the process's stack pointer 
+         * When the process is not running, i.e., when the scheduler or some
+         * other process is running, then we store the process's stack pointer
          * (pointer to proc_stack) to ksp.
          */
         uintptr_t *ksp;
         /** Process identifier.
-         * This is the process's ID used for identification during 
+         * This is the process's ID used for identification during
          * inter-process communication.
          */
         uintptr_t pid;
-        /** Capability table. 
+        /** Capability table.
          * Pointer to the capability table.
          */
         Capability **cap_table;
@@ -60,7 +61,7 @@ extern Process processes[N_PROC];
 register Process *current __asm__("tp");
 
 /** Initialize process.
- * This initializes all processes, setting their PID, stack pointer, and 
+ * This initializes all processes, setting their PID, stack pointer, and
  * entry points.
  */
 void InitProcesses(void);
