@@ -32,7 +32,7 @@ void Sched(void) {
                 proc = get_proc(hartid, time / N_TICKS);
                 if (proc == 0)
                         continue;
-                if (!try_acquire_lock(&proc->lock))
+                if (try_acquire_lock(&proc->lock))
                         current = proc;
         }
         write_timeout(hartid, timeout);
