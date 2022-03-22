@@ -5,8 +5,8 @@
 #include "config.h"
 #include "csr.h"
 
-uint64_t mtime;
-uint64_t mtimecmp[N_CORES];
+extern volatile uint64_t mtime;
+extern volatile uint64_t mtimecmp[N_CORES];
 
 inline uint64_t read_time(void) {
         return mtime;
