@@ -27,7 +27,7 @@ _start:
         csrr    t0,mhartid
         bnez    t0,1f
 
-        call    InitProc
+        call    InitProcesses
 
         fence   rw,rw
         la      t0,lock
