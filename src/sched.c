@@ -27,9 +27,9 @@ void Sched(void) {
                 current = 0;
         }
         while (!current) {
-                time = (read_time() + N_TICKS) & ~(N_TICKS-1);
-                timeout = time + N_TICKS - N_SLACK_TICKS;
-                proc = get_proc(hartid, time / N_TICKS);
+                time = (read_time() + TICKS) & ~(TICKS-1);
+                timeout = time + TICKS - SLACK_TICKS;
+                proc = get_proc(hartid, time / TICKS);
                 if (proc == 0)
                         continue;
                 if (try_acquire_lock(&proc->lock))
