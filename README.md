@@ -2,6 +2,13 @@
 
 Simply Secure Separation Kernel (S3K) is a real-time separation kernel for embedded RISC-V applications. S3K aims to spatially and temporally isolate all partitions running on the RISC-V processor. S3K relies on RISC-V's PMP mechanism to isolate the partitions, no virtual memory is required.
 
+## Coding style
+
+- Visible large functions, CamelCase.
+- Non visible (static) and inline functions, snake_case.
+- Variables, snake_case.
+- Indentation and so on, use clang-format with `make format` and check the `.clang-format` file
+
 ## User guide
 
 Install the GNU RISC-V toolchain (around 16 GB of space required):
