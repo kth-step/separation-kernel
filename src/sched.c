@@ -51,7 +51,7 @@ static int get_proc(uintptr_t hartid, uint64_t time, Process **proc, int *length
                  * lenght */
                 uint64_t si = schedule[i];
                 if (get_sentry(s, hartid) == get_sentry(si, hartid))
-                        *length++;
+                        *length = *length + 1;
         }
         *proc = processes + get_spid(s, hartid);
         /* Return success */
