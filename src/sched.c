@@ -30,8 +30,7 @@ static uint64_t get_sentry(uint64_t s, uintptr_t hartid) {
         return (s >> (hartid * 16)) & 0xFFFF;
 }
 
-static int get_proc(uintptr_t hartid, uint64_t time, Process **proc,
-                    int *length) {
+static int get_proc(uintptr_t hartid, uint64_t time, Process **proc, int *length) {
         /* Calculate the current quantum */
         int q = (time / TICKS) % N_QUANTUM;
         /* Get the current quantum schedule */
@@ -87,8 +86,7 @@ void Sched(void) {
                 /* Get the start of next time slice. */
                 time = (read_time() + TICKS) & ~(TICKS - 1);
                 /* Try getting a process at that time slice. */
-                if (get_proc(hartid, time, &proc, &length) &&
-                    try_acquire_lock(&proc->lock)) {
+                if (get_proc(hartid, time, &proc, &length) && try_acquire_lock(&proc->lock)) {
                         current = proc;
                 }
         }

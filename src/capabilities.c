@@ -52,15 +52,12 @@ static inline int is_child(Capability *parent, Capability *child) {
         if (is_type(parent, CAP_TIME_SLICE) && is_type(child, CAP_TIME_SLICE)) {
                 /* Time slice child of time slice? */
                 return is_child_ts_ts(&parent->time_slice, &child->time_slice);
-        } else if (is_type(parent, CAP_MEMORY_SLICE) &&
-                   is_type(child, CAP_PMP_ENTRY)) {
+        } else if (is_type(parent, CAP_MEMORY_SLICE) && is_type(child, CAP_PMP_ENTRY)) {
                 /* PMP Entry child of memory slice? */
                 return is_child_ms_pe(&parent->memory_slice, &child->pmp_entry);
-        } else if (is_type(parent, CAP_MEMORY_SLICE) &&
-                   is_type(child, CAP_MEMORY_SLICE)) {
+        } else if (is_type(parent, CAP_MEMORY_SLICE) && is_type(child, CAP_MEMORY_SLICE)) {
                 /* Memory slice child of memory slice? */
-                return is_child_ms_ms(&parent->memory_slice,
-                                      &child->memory_slice);
+                return is_child_ms_ms(&parent->memory_slice, &child->memory_slice);
         }
         /* If no case match, return false */
         return 0;
