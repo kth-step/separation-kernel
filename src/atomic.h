@@ -22,7 +22,7 @@
                     "  li     %0,0\n"                       \
                     "1:lr" #width #aq                       \
                     "   t0,(%3)\n"                          \
-                    "  bneq   t0,%1,2f\n"                   \
+                    "  bne    t0,%1,2f\n"                   \
                     "  sc" #width #rl                       \
                     " t0,%2,(%3)\n"                         \
                     "  bnez   t0,1b\n"                      \
