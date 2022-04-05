@@ -5,9 +5,23 @@
 
 AsmSwitchToSched:
         addi    sp,sp,-14*8
+        /* Store return address. */
+        /* Note: This return address belongs to
+         * kernel process, user ra is stored in trap entry 
+         */
         sd      ra,(0*8)(sp)
+        /* Store user sp. */
+        /* Note: When in debug mode, the kernel stores the
+         * user sp in the trap entry, replacing mscratch with
+         * zero to detect exceptions in the kernel.
+         */
         csrr    t0,mscratch
         sd      t0,(1*8)(sp)
+        /* Store saved registers. */
+        /* Note: The saved registers has user OR kernel data,
+         * if the saved registers has kernel data, then the
+         * user data has been stored in the stack by a C function
+         * as per calling conventions. */
         sd      s0,(2*8)(sp)
         sd      s1,(3*8)(sp)
         sd      s2,(4*8)(sp)
@@ -32,11 +46,14 @@ AsmSwitchToProc:
         /* Swap process sp with core sp */
         amoswap.d sp,sp,(tp)
 
-        /* Add memory protection here */
+        /* TODO: Add memory protection here */
 
+        /* Load return address. */
         ld      ra,(0*8)(sp)
+        /* Load user sp. */
         ld      t0,(1*8)(sp)
         csrw    mscratch,t0
+        /* Load saved registers. */
         ld      s0,(2*8)(sp)
         ld      s1,(3*8)(sp)
         ld      s2,(4*8)(sp)

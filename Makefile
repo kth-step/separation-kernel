@@ -16,6 +16,7 @@ CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
 CFLAGS+=-O2 -g
 CFLAGS+= -T$(LDS) -nostartfiles
+CFLAGS+= -DDEBUG
 
 # Commands
 
