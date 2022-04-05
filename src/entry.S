@@ -37,7 +37,6 @@ AsmTrapEntry:
         sd      a6,(9*8)(tp)
         sd      a7,(10*8)(tp)
         csrr    t3,mepc
-        sd      t3,(11*8)(tp)
 
         /* Check trap type. */
         csrr    t1,mcause
@@ -55,7 +54,6 @@ __syscall:
         bge     t0,t2,__exception
         la      ra,__syscall_trampoline
         addi    t3,t3,4
-        sd      t3,(11*8)(tp)
         slli    t1,t0,2
         j       3f
 
@@ -63,11 +61,14 @@ __exception:
         la      ra,__exception_trampoline
         mv      a0,t1
         csrr    a1,mtval
-        csrr    a2,mepc
+        mv      a2,t3
 
-        /* Jump to trampoline */
+        /* Calculate trampoline address */
 2:      slli    t1,t1,2
 3:      add     ra,ra,t1
+        /* Store user pc */
+        sd      t3,(11*8)(tp)
+        /* Jump to trampoline */
         jalr    ra,0(ra)
         csrr    t1,mip
         andi    t1,t1,128
