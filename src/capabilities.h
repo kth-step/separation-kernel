@@ -137,23 +137,27 @@ static inline CapSupervisor cap_get_supervisor(Cap *cap) {
 }
 
 /* Check if a PmpEntry is child of a Memory Slice */
-static inline bool cap_is_child_ts_ts(const CapTimeSlice parent, const CapTimeSlice child) {
+static inline bool cap_is_child_ts_ts(const CapTimeSlice parent,
+                                      const CapTimeSlice child) {
         return (parent.hartid == child.hartid) && (parent.tsid < child.tsid) &&
                (child.tsid <= parent.fuel);
 }
 
 /* Assumes same hartid */
 /* Returns true if the time slices intersect */
-static inline bool cap_is_intersect_ts_ts(const CapTimeSlice ts0, const CapTimeSlice ts1) {
+static inline bool cap_is_intersect_ts_ts(const CapTimeSlice ts0,
+                                          const CapTimeSlice ts1) {
         return !(ts0.fuel < ts1.tsid || ts1.fuel < ts0.tsid);
 }
 
-static inline bool cap_is_intersect_ms_ms(const CapMemorySlice ms0, const CapMemorySlice ms1) {
+static inline bool cap_is_intersect_ms_ms(const CapMemorySlice ms0,
+                                          const CapMemorySlice ms1) {
         return !(ms0.end < ms1.begin || ms1.end < ms0.begin);
 }
 
 /* Get the beginning and end of a PMP entry. */
-static inline void cap_bound_of_pe(const CapPmpEntry pe, uintptr_t *begin, uintptr_t *end) {
+static inline void cap_bound_of_pe(const CapPmpEntry pe, uintptr_t *begin,
+                                   uintptr_t *end) {
         int A = (pe.cfg >> 3) & 0x3;
         switch (A) {
                 case 1: /* TOR */
@@ -175,13 +179,15 @@ static inline void cap_bound_of_pe(const CapPmpEntry pe, uintptr_t *begin, uintp
         }
 }
 
-static inline bool cap_is_intersect_ms_pe(const CapMemorySlice ms, const CapPmpEntry pe) {
+static inline bool cap_is_intersect_ms_pe(const CapMemorySlice ms,
+                                          const CapPmpEntry pe) {
         uintptr_t begin, end;
         cap_bound_of_pe(pe, &begin, &end);
         return !(ms.end < begin || end < ms.begin);
 }
 
-static inline bool cap_is_intersect_pe_pe(const CapPmpEntry pe0, const CapPmpEntry pe1) {
+static inline bool cap_is_intersect_pe_pe(const CapPmpEntry pe0,
+                                          const CapPmpEntry pe1) {
         uintptr_t begin0, end0;
         uintptr_t begin1, end1;
         cap_bound_of_pe(pe0, &begin0, &end0);
@@ -210,7 +216,8 @@ static inline bool cap_validate_pe(const CapPmpEntry pe) {
 }
 
 /* Check if a PmpEntry is child of a Memory Slice */
-static inline bool cap_is_child_ms_pe(const CapMemorySlice parent, const CapPmpEntry child) {
+static inline bool cap_is_child_ms_pe(const CapMemorySlice parent,
+                                      const CapPmpEntry child) {
         uintptr_t pe_begin, pe_end;
         cap_bound_of_pe(child, &pe_begin, &pe_end);
         return parent.begin <= pe_begin && pe_end <= parent.end &&
@@ -218,7 +225,8 @@ static inline bool cap_is_child_ms_pe(const CapMemorySlice parent, const CapPmpE
 }
 
 /* Check if a Memory Slice is child of a Memory Slice */
-static inline bool cap_is_child_ms_ms(const CapMemorySlice parent, const CapMemorySlice child) {
+static inline bool cap_is_child_ms_ms(const CapMemorySlice parent,
+                                      const CapMemorySlice child) {
         return parent.begin <= child.begin && child.end <= parent.end;
 }
 
@@ -231,8 +239,10 @@ static inline bool cap_is_child_ms(CapMemorySlice parent, Cap *child) {
 static inline bool cap_is_child(Cap *parent, Cap *child) {
         if (cap_is_type(parent, CAP_MEMORY_SLICE))
                 return cap_is_child_ms(cap_get_memory_slice(parent), child);
-        if (cap_is_type(parent, CAP_TIME_SLICE) && cap_is_type(parent, CAP_TIME_SLICE))
-                return cap_is_child_ts_ts(cap_get_time_slice(parent), cap_get_time_slice(child));
+        if (cap_is_type(parent, CAP_TIME_SLICE) &&
+            cap_is_type(parent, CAP_TIME_SLICE))
+                return cap_is_child_ts_ts(cap_get_time_slice(parent),
+                                          cap_get_time_slice(child));
         return false;
 }
 

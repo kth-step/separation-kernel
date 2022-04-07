@@ -17,10 +17,7 @@ typedef struct proc Proc;
  */
 typedef enum proc_state ProcState;
 
-
-enum proc_state {
-        PROC_HALTED, PROC_SUSPENDED, PROC_RUNNING, PROC_BLOCKED
-};
+enum proc_state { PROC_HALTED, PROC_SUSPENDED, PROC_RUNNING, PROC_BLOCKED };
 
 struct proc {
         /** Kernel stack pointer.
@@ -60,9 +57,9 @@ struct proc {
         Lock lock;
 };
 
-
 /** Processes
- * We have a static number of processes N_PROC. The initial process is always process 0.
+ * We have a static number of processes N_PROC. The initial process is always
+ * process 0.
  */
 extern Proc processes[N_PROC];
 /** Capability table */
