@@ -7,74 +7,81 @@
 #include "atomic.h"
 #include "config.h"
 
-typedef enum cap_type {
+typedef struct cap Cap;
+typedef enum cap_type CapType;
+typedef struct cap_memory_slice CapMemorySlice;
+typedef struct cap_pmp_entry CapPmpEntry;
+typedef struct cap_time_slice CapTimeSlice;
+typedef struct cap_supervisor CapSupervisor;
+typedef struct cap_endpoint CapEndpoint;
+
+enum cap_type {
         CAP_INVALID,
         CAP_PMP_ENTRY,
         CAP_MEMORY_SLICE,
         CAP_TIME_SLICE,
         CAP_ENDPOINT,
         CAP_SUPERVISOR
-} CapType;
+};
 
-typedef struct cap_memory_slice {
+struct cap_memory_slice {
         uint8_t perm;
         uint64_t begin;
         uint64_t end;
-} CapMemorySlice;
+};
 
-typedef struct cap_pmp_entry {
+struct cap_pmp_entry {
         uint8_t cfg;
         uint64_t addr;
         uint64_t addr_tor;
-} CapPmpEntry;
+};
 
-typedef struct cap_time_slice {
+struct cap_time_slice {
         uint8_t hartid;
         uint8_t tsid;
         uint8_t fuel;
         uint16_t begin;
         uint16_t end;
-} CapTimeSlice;
+};
 
-typedef struct cap_supervisor {
+struct cap_supervisor {
         uint8_t pid;
-} CapSupervisor;
+};
 
-typedef struct cap_endpoint {
+struct cap_endpoint {
         /* TODO: */
-} CapEndpoint;
+};
 
-typedef struct cap Capability;
 struct cap {
-        Capability *prev;
-        Capability *next;
+        Cap *prev;
+        Cap *next;
         uint64_t field0;
         uint64_t field1;
 };
 
-_Static_assert(sizeof(Capability) == 32, "Capability node size error");
+_Static_assert(sizeof(Cap) == 32, "Capability node size error");
 
-static inline CapType cap_get_type(const Capability *cap) {
+static inline CapType cap_get_type(const Cap *cap) {
         return cap->field0 >> 56;
 }
 
 /* Check capability type */
-static inline bool cap_is_type(const Capability *cap, CapType t) {
+static inline bool cap_is_type(const Cap *cap, CapType t) {
         return cap_get_type(cap) == t;
 }
 
-static inline bool cap_is_deleted(Capability *node) {
+static inline bool cap_is_deleted(Cap *node) {
         return is_marked(node->prev) && node->next == NULL;
 }
 
-static inline void cap_set_memory_slice(Capability *cap, const CapMemorySlice ms) {
+static inline void cap_set_memory_slice(Cap *cap, const CapMemorySlice ms) {
         cap->field0 = (uint64_t)CAP_MEMORY_SLICE << 56;
         cap->field0 |= ms.begin;
         cap->field1 = (uint64_t)ms.perm << 56;
         cap->field1 |= ms.end;
 }
 
-static inline CapMemorySlice cap_get_memory_slice(const Capability *cap) {
+static inline CapMemorySlice cap_get_memory_slice(const Cap *cap) {
         CapMemorySlice ms;
         ms.begin = cap->field0 & 0xFFFFFFFFFFFFFFUL;
         ms.perm = cap->field1 >> 56;
@@ -82,14 +89,14 @@ static inline CapMemorySlice cap_get_memory_slice(const Capability *cap) {
         return ms;
 }
 
-static inline void cap_set_pmp_entry(Capability *cap, const CapPmpEntry pe) {
+static inline void cap_set_pmp_entry(Cap *cap, const CapPmpEntry pe) {
         cap->field0 = (uint64_t)CAP_PMP_ENTRY << 56;
         cap->field0 |= pe.addr;
         cap->field1 = (uint64_t)pe.cfg << 56;
         cap->field1 |= pe.addr_tor;
 }
 
-static inline CapPmpEntry cap_get_pmp_entry(const Capability *cap) {
+static inline CapPmpEntry cap_get_pmp_entry(const Cap *cap) {
         CapPmpEntry pe;
         pe.addr = cap->field0 & 0xFFFFFFFFFFFFFFUL;
         pe.cfg = cap->field1 >> 56;
@@ -97,7 +104,7 @@ static inline CapPmpEntry cap_get_pmp_entry(const Capability *cap) {
         return pe;
 }
 
-static inline void cap_set_time_slice(Capability *cap, const CapTimeSlice ts) {
+static inline void cap_set_time_slice(Cap *cap, const CapTimeSlice ts) {
         cap->field0 = (uint64_t)CAP_TIME_SLICE << 56;
         cap->field0 |= (uint64_t)ts.hartid << 48;
         cap->field0 |= (uint64_t)ts.tsid << 40;
@@ -107,7 +114,7 @@ static inline void cap_set_time_slice(Capability *cap, const CapTimeSlice ts) {
         cap->field1 = 0;
 }
 
-static inline CapTimeSlice cap_get_time_slice(Capability *cap) {
+static inline CapTimeSlice cap_get_time_slice(Cap *cap) {
         CapTimeSlice ts;
         ts.hartid = (cap->field0 >> 48) & 0xFF;
         ts.tsid = (cap->field0 >> 40) & 0xFF;
@@ -117,13 +124,13 @@ static inline CapTimeSlice cap_get_time_slice(Capability *cap) {
         return ts;
 }
 
-static inline void cap_set_supervisor(Capability *cap, const CapSupervisor ts) {
+static inline void cap_set_supervisor(Cap *cap, const CapSupervisor ts) {
         cap->field0 = (uint64_t)CAP_TIME_SLICE << 56;
         cap->field0 |= ts.pid;
         cap->field1 = 0;
 }
 
-static inline CapSupervisor cap_get_supervisor(Capability *cap) {
+static inline CapSupervisor cap_get_supervisor(Cap *cap) {
         CapSupervisor sup;
         sup.pid = (cap->field0 >> 48) & 0xFF;
         return sup;
@@ -215,13 +222,13 @@ static inline bool cap_is_child_ms_ms(const CapMemorySlice parent, const CapMemo
         return parent.begin <= child.begin && child.end <= parent.end;
 }
 
-static inline bool cap_is_child_ms(CapMemorySlice parent, Capability *child) {
+static inline bool cap_is_child_ms(CapMemorySlice parent, Cap *child) {
         if (cap_is_type(child, CAP_MEMORY_SLICE))
                 return cap_is_child_ms_ms(parent, cap_get_memory_slice(child));
         return cap_is_child_ms_pe(parent, cap_get_pmp_entry(child));
 }
 
-static inline bool cap_is_child(Capability *parent, Capability *child) {
+static inline bool cap_is_child(Cap *parent, Cap *child) {
         if (cap_is_type(parent, CAP_MEMORY_SLICE))
                 return cap_is_child_ms(cap_get_memory_slice(parent), child);
         if (cap_is_type(parent, CAP_TIME_SLICE) && cap_is_type(parent, CAP_TIME_SLICE))
@@ -229,7 +236,7 @@ static inline bool cap_is_child(Capability *parent, Capability *child) {
         return false;
 }
 
-void CapRevoke(Capability *cap);
-void CapDelete(Capability *cap);
-int CapMove(Capability *dest, Capability *src);
-int CapInsert(Capability *parent, Capability *child);
+void CapRevoke(Cap *cap);
+void CapDelete(Cap *cap);
+int CapMove(Cap *dest, Cap *src);
+int CapInsert(Cap *parent, Cap *child);

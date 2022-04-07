@@ -41,7 +41,7 @@ struct proc {
         /** Capability table.
          * Pointer to the capability table.
          */
-        Capability *cap_table;
+        Cap *cap_table;
         /** Argument registers.
          * We store the argument registers a0-a7 in the args array,
          * this simplifies inter-process communication.
@@ -66,7 +66,7 @@ struct proc {
  */
 extern Proc processes[N_PROC];
 /** Capability table */
-extern Capability cap_tables[N_PROC][N_CAPS];
+extern Cap cap_tables[N_PROC][N_CAPS];
 
 /** Current process
  * This is a core local variable. If the core has a process, then current

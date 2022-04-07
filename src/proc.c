@@ -22,7 +22,7 @@ extern void AsmTrapExit();
 
 /* Defined in proc.h */
 Proc processes[N_PROC];
-Capability cap_tables[N_PROC][N_CAPS];
+Cap cap_tables[N_PROC][N_CAPS];
 
 /* Initializes one process. */
 static void proc_init_proc(int pid) {
@@ -41,7 +41,7 @@ static void proc_init_proc(int pid) {
         proc->cap_table = cap_tables[pid];
         for (int i = 0; i < N_CAPS; ++i) {
                 proc->cap_table[i].next = NULL;
-                proc->cap_table[i].prev = (Capability *)mark_bit;
+                proc->cap_table[i].prev = (Cap *)mark_bit;
         }
         /* Set process to HALTED. */
         proc->state = PROC_HALTED;
