@@ -17,10 +17,11 @@ CFLAGS+=-std=gnu18
 CFLAGS+=-O2 -g
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+= -DDEBUG
+CFLAGS+=-Wall -fanalyzer
 
 # Commands
 
-.PHONY: all settings format clean size
+.PHONY: all settings format clean size debug-qemu qemu
 all: settings $(ELF) $(DA)
 
 settings:
@@ -28,7 +29,7 @@ settings:
 	@echo "  CC      = $(CC)"
 	@echo "  OBJDUMP = $(OBJDUMP)"
 	@echo "  CFLAGS  = $(CFLAGS)"
-	@echo ""
+	@echo
 
 format:
 	@echo "Formatting code"
@@ -36,13 +37,13 @@ format:
 
 clean:
 	@echo "Cleaning"
-	@rm -f $(ELF) $(DA) inc/offsets.h
+	@rm -f $(ELF) $(DA)
 
 size:
 	@echo "Size of binary:"
 	@$(SIZE) $(ELF)
 
-debug-qemu: $(ELF)
+qemu debug-qemu: $(ELF)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
 
 # Build instructions
@@ -53,7 +54,7 @@ $(BUILD_DIR):
 $(ELF): Makefile config.mk | $(BUILD_DIR)
 
 $(BUILD_DIR)/%.elf: $(C_HDRS) $(C_SRCS) $(S_SRCS) config.lds
-	@echo "Linking ELF file:\t$(S_SRCS)$(C_SRCS) ==> $@"
+	@echo "Compiling ELF file:\t$(S_SRCS)$(C_SRCS) ==> $@"
 	@$(CC) $(CFLAGS) -o $@ $(S_SRCS) $(C_SRCS)
 
 $(BUILD_DIR)/%.da: $(ELF)
