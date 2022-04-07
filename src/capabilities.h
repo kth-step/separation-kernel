@@ -1,40 +1,235 @@
 // See LICENSE file for copyright and license details.
 #pragma once
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
+
+#include "atomic.h"
+#include "config.h"
 
 typedef enum cap_type {
         CAP_INVALID,
         CAP_PMP_ENTRY,
         CAP_MEMORY_SLICE,
-        CAP_TIME_SLICE
+        CAP_TIME_SLICE,
+        CAP_ENDPOINT,
+        CAP_SUPERVISOR
 } CapType;
 
-// Capability {{{
-typedef struct {
-        CapType type : 8;
-        uintptr_t addr : 56;      // pmpaddr field (lower bound if TOR)
-        uintptr_t cfg : 8;        // pmpcfg field
-        uintptr_t addr_tor : 56;  // second pmpaddr field (upper bound if TOR)
-} PmpEntry;
-typedef struct {
-        CapType type : 8;
-        uintptr_t begin : 56;  // Start of memory slice.
-        uintptr_t rwx : 8;     // Read, write, execute permissions.
-        uintptr_t end : 56;    // End of memory slice.
-} MemorySlice;
-typedef struct {
-        CapType type : 8;
-        uintptr_t cid : 8;    // Core to run on.
-        uintptr_t tsid : 8;   // TimeSlice ID.
-        uintptr_t fuel : 8;   // Max number of children.
-        uintptr_t begin : 8;  // Start of time slice.
-        uintptr_t end : 8;    // End of time slice.
-} TimeSlice;
-typedef union capability {
-        CapType type : 8;
-        PmpEntry pmp_entry;
-        MemorySlice memory_slice;
-        TimeSlice time_slice;
-} Capability;
-_Static_assert(sizeof(Capability) == 16, "Capability size error");
-// }}}
+typedef struct cap_memory_slice {
+        uint8_t perm;
+        uint64_t begin;
+        uint64_t end;
+} CapMemorySlice;
+
+typedef struct cap_pmp_entry {
+        uint8_t cfg;
+        uint64_t addr;
+        uint64_t addr_tor;
+} CapPmpEntry;
+
+typedef struct cap_time_slice {
+        uint8_t hartid;
+        uint8_t tsid;
+        uint8_t fuel;
+        uint16_t begin;
+        uint16_t end;
+} CapTimeSlice;
+
+typedef struct cap_supervisor {
+        uint8_t pid;
+} CapSupervisor;
+
+typedef struct cap_endpoint {
+        /* TODO: */
+} CapEndpoint;
+
+typedef struct cap Capability;
+struct cap {
+        Capability *prev;
+        Capability *next;
+        uint64_t field0;
+        uint64_t field1;
+};
+
+_Static_assert(sizeof(Capability) == 32, "Capability node size error");
+
+static inline CapType cap_get_type(const Capability *cap) {
+        return cap->field0 >> 56;
+}
+
+/* Check capability type */
+static inline bool cap_is_type(const Capability *cap, CapType t) {
+        return cap_get_type(cap) == t;
+}
+
+static inline bool cap_is_deleted(Capability *node) {
+        return is_marked(node->prev) && node->next == NULL;
+}
+
+static inline void cap_set_memory_slice(Capability *cap, const CapMemorySlice ms) {
+        cap->field0 = (uint64_t)CAP_MEMORY_SLICE << 56;
+        cap->field0 |= ms.begin;
+        cap->field1 = (uint64_t)ms.perm << 56;
+        cap->field1 |= ms.end;
+}
+
+static inline CapMemorySlice cap_get_memory_slice(const Capability *cap) {
+        CapMemorySlice ms;
+        ms.begin = cap->field0 & 0xFFFFFFFFFFFFFFUL;
+        ms.perm = cap->field1 >> 56;
+        ms.end = cap->field1 & 0xFFFFFFFFFFFFFFUL;
+        return ms;
+}
+
+static inline void cap_set_pmp_entry(Capability *cap, const CapPmpEntry pe) {
+        cap->field0 = (uint64_t)CAP_PMP_ENTRY << 56;
+        cap->field0 |= pe.addr;
+        cap->field1 = (uint64_t)pe.cfg << 56;
+        cap->field1 |= pe.addr_tor;
+}
+
+static inline CapPmpEntry cap_get_pmp_entry(const Capability *cap) {
+        CapPmpEntry pe;
+        pe.addr = cap->field0 & 0xFFFFFFFFFFFFFFUL;
+        pe.cfg = cap->field1 >> 56;
+        pe.addr_tor = cap->field1 & 0xFFFFFFFFFFFFFFUL;
+        return pe;
+}
+
+static inline void cap_set_time_slice(Capability *cap, const CapTimeSlice ts) {
+        cap->field0 = (uint64_t)CAP_TIME_SLICE << 56;
+        cap->field0 |= (uint64_t)ts.hartid << 48;
+        cap->field0 |= (uint64_t)ts.tsid << 40;
+        cap->field0 |= (uint64_t)ts.fuel << 32;
+        cap->field0 |= (ts.begin << 16);
+        cap->field0 |= ts.end;
+        cap->field1 = 0;
+}
+
+static inline CapTimeSlice cap_get_time_slice(Capability *cap) {
+        CapTimeSlice ts;
+        ts.hartid = (cap->field0 >> 48) & 0xFF;
+        ts.tsid = (cap->field0 >> 40) & 0xFF;
+        ts.fuel = (cap->field0 >> 32) & 0xFF;
+        ts.begin = (cap->field0 >> 16) & 0xFFFF;
+        ts.end = cap->field0 & 0xFFFF;
+        return ts;
+}
+
+static inline void cap_set_supervisor(Capability *cap, const CapSupervisor ts) {
+        cap->field0 = (uint64_t)CAP_TIME_SLICE << 56;
+        cap->field0 |= ts.pid;
+        cap->field1 = 0;
+}
+
+static inline CapSupervisor cap_get_supervisor(Capability *cap) {
+        CapSupervisor sup;
+        sup.pid = (cap->field0 >> 48) & 0xFF;
+        return sup;
+}
+
+/* Check if a PmpEntry is child of a Memory Slice */
+static inline bool cap_is_child_ts_ts(const CapTimeSlice parent, const CapTimeSlice child) {
+        return (parent.hartid == child.hartid) && (parent.tsid < child.tsid) &&
+               (child.tsid <= parent.fuel);
+}
+
+/* Assumes same hartid */
+/* Returns true if the time slices intersect */
+static inline bool cap_is_intersect_ts_ts(const CapTimeSlice ts0, const CapTimeSlice ts1) {
+        return !(ts0.fuel < ts1.tsid || ts1.fuel < ts0.tsid);
+}
+
+static inline bool cap_is_intersect_ms_ms(const CapMemorySlice ms0, const CapMemorySlice ms1) {
+        return !(ms0.end < ms1.begin || ms1.end < ms0.begin);
+}
+
+/* Get the beginning and end of a PMP entry. */
+static inline void cap_bound_of_pe(const CapPmpEntry pe, uintptr_t *begin, uintptr_t *end) {
+        int A = (pe.cfg >> 3) & 0x3;
+        switch (A) {
+                case 1: /* TOR */
+                        *begin = pe.addr;
+                        *end = pe.addr_tor;
+                        break;
+                case 2: /* NA4 */
+                        *begin = pe.addr;
+                        *end = pe.addr + 4;
+                        break;
+                case 3: /* NAPOT */
+                        /* Bit magic! */
+                        *begin = (pe.addr & (pe.addr + 1));
+                        *end = *begin + (pe.addr ^ (pe.addr + 1)) + 1;
+                        break;
+                default: /* NONE, should never happen. */
+                        __builtin_unreachable();
+                        break;
+        }
+}
+
+static inline bool cap_is_intersect_ms_pe(const CapMemorySlice ms, const CapPmpEntry pe) {
+        uintptr_t begin, end;
+        cap_bound_of_pe(pe, &begin, &end);
+        return !(ms.end < begin || end < ms.begin);
+}
+
+static inline bool cap_is_intersect_pe_pe(const CapPmpEntry pe0, const CapPmpEntry pe1) {
+        uintptr_t begin0, end0;
+        uintptr_t begin1, end1;
+        cap_bound_of_pe(pe0, &begin0, &end0);
+        cap_bound_of_pe(pe1, &begin1, &end1);
+        return !(end0 < begin1 || end1 < begin0);
+}
+
+/* Assumes child of existing capability. */
+static inline bool cap_validate_ts(const CapTimeSlice ts) {
+        return ts.begin < ts.end;
+}
+
+/* Assumes child of existing capability. */
+static inline bool cap_validate_ms(const CapMemorySlice ms) {
+        return ms.begin < ms.end;
+}
+
+/* Assumes child of existing capability. */
+static inline bool cap_validate_pe(const CapPmpEntry pe) {
+        uintptr_t begin, end;
+        cap_bound_of_pe(pe, &begin, &end);
+        uintptr_t a = (pe.cfg >> 3) & 0x3;
+        uintptr_t rwx = pe.cfg & 0x7;
+        /* TODO: check for illegal rwx values */
+        return begin < end && (a > 0) && (rwx > 0);
+}
+
+/* Check if a PmpEntry is child of a Memory Slice */
+static inline bool cap_is_child_ms_pe(const CapMemorySlice parent, const CapPmpEntry child) {
+        uintptr_t pe_begin, pe_end;
+        cap_bound_of_pe(child, &pe_begin, &pe_end);
+        return parent.begin <= pe_begin && pe_end <= parent.end &&
+               ((child.cfg & 0x7) == (parent.perm & child.cfg));
+}
+
+/* Check if a Memory Slice is child of a Memory Slice */
+static inline bool cap_is_child_ms_ms(const CapMemorySlice parent, const CapMemorySlice child) {
+        return parent.begin <= child.begin && child.end <= parent.end;
+}
+
+static inline bool cap_is_child_ms(CapMemorySlice parent, Capability *child) {
+        if (cap_is_type(child, CAP_MEMORY_SLICE))
+                return cap_is_child_ms_ms(parent, cap_get_memory_slice(child));
+        return cap_is_child_ms_pe(parent, cap_get_pmp_entry(child));
+}
+
+static inline bool cap_is_child(Capability *parent, Capability *child) {
+        if (cap_is_type(parent, CAP_MEMORY_SLICE))
+                return cap_is_child_ms(cap_get_memory_slice(parent), child);
+        if (cap_is_type(parent, CAP_TIME_SLICE) && cap_is_type(parent, CAP_TIME_SLICE))
+                return cap_is_child_ts_ts(cap_get_time_slice(parent), cap_get_time_slice(child));
+        return false;
+}
+
+void CapRevoke(Capability *cap);
+void CapDelete(Capability *cap);
+int CapMove(Capability *dest, Capability *src);
+int CapInsert(Capability *parent, Capability *child);
