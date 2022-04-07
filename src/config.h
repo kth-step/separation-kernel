@@ -19,6 +19,12 @@
 #define STACK_SIZE 1024
 /* log_2 of stack size. */
 #define LOG_STACK_SIZE 10
+
+/* Beginning and end of the user processes' memory region. 
+ * Used for setting up initial memory of the boot process. */
+#define USER_MEMORY_BEGIN 0x80000000UL
+#define USER_MEMORY_END 0x100000000UL
+
 /* Boot PC. This will be removed later. */
 #ifndef __ASSEMBLER__
 extern void user_code();
