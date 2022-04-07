@@ -2,68 +2,155 @@
 #pragma once
 #include <stdint.h>
 
-#define FENCE(pred, succ) __asm__ volatile("fence " #pred "," #succ)
+enum ordering { relaxed, acquire, release, sequential };
 
-#define __AMOOP(ptr, value, op, width, aqrl)                              \
-        ({                                                                \
-                typeof(*ptr) __ret;                                       \
-                __asm__ volatile("amo" #op "." #width #aqrl " %0,%1,(%2)" \
-                                 : "=r"(__ret)                            \
-                                 : "r"(value), "r"(ptr)                   \
-                                 : "memory");                             \
-                __ret;                                                    \
+#define fence(pred, succ) __asm__ volatile("fence " #pred "," #succ)
+
+#define __amoop(op, ptr, value, order)                                          \
+        ({                                                                      \
+                typeof(*ptr) __ret;                                             \
+                switch (order) {                                                \
+                        case relaxed:                                           \
+                                __asm__ volatile("amo" #op ".d %0,%1,(%2)"      \
+                                                 : "=r"(__ret)                  \
+                                                 : "r"(value), "r"(ptr)         \
+                                                 : "memory");                   \
+                                break;                                          \
+                        case acquire:                                           \
+                                __asm__ volatile("amo" #op ".d.aq %0,%1,(%2)"   \
+                                                 : "=r"(__ret)                  \
+                                                 : "r"(value), "r"(ptr)         \
+                                                 : "memory");                   \
+                                break;                                          \
+                        case release:                                           \
+                                __asm__ volatile("amo" #op ".d.rl %0,%1,(%2)"   \
+                                                 : "=r"(__ret)                  \
+                                                 : "r"(value), "r"(ptr)         \
+                                                 : "memory");                   \
+                                break;                                          \
+                        case sequential:                                        \
+                                __asm__ volatile("amo" #op ".d.aqrl %0,%1,(%2)" \
+                                                 : "=r"(__ret)                  \
+                                                 : "r"(value), "r"(ptr)         \
+                                                 : "memory");                   \
+                                break;                                          \
+                }                                                               \
+                __ret;                                                          \
         })
 
+#define amoswap_explicit(ptr, value, order) __amoop(swap, ptr, value, order)
+#define amoadd_explicit(ptr, value, order) __amoop(add, ptr, value, order)
+#define amoand_explicit(ptr, value, order) __amoop(and, ptr, value, order)
+#define amoor_explicit(ptr, value, order) __amoop(or, ptr, value, order)
+#define amoxor_explicit(ptr, value, order) __amoop(xor, ptr, value, order)
+#define amomax_explicit(ptr, value, order) __amoop(max, ptr, value, order)
+#define amomin_explicit(ptr, value, order) __amoop(min, ptr, value, order)
+#define amoswap(ptr, value) amoswap_explicit(ptr, value, sequential)
+#define amoadd(ptr, value) amoadd_explicit(ptr, value, sequential)
+#define amoand(ptr, value) amoand_explicit(ptr, value, sequential)
+#define amoor(ptr, value) amoor_explicit(ptr, value, sequential)
+#define amoxor(ptr, value) amoxop_explicit(ptr, value, sequential)
+#define amomax(ptr, value) amomax_explicit(ptr, value, sequential)
+#define amomin(ptr, value) amomin_explicit(ptr, value, sequential)
 
-#define __CAS(ptr, expected, desired, width, aq, rl)        \
-        ({                                                  \
-                uintptr_t __ret;                            \
-                __asm__ volatile(                           \
-                    "  li     %0,0\n"                       \
-                    "1:lr" #width #aq                       \
-                    "   t0,(%3)\n"                          \
-                    "  bne    t0,%1,2f\n"                   \
-                    "  sc" #width #rl                       \
-                    " t0,%2,(%3)\n"                         \
-                    "  bnez   t0,1b\n"                      \
-                    "  li     %0,1\n"                       \
-                    "2:\n"                                  \
-                    : "=r&"(__ret)                          \
-                    : "r"(expected), "r"(desired), "r"(ptr) \
-                    : "t0", "memory");                      \
-                __ret;                                      \
+#define compare_and_swap_explicit(ptr, expected, desired, order)            \
+        ({                                                                  \
+                typeof(expected) __oldval;                                  \
+                uintptr_t __tmp;                                            \
+                switch (order) {                                            \
+                        case relaxed:                                       \
+                                asm volatile(                               \
+                                    "1:lr.d %0,(%2)\n"                      \
+                                    "  bne %0,%3,2f\n"                      \
+                                    "  sc.d %1,%4,(%2)\n"                   \
+                                    "  bnez %1,1b\n"                        \
+                                    "2:\n"                                  \
+                                    : "=r&"(__oldval), "=r&"(__tmp)         \
+                                    : "r"(ptr), "r"(expected), "r"(desired) \
+                                    : "memory");                            \
+                                break;                                      \
+                        case acquire:                                       \
+                                asm volatile(                               \
+                                    "1:lr.d.aq %0,(%2)\n"                   \
+                                    "  bne %0,%3,2f\n"                      \
+                                    "  sc.d %1,%4,(%2)\n"                   \
+                                    "  bnez %1,1b\n"                        \
+                                    "2:\n"                                  \
+                                    : "=r&"(__oldval), "=r&"(__tmp)         \
+                                    : "r"(ptr), "r"(expected), "r"(desired) \
+                                    : "memory");                            \
+                                break;                                      \
+                        case release:                                       \
+                                asm volatile(                               \
+                                    "1:lr.d %0,(%2)\n"                      \
+                                    "  bne %0,%3,2f\n"                      \
+                                    "  sc.d.rl %1,%4,(%2)\n"                \
+                                    "  bnez %1,1b\n"                        \
+                                    "2:\n"                                  \
+                                    : "=r&"(__oldval), "=r&"(__tmp)         \
+                                    : "r"(ptr), "r"(expected), "r"(desired) \
+                                    : "memory");                            \
+                                break;                                      \
+                        case sequential:                                    \
+                                asm volatile(                               \
+                                    "1:lr.d.aq %0,(%2)\n"                   \
+                                    "  bne %0,%3,2f\n"                      \
+                                    "  sc.d.rl %1,%4,(%2)\n"                \
+                                    "  bnez %1,1b\n"                        \
+                                    "2:\n"                                  \
+                                    : "=r&"(__oldval), "=r&"(__tmp)         \
+                                    : "r"(ptr), "r"(expected), "r"(desired) \
+                                    : "memory");                            \
+                                break;                                      \
+                }                                                           \
+                __oldval == expected;                                       \
         })
+#define compare_and_swap(ptr, expected, desired) \
+        compare_and_swap_explicit(ptr, expected, desired, sequential)
 
-#define AMOOR_D_AQRL(ptr, value) __AMOOP(ptr, value, or, d, .aqrl)
-#define AMOAND_D_AQRL(ptr, value) __AMOOP(ptr, value, and, d, .aqrl)
+#define load_explicit(ptr, order)                                                                 \
+        ({                                                                                        \
+                uintptr_t __ret;                                                                  \
+                switch (order) {                                                                  \
+                        case relaxed:                                                             \
+                                __ret = *ptr;                                                     \
+                                break;                                                            \
+                        case acquire:                                                             \
+                                asm volatile("amoor.d.aq %0,x0,(%1)" : "=r"(__ret) : "r"(ptr));   \
+                                break;                                                            \
+                        case release:                                                             \
+                                asm volatile("amoor.d.rl %0,x0,(%1)" : "=r"(__ret) : "r"(ptr));   \
+                                break;                                                            \
+                        case sequential:                                                          \
+                                asm volatile("amoor.d.aqrl %0,x0,(%1)" : "=r"(__ret) : "r"(ptr)); \
+                                break;                                                            \
+                }                                                                                 \
+                __ret;                                                                            \
+        })
+#define load(ptr) load_explicit(ptr, sequential)
 
-#define CAS_D(ptr, expected, desired) __CAS(ptr, expected, desired, .d, , )
-#define CAS_D_AQ(ptr, expected, desired) __CAS(ptr, expected, desired, .d, .aq, )
-#define CAS_D_RL(ptr, expected, desired) __CAS(ptr, expected, desired, .d, , .rl)
-#define CAS_D_AQRL(ptr, expected, desired) __CAS(ptr, expected, desired, .d, .aq, .rl)
-
-#define CAS_W(ptr, expected, desired) __CAS(ptr, expected, desired, .w, , )
-#define CAS_W_AQ(ptr, expected, desired) __CAS(ptr, expected, desired, .w, .aq, )
-#define CAS_W_RL(ptr, expected, desired) __CAS(ptr, expected, desired, .w, , .rl)
-#define CAS_W_AQRL(ptr, expected, desired) __CAS(ptr, expected, desired, .w, .aq, .rl)
+#define store_explicit(ptr, value, order)                                                         \
+        ({                                                                                        \
+                switch (order) {                                                                  \
+                        case relaxed:                                                             \
+                                *ptr = value;                                                     \
+                                break;                                                            \
+                        case acquire:                                                             \
+                                asm volatile("amoswap.d.aq x0,%0,(%1)" :: "r"(value), "r"(ptr)); \
+                                break;                                                            \
+                        case release:                                                             \
+                                asm volatile("amoswap.d.rl x0,%0,(%1)" :: "r"(value), "r"(ptr)); \
+                                break;                                                            \
+                        case sequential:                                                          \
+                                asm volatile("amoswap.d.aqrl x0,%0,(%1)" :: "r"(value), "r"(ptr));  \
+                                break;                                                            \
+                }                                                                                 \
+        })
+#define store(ptr) store_explicit(ptr, value, sequential)
 
 /* Macros for marked pointers */
 /* Use the most significant bit as mark */
-#define MARK_BIT (1UL << (__riscv_xlen - 1))
-#define IS_MARKED(mptr) (mptr >= ((typeof(mptr))MARK_BIT))
-#define UNMARK(mptr) ((typeof(mptr))((uintptr_t)mptr & ~MARK_BIT))
-#define MARK(mptr) ((typeof(mptr))((uintptr_t)mptr | MARK_BIT))
-
-#if __riscv_xlen == 64
-#define CAS(ptr, expected, desired) CAS_D(ptr, expected, desired)
-#define CAS_AQ(ptr, expected, desired) CAS_D_AQ(ptr, expected, desired)
-#define CAS_RL(ptr, expected, desired) CAS_D_RL(ptr, expected, desired)
-#define CAS_AQRL(ptr, expected, desired) CAS_D_AQRL(ptr, expected, desired)
-#define AMOOR_AQRL(ptr, value) AMOOR_D_AQRL(ptr, value)
-#define AMOAND_AQRL(ptr, value) AMOAND_D_AQRL(ptr, value)
-#else
-#define CAS(ptr, expected, desired) CAS_W(ptr, expected, desired)
-#define CAS_AQ(ptr, expected, desired) CAS_W_AQ(ptr, expected, desired)
-#define CAS_RL(ptr, expected, desired) CAS_W_RL(ptr, expected, desired)
-#define CAS_AQRL(ptr, expected, desired) CAS_W_AQRL(ptr, expected, desired)
-#endif
+static const unsigned long mark_bit = 1;
+#define is_marked(ptr) ((uintptr_t)(ptr) & mark_bit)
+#define unmark(ptr) ((void*)((uintptr_t)(ptr) & ~mark_bit))
+#define mark(ptr) ((void*)((uintptr_t)(ptr) | mark_bit))
