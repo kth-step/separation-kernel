@@ -134,7 +134,7 @@ bool CapInsert(Cap *parent, Cap *child) {
         while (!succ && !cap_is_deleted(parent)) {
                 /* Check if timer has been triggered */
                 sched_preemption();
-                if (cap_try_mark(parent))
+                if (!cap_try_mark(parent))
                         continue;
                 succ = cap_insert(parent, child);
                 cap_unmark(parent);

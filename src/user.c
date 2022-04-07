@@ -78,35 +78,28 @@ int S3K_SLICE_CAP(uintptr_t src, uintptr_t dest, uintptr_t field0,
 }
 
 void user_main(uintptr_t pid, uint64_t begin, uint64_t end) {
-        while (1) {
-                printf("pid %3lx:\t%016lx\t%016lx\r\n", pid, begin, end);
-                int code;
-                code = S3K_SLICE_CAP(2, 20, 0x0300011000000040,
-                                     0x0000000000000000);
-                printf("%d\n", code);
-                S3K_SLICE_CAP(20, 9, 0x0300020400000040, 0x0000000000000000);
-                S3K_DELETE_CAP(20);
-                for (int i = 0; i < 256; i++) {
-                        uint64_t field0, field1;
-                        S3K_READ_CAP(i, &field0, &field1);
-                        if (field0 != 0 || field1 != 0)
-                                printf("\t cid %3d:\t%016lx\t%016lx\n", i,
-                                       field0, field1);
-                }
-
-                for (int i = 0; i < 256; i++) {
-                        if (!S3K_REVOKE_CAP(i)) {
-                                printf("cid %3d revoke success\n", i);
-                                for (int i = 0; i < 256; i++) {
-                                        uint64_t field0, field1;
-                                        S3K_READ_CAP(i, &field0, &field1);
-                                        if (field0 != 0 || field1 != 0)
-                                                printf(
-                                                    "\t cid "
-                                                    "%3d:\t%016lx\t%016lx\n",
-                                                    i, field0, field1);
-                                }
-                        }
-                }
+        printf("pid %3lx:\t%016lx\t%016lx\r\n", pid, begin, end);
+        S3K_SLICE_CAP(2, 20, 0x0300011000000040, 0x0000000000000000);
+        S3K_SLICE_CAP(20, 9, 0x0300020400000040, 0x0000000000000000);
+        for (int i = 0; i < 256; i++) {
+                uint64_t field0, field1;
+                S3K_READ_CAP(i, &field0, &field1);
+                if (field0 != 0 || field1 != 0)
+                        printf("\t cid %3d:\t%016lx\t%016lx\n", i, field0,
+                               field1);
         }
+
+        printf("pid %3lx:\t%016lx\t%016lx\r\n", pid, begin, end);
+        for (int i = 0; i < 256; i++) {
+                S3K_REVOKE_CAP(i);
+        }
+        for (int i = 0; i < 256; i++) {
+                uint64_t field0, field1;
+                S3K_READ_CAP(i, &field0, &field1);
+                if (field0 != 0 || field1 != 0)
+                        printf("\t cid %3d:\t%016lx\t%016lx\n", i, field0,
+                               field1);
+        }
+        while (1)
+                ;
 }
