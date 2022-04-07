@@ -7,6 +7,10 @@
 #include "config.h"
 #include "lock.h"
 
+typedef enum proc_state {
+        PROC_HALTED, PROC_SUSPENDED, PROC_RUNNING, PROC_BLOCKED
+} ProcState;
+
 /** Process
  * This is the Process Control Block (PCB). We store pointers
  * register and process's state in this struct.
@@ -30,7 +34,7 @@ typedef struct process {
         /** Capability table.
          * Pointer to the capability table.
          */
-        Capability **cap_table;
+        Capability *cap_table;
         /** Argument registers.
          * We store the argument registers a0-a7 in the args array,
          * this simplifies inter-process communication.
@@ -41,18 +45,20 @@ typedef struct process {
          * exception handling and supervisor capabilities.
          */
         uintptr_t *pc;
-        /** Lock.
-         * A core has to claim this lock before running the process.
-         * The lock value is zero when unclaimed, non-zero when claimed.
+        /** Process state.
+         * TODO: Comment
          */
-        uintptr_t lock;
+        ProcState state;
+        /* TODO: Replace with process state */
+        Lock lock;
 } Process;
 
 /** Processes
- * We have a static number of processes N_PROC. The initial process is always
- * process 0.
+ * We have a static number of processes N_PROC. The initial process is always process 0.
  */
 extern Process processes[N_PROC];
+/** Capability table */
+extern Capability cap_tables[N_PROC][N_CAPS];
 
 /** Current process
  * This is a core local variable. If the core has a process, then current
@@ -64,4 +70,4 @@ register Process *current __asm__("tp");
  * This initializes all processes, setting their PID, stack pointer, and
  * entry points.
  */
-void InitProcesses(void);
+void ProcInitProcesses(void);

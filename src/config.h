@@ -5,6 +5,8 @@
 #define N_CORES 2
 /* Number of processes. */
 #define N_PROC 4
+/* Number of capabilities per process */
+#define N_CAPS 256
 
 /* Number of time slices in a major frame. */
 #define N_QUANTUM 64
@@ -17,3 +19,8 @@
 #define STACK_SIZE 1024
 /* log_2 of stack size. */
 #define LOG_STACK_SIZE 10
+/* Boot PC. This will be removed later. */
+#ifndef __ASSEMBLER__
+extern void user_code();
+#define BOOT_PC (uintptr_t*)user_code
+#endif

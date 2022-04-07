@@ -41,7 +41,7 @@ _start:
         bnez    t0,__wait
 
         /* Initialize the process, only hart 0 does this. */
-        call    InitProcesses
+        call    ProcInitProcesses
 
         /* Unlock the other harts. */
         fence   rw,rw
