@@ -8,12 +8,15 @@
 /* Number of capabilities per process */
 #define N_CAPS 256
 
+/* Ticks per second */
+#define TICKS_PER_SECOND 10000000UL
+
 /* Number of time slices in a major frame. */
-#define N_QUANTUM 64
+#define N_QUANTUM 60
 /* Number of ticks per quantum. */
-#define TICKS (8192)
+#define TICKS (TICKS_PER_SECOND/N_QUANTUM)
 /* Number of slack ticks (buffer) for scheduler. */
-#define SLACK_TICKS (TICKS / 16)
+#define SLACK_TICKS (TICKS/10)
 
 /* Stack size. */
 #define STACK_SIZE 1024

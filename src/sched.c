@@ -53,7 +53,7 @@ static inline uint64_t sched_get_length(uint64_t s, uint64_t q,
 
 static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         /* Calculate the current quantum */
-        uint64_t q = (time / TICKS) % N_QUANTUM;
+        uint64_t q = time % N_QUANTUM;
         /* Get the current quantum schedule */
         uint64_t s = load_explicit(&schedule[q], acquire);
         uint64_t pid = sched_get_pid(s, hartid); /* Process ID. */
@@ -91,7 +91,7 @@ void Sched(void) {
         /* Here the core tries to fetch a process to run */
         while (1) {
                 /* Get the start of next time slice. */
-                uint64_t time = (read_time() + TICKS) & ~(TICKS - 1);
+                uint64_t time = (read_time() / TICKS) + 1;
                 /* Try getting a process at that time slice. */
                 uint64_t length = sched_get_proc(hartid, time, &proc);
                 if (length > 0 && try_acquire_lock(&proc->lock)) {
@@ -104,12 +104,13 @@ void Sched(void) {
                          * run of which SLACK_TIME is the time reserved for
                          * scheduler.
                          */
-                        uint64_t timeout = time + TICKS * length - SLACK_TICKS;
+                        uint64_t timeout =
+                            time * TICKS + TICKS * length - SLACK_TICKS;
 
                         /* Write to timeout register */
                         write_timeout(hartid, timeout);
                         /* Wait until it is time to run */
-                        while (read_time() < time)
+                        while (read_time() < time * TICKS)
                                 ;
                         /* Returns to AsmSwitchToProc. */
                         return;
