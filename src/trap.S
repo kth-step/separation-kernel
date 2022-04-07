@@ -102,7 +102,7 @@ AsmTrapExit:
 #ifdef DEBUG
         /* Write user sp to mscratch. */
         ld      t0,(10*8)(sp)
-        csrw    mscratch,
+        csrw    mscratch,t0
 #endif
         /* Write user pc to mepc. */
         ld      t3,(11*8)(tp)
@@ -172,13 +172,13 @@ __interrupt_trampoline:
         j       __hang  /* 11: Machine external interrupt */
 __syscall_trampoline:
         /* System calls */
-        j       EcallPid
-        j       __hang
-        j       __hang
-        j       __hang
-        j       __hang
-        j       __hang
-        j       __hang
+        j       SyscallPid
+        j       SyscallReadCap
+        j       SyscallMove
+        j       SyscallRevoke
+        j       SyscallDelete
+        j       SyscallSlice
+        j       SyscallSplit
         j       __hang
         j       __hang
         j       __hang
