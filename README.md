@@ -4,10 +4,13 @@ Simply Secure Separation Kernel (S3K) is a real-time separation kernel for embed
 
 ## Coding style
 
-- Visible large functions, CamelCase.
-- Non visible (static) and inline functions, snake_case.
-- Variables, snake_case.
+- Large functions should use CamelCase, small functions should use snake_case.
+- Non-visible functions (static functions to a `.c` file) should have two underlines as a prefix, e.g., `__hidden_function`.
+- Variables should use snake_case.
+- Structs, enum, and union must be defined with snake_case and have a typedef in CamelCase.
 - Indentation and so on, use clang-format with `make format` and check the `.clang-format` file
+- Functions and types of the same file must have a common prefix. For examples, `cap_delete`, `CapDelete`, `CapType`, `ProcState`, `ProcInitProcesses`, `AsmTrapEntry`, `AsmTrapExit`, and more.
+- Globally visible assembly functions should start with the prefix `Asm`.
 
 ## User guide
 
