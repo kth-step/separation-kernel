@@ -13,18 +13,13 @@ void SyscallPid(void) {
 
 void SyscallInit(uintptr_t cid_sup, uintptr_t cid_pmp) {
         /* Check if valid capability index */
-        if (cid_sup >= N_CAPS || cid_pmp >= N_CAPS) {
-                current->args[0] = 1;
-                return;
-        }
-
-        Cap *cap_sup = &current->cap_table[cid_sup];
-        Cap *cap_pmp = &current->cap_table[cid_pmp];
+        Cap *cap_sup = &current->cap_table[cid_sup % N_CAPS];
+        Cap *cap_pmp = &current->cap_table[cid_pmp % N_CAPS];
 
         /* Check if capability type is supervisor */
         if (cap_is_type(cap_sup, CAP_SUPERVISOR) ||
             cap_is_type(cap_pmp, CAP_PMP_ENTRY)) {
-                current->args[0] = 2;
+                current->args[0] = 1;
                 return;
         }
         CapSupervisor sup = cap_get_supervisor(cap_sup);
@@ -32,7 +27,7 @@ void SyscallInit(uintptr_t cid_sup, uintptr_t cid_pmp) {
         Proc *proc = &processes[sup.pid];
         /* Check if process has halted. */
         if (proc->state == PROC_HALTED) {
-                current->args[0] = 3;
+                current->args[0] = 1;
         }
         /* Clean stack. */
         for (int i = 0; i < (STACK_SIZE / 8); i++) {
@@ -46,115 +41,88 @@ void SyscallInit(uintptr_t cid_sup, uintptr_t cid_pmp) {
         /* TODO: Unload PMP cap in supervisor */
         CapMove(&proc->cap_table[0], cap_pmp);
         /* TODO: Load PMP cap in supervisor */
-        current->args[0] = 0;
+        current->args[0] = 1;
 }
 
 void SyscallReadCap(uintptr_t cid) {
-        if (cid >= N_CAPS) {
-                current->args[0] = 0;
-                current->args[1] = 0;
-                return;
-        }
-        Cap *cap = &current->cap_table[cid];
+        Cap *cap = &current->cap_table[cid % N_CAPS];
+        /* Read fields first */
         current->args[0] = cap->field0;
         current->args[1] = cap->field1;
+        /* Fence so we read first then check if deleted */
         fence(r, r);
         if (cap_is_deleted(cap)) {
+                /* If deleted, then set args. */
                 current->args[0] = 0;
                 current->args[1] = 0;
         }
 }
 
 void SyscallMove(uintptr_t cid_dest, uintptr_t cid_src) {
-        if (cid_dest >= N_CAPS || cid_src >= N_CAPS || cid_dest == cid_src) {
-                current->args[0] = 1;
-                return;
-        }
-        Cap *cap_dest = &current->cap_table[cid_dest];
-        Cap *cap_src = &current->cap_table[cid_src];
-        if (!cap_is_deleted(cap_dest)) {
-                current->args[0] = 2;
-                return;
-        }
-        if (cap_is_deleted(cap_src)) {
-                current->args[0] = 3;
-                return;
-        }
-        if (CapMove(cap_dest, cap_src))
+        if (cid_dest == cid_src) {
                 current->args[0] = 0;
-        else
-                current->args[0] = 4;
+                return;
+        }
+        Cap *cap_dest = &current->cap_table[cid_dest % N_CAPS];
+        Cap *cap_src = &current->cap_table[cid_src % N_CAPS];
+        if (!cap_is_deleted(cap_dest) || cap_is_deleted(cap_src)) {
+                current->args[0] = 0;
+                return;
+        }
+        current->args[0] = CapMove(cap_dest, cap_src);
 }
 
 void SyscallRevoke(uintptr_t cid) {
-        current->args[0] = 0;
-        if (cid >= N_CAPS) {
-                current->args[0] = 1;
-                return;
-        }
-        Cap *cap = &current->cap_table[cid];
-        if (!cap_is_deleted(cap))
-                CapRevoke(cap);
-        else
-                current->args[0] = 1;
+        Cap *cap = &current->cap_table[cid % N_CAPS];
+        if (cap_is_deleted(cap))
+                current->args[0] = 0;
+        CapRevoke(cap);
+        current->args[0] = 1;
 }
 
 void SyscallDelete(uintptr_t cid) {
-        current->args[0] = 0;
-        if (cid >= N_CAPS) {
-                current->args[0] = 1;
-                return;
-        }
-        Cap *cap = &current->cap_table[cid];
-        if (!cap_is_deleted(cap))
-                CapDelete(cap);
-        else
-                current->args[0] = 1;
+        Cap *cap = &current->cap_table[cid % N_CAPS];
+        current->args[0] = CapDelete(cap);
 }
 
 void SyscallSlice(uintptr_t cid_src, uintptr_t cid_dest, uint64_t field0,
                   uint64_t field1) {
-        if (cid_dest >= N_CAPS || cid_src >= N_CAPS) {
+        Cap *cap_dest = &current->cap_table[cid_dest % N_CAPS];
+        Cap *cap_src = &current->cap_table[cid_src % N_CAPS];
+        if (cap_is_deleted(cap_dest)) {
                 current->args[0] = 1;
-        }
-
-        Cap *cap_dest = &current->cap_table[cid_dest];
-        if (!cap_is_deleted(cap_dest)) {
-                current->args[0] = 2;
                 return;
         }
         cap_dest->field0 = field0;
         cap_dest->field1 = field1;
-        Cap *cap_src = &current->cap_table[cid_src];
-        Cap *next = cap_src->next;
-        /* Validate slices */
-        if (!(next != NULL && cap_is_child(cap_src, next)) &&
-            cap_is_child(cap_src, cap_dest)) {
-                if (CapInsert(cap_src, cap_dest)) {
-                        current->args[0] = 0;
-                } else {
-                        current->args[0] = 3;
-                }
+        if (!cap_is_valid(cap_dest) || !cap_is_child(cap_src, cap_dest)) {
+                current->args[0] = 1;
+                return;
         }
+        /* If parent has a child, error. */
+        Cap *cap_next = cap_src->next;
+        if (cap_next != NULL && cap_is_child(cap_src, cap_next)) {
+                current->args[0] = 1;
+                return;
+        }
+        /* Validate slices */
+        current->args[0] = CapInsert(cap_src, cap_dest);
 }
+
 void SyscallSplit(uintptr_t cid_src, uintptr_t cid_dest0, uint64_t field00,
                   uint64_t field01, uintptr_t cid_dest1, uint64_t field10,
                   uint64_t field11) {
-        if (cid_dest0 >= N_CAPS || cid_dest1 >= N_CAPS || cid_src >= N_CAPS) {
-                current->args[0] = 1;
-        }
-
-        Cap *cap_dest0 = &current->cap_table[cid_dest0];
-        Cap *cap_dest1 = &current->cap_table[cid_dest1];
+        Cap *cap_src = &current->cap_table[cid_src % N_CAPS];
+        Cap *cap_dest0 = &current->cap_table[cid_dest0 % N_CAPS];
+        Cap *cap_dest1 = &current->cap_table[cid_dest1 % N_CAPS];
         if (!cap_is_deleted(cap_dest0) || !cap_is_deleted(cap_dest1)) {
-                current->args[0] = 2;
+                current->args[0] = 0;
                 return;
         }
         cap_dest0->field0 = field00;
         cap_dest0->field1 = field01;
         cap_dest1->field0 = field10;
         cap_dest1->field1 = field11;
-        Cap *cap_src = &current->cap_table[cid_src];
         Cap *next = cap_src->next;
         /* Validate slices */
         if (!(next != NULL && cap_is_child(cap_src, next)) &&

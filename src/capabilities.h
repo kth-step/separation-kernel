@@ -215,6 +215,19 @@ static inline bool cap_validate_pe(const CapPmpEntry pe) {
         return begin < end && (a > 0) && (rwx > 0);
 }
 
+static inline bool cap_is_valid(Cap *cap) {
+        switch (cap_get_type(cap)) {
+                case CAP_TIME_SLICE:
+                        return cap_validate_ts(cap_get_time_slice(cap));
+                case CAP_MEMORY_SLICE:
+                        return cap_validate_ms(cap_get_memory_slice(cap));
+                case CAP_PMP_ENTRY:
+                        return cap_validate_pe(cap_get_pmp_entry(cap));
+                default:
+                        return true;
+        }
+}
+
 /* Check if a PmpEntry is child of a Memory Slice */
 static inline bool cap_is_child_ms_pe(const CapMemorySlice parent,
                                       const CapPmpEntry child) {
@@ -247,6 +260,6 @@ static inline bool cap_is_child(Cap *parent, Cap *child) {
 }
 
 void CapRevoke(Cap *cap);
-void CapDelete(Cap *cap);
-int CapMove(Cap *dest, Cap *src);
-int CapInsert(Cap *parent, Cap *child);
+bool CapDelete(Cap *cap);
+bool CapMove(Cap *dest, Cap *src);
+bool CapInsert(Cap *parent, Cap *child);
