@@ -51,7 +51,7 @@ static inline uint64_t sched_get_length(uint64_t s, uint64_t q,
         return length;
 }
 
-static int sched_get_proc(uintptr_t hartid, uint64_t time, Process **proc) {
+static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         /* Calculate the current quantum */
         uint64_t q = (time / TICKS) % N_QUANTUM;
         /* Get the current quantum schedule */
@@ -86,7 +86,7 @@ void Sched(void) {
         uintptr_t hartid = read_csr(mhartid);
 
         /* Process to run and number of time slices to run for */
-        Process *proc;
+        Proc *proc;
 
         /* Here the core tries to fetch a process to run */
         while (1) {

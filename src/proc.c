@@ -21,13 +21,13 @@
 extern void AsmTrapExit();
 
 /* Defined in proc.h */
-Process processes[N_PROC];
+Proc processes[N_PROC];
 Capability cap_tables[N_PROC][N_CAPS];
 
 /* Initializes one process. */
 static void proc_init_proc(int pid) {
         /* Get the PCB */
-        Process *proc = processes + pid;
+        Proc *proc = processes + pid;
         /* Set the process id to */
         proc->pid = pid;
         /* Set the process's kernel stack. */
@@ -47,11 +47,11 @@ static void proc_init_proc(int pid) {
         proc->state = PROC_HALTED;
 }
 
-static void proc_init_boot_proc(void) {
+static void proc_init_boot_proc(Proc *boot) {
         /* Set the initial PC. */
-        processes[0].pc = BOOT_PC;
+        boot->pc = BOOT_PC;
         /* Set it to running. */
-        processes[0].state = PROC_RUNNING;
+        boot->state = PROC_RUNNING;
 
         /* Gives all time capabilities to boot process */
         for (int i = 0; i < N_PROC; ++i) {
@@ -61,24 +61,24 @@ static void proc_init_boot_proc(void) {
                 ts.begin = 0;
                 ts.end = N_QUANTUM;
                 ts.fuel = 255;
-                cap_set_time_slice(&processes[0].cap_table[i + 2], ts);
-                processes[0].cap_table[i + 2].next = NULL;
-                processes[0].cap_table[i + 2].prev = NULL;
+                cap_set_time_slice(&boot->cap_table[i + 2], ts);
+                boot->cap_table[i + 2].next = NULL;
+                boot->cap_table[i + 2].prev = NULL;
         }
         CapMemorySlice ms;
         ms.perm = 0x7;
         ms.begin = USER_MEMORY_BEGIN;
         ms.end = USER_MEMORY_END;
-        cap_set_memory_slice(&processes[0].cap_table[1], ms);
+        cap_set_memory_slice(&boot->cap_table[1], ms);
         CapPmpEntry pe;
         pe.cfg = 0x5 | (3 << 3);
         pe.addr = USER_MEMORY_BEGIN | (0x1000 - 1);
         pe.addr_tor = 0;
-        cap_set_pmp_entry(&processes[0].cap_table[0], pe);
-        processes[0].cap_table[0].prev = &processes[0].cap_table[1];
-        processes[0].cap_table[0].next = NULL;
-        processes[0].cap_table[1].next = &processes[0].cap_table[0];
-        processes[0].cap_table[1].prev = NULL;
+        cap_set_pmp_entry(&boot->cap_table[0], pe);
+        boot->cap_table[0].prev = &boot->cap_table[1];
+        boot->cap_table[0].next = NULL;
+        boot->cap_table[1].next = &boot->cap_table[0];
+        boot->cap_table[1].prev = NULL;
 
         /* TODO: Set pc to beginning of CapPmpEntry/CapMemorySlice. */
 }
@@ -89,5 +89,5 @@ void ProcInitProcesses(void) {
         for (int i = 0; i < N_PROC; i++)
                 proc_init_proc(i);
         /*** Boot process ***/
-        proc_init_boot_proc();
+        proc_init_boot_proc(&processes[0]);
 }

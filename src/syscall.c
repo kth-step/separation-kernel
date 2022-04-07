@@ -29,7 +29,7 @@ void SyscallInit(uintptr_t cid_sup, uintptr_t cid_pmp) {
         }
         CapSupervisor sup = cap_get_supervisor(cap_sup);
         assert(sup.pid < N_PROC);
-        Process *proc = &processes[sup.pid];
+        Proc *proc = &processes[sup.pid];
         /* Check if process has halted. */
         if (proc->state == PROC_HALTED) {
                 current->args[0] = 3;
