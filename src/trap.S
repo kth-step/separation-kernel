@@ -96,7 +96,8 @@ __exception:
          * triggering the scheduler. Return address will be
          * the csrr above.
          */
-        bnez    t1,AsmSwitchToSched
+        beqz    t1,AsmTrapExit
+        call    AsmSwitchToSched
 
 AsmTrapExit:
 #ifdef DEBUG
