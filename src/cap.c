@@ -1,5 +1,5 @@
 // See LICENSE file for copyright and license details.
-#include "capabilities.h"
+#include "cap.h"
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -7,6 +7,10 @@
 
 #include "atomic.h"
 #include "sched.h"
+#include "cap_util.h"
+
+/** Capability table */
+Cap cap_tables[N_PROC][N_CAPS];
 
 static inline bool cap_try_mark(Cap *node) {
         return !is_marked(amoor(&node->prev, mark_bit));
@@ -45,27 +49,23 @@ static inline bool cap_delete(Cap *prev, Cap *curr) {
  * Returns 1 if successful, otherwise 0.
  * Assumption: parent != NULL and is_marked(parent->prev)
  */
-static inline bool cap_insert(Cap *parent, Cap *child) {
-        Cap *next = parent->next;
-        if (next == NULL || compare_and_swap(&next->prev, parent, child)) {
+static inline bool cap_append(Cap *node, Cap *prev) {
+        Cap *next = prev->next;
+        if (next == NULL || compare_and_swap(&next->prev, prev, node)) {
                 fence(w, w);
-                child->next = next;
+                node->next = next;
                 fence(w, w);
-                parent->next = child;
+                prev->next = node;
                 fence(w, w);
-                child->prev = parent;
+                node->prev = prev;
                 return true;
         }
         return false;
 }
 
-extern void AsmSwitchToSched();
-
 bool CapDelete(Cap *curr) {
         while (1) {
                 Cap *prev = unmark(curr->prev);
-                sched_preemption();
-
                 if (prev != NULL && !cap_try_mark(prev))
                         continue;
                 bool succ = cap_delete(prev, curr);
@@ -76,10 +76,11 @@ bool CapDelete(Cap *curr) {
         }
 }
 
+/*
 void cap_revoke_ms(Cap *curr) {
         Cap *next = curr->next;
         CapMemorySlice ms = cap_get_memory_slice(curr);
-        while (!cap_is_deleted(curr) && next && cap_is_child_ms(ms, next)) {
+        while (!cap_is_deleted(curr) && next) {
                 sched_preemption();
                 // Get the previous node
                 // Lock curr
@@ -91,12 +92,10 @@ void cap_revoke_ms(Cap *curr) {
                 next = curr->next;
         }
 }
-
 void cap_revoke_ts(Cap *curr) {
         Cap *next = curr->next;
         CapTimeSlice ts = cap_get_time_slice(curr);
-        while (!cap_is_deleted(curr) && next &&
-               cap_is_child_ts_ts(ts, cap_get_time_slice(next))) {
+        while (!cap_is_deleted(curr) && next) {
                 sched_preemption();
                 // Lock curr
                 if (!cap_try_mark(curr))
@@ -107,37 +106,26 @@ void cap_revoke_ts(Cap *curr) {
                 next = curr->next;
         }
 }
+*/
 
 void CapRevoke(Cap *curr) {
-        switch (cap_get_type(curr)) {
-                case CAP_MEMORY_SLICE:
-                        cap_revoke_ms(curr);
-                        break;
-                case CAP_TIME_SLICE:
-                        cap_revoke_ts(curr);
-                        break;
-                default:
-                        break;
-        }
 }
 
 /**
  * Insert a child capability after the parent
  * only if the parent is not deleted.
  */
-bool CapInsert(Cap *parent, Cap *child) {
+bool CapAppend(Cap *node, Cap *prev) {
         /* Child node must be empty */
-        if (!cap_is_deleted(child))
+        if (!cap_is_deleted(node))
                 return false;
         bool succ = false;
         /* While parent is alive, attempt to insert */
-        while (!succ && !cap_is_deleted(parent)) {
-                /* Check if timer has been triggered */
-                sched_preemption();
-                if (!cap_try_mark(parent))
+        while (!succ && !cap_is_deleted(prev)) {
+                if (!cap_try_mark(prev))
                         continue;
-                succ = cap_insert(parent, child);
-                cap_unmark(parent);
+                succ = cap_append(node, prev);
+                cap_unmark(prev);
         }
         return succ;
 }
@@ -147,13 +135,33 @@ bool CapInsert(Cap *parent, Cap *child) {
  * Uses a CapInsert followed by CapDelete.
  */
 bool CapMove(Cap *dest, Cap *src) {
-        dest->field0 = src->field0;
-        dest->field1 = src->field1;
-        if (CapInsert(src, dest)) {
+        if (cap_is_deleted(src))
+                return false;
+        dest->data[0] = src->data[0];
+        dest->data[1] = src->data[1];
+        if (CapAppend(src, dest)) {
                 // First insert the copy after the parent
                 // Then delete the parent.
                 CapDelete(src);
                 return true;
         }
         return false;
+}
+
+uint64_t CapSliceTS(Cap *src, Cap *dest, uint64_t data[2]) {
+        return -1;
+}
+
+uint64_t CapSplitTS(Cap *src, Cap *dest0, Cap *dest1, uint64_t data0[2],
+                    uint64_t data1[2]) {
+        return -1;
+}
+
+uint64_t CapSliceMS(Cap *src, Cap *dest, uint64_t data[2]) {
+        return -1;
+}
+
+uint64_t CapSplitMS(Cap *src, Cap *dest0, Cap *dest1, uint64_t data0[2],
+                    uint64_t data1[2]) {
+        return -1;
 }

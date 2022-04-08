@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "capabilities.h"
+#include "cap.h"
 #include "config.h"
 #include "lock.h"
 
@@ -44,17 +44,13 @@ struct proc {
          * this simplifies inter-process communication.
          */
         uintptr_t args[8];
-        /** Program counter.
-         * We store the process's program counter here, this simplifies
-         * exception handling and supervisor capabilities.
-         */
-        uintptr_t *pc;
         /** Process state.
          * TODO: Comment
          */
         ProcState state;
-        /* TODO: Replace with process state */
-        Lock lock;
+        bool halt;
+
+        int epid;
 };
 
 /** Processes
@@ -62,8 +58,6 @@ struct proc {
  * process 0.
  */
 extern Proc processes[N_PROC];
-/** Capability table */
-extern Cap cap_tables[N_PROC][N_CAPS];
 
 /** Current process
  * This is a core local variable. If the core has a process, then current
@@ -76,3 +70,5 @@ register Proc *current __asm__("tp");
  * entry points.
  */
 void ProcInitProcesses(void);
+
+void ProcHalt(Proc *proc);

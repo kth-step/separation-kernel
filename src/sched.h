@@ -11,7 +11,7 @@ void Sched(void);
 
 extern void AsmSwitchToSched();
 static inline void sched_preemption() {
-        if (read_csr(mip) & 128) {
+        if (__builtin_expect(read_csr(mip) & 128,0)) {
                 AsmSwitchToSched();
         }
 }

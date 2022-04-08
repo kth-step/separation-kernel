@@ -28,8 +28,3 @@
 #define USER_MEMORY_BEGIN 0x80000000UL
 #define USER_MEMORY_END 0x100000000UL
 
-/* Boot PC. This will be removed later. */
-#ifndef __ASSEMBLER__
-extern void user_code();
-#define BOOT_PC (uintptr_t*)user_code
-#endif
