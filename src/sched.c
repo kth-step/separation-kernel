@@ -73,8 +73,32 @@ static void release_current(void) {
         /* If current == 0, we have nothing to release */
         if (current) {
                 /* Release the process */
-                release_lock(&current->lock);
+                current->state = PROC_SUSPENDED;
+                fence(rw, rw);
+                if (current->halt)
+                        compare_and_swap(&current->state, PROC_SUSPENDED,
+                                         PROC_HALTED);
                 current = 0;
+        }
+}
+
+bool sched_acquire_proc(Proc *proc) {
+        current = proc;
+        return compare_and_swap(&proc->state, PROC_SUSPENDED, PROC_RUNNING);
+}
+
+void set_timeout(uint64_t quantum) {
+        /* Timeout.
+         * TICKS * length is the number of ticks for process to
+         * run of which SLACK_TIME is the time reserved for
+         * scheduler.
+         */
+        uint64_t timeout = quantum * TICKS - SLACK_TICKS;
+        write_timeout(read_csr(mhartid), timeout);
+}
+
+void wait(uint64_t time) {
+        while (read_time() < time * TICKS) {
         }
 }
 
@@ -94,24 +118,11 @@ void Sched(void) {
                 uint64_t time = (read_time() / TICKS) + 1;
                 /* Try getting a process at that time slice. */
                 uint64_t length = sched_get_proc(hartid, time, &proc);
-                if (length > 0 && try_acquire_lock(&proc->lock)) {
-                        /* If we acquire the lock, set proc as our current
-                         * process */
-                        current = proc;
-
-                        /* Timeout.
-                         * TICKS * length is the number of ticks for process to
-                         * run of which SLACK_TIME is the time reserved for
-                         * scheduler.
-                         */
-                        uint64_t timeout =
-                            time * TICKS + TICKS * length - SLACK_TICKS;
-
-                        /* Write to timeout register */
-                        write_timeout(hartid, timeout);
+                if (length > 0 && sched_acquire_proc(proc)) {
+                        /* Set timeout */
+                        set_timeout(time + length);
                         /* Wait until it is time to run */
-                        while (read_time() < time * TICKS)
-                                ;
+                        wait(time);
                         /* Returns to AsmSwitchToProc. */
                         return;
                 }

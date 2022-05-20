@@ -3,196 +3,96 @@
 #include <assert.h>
 #include <stdint.h>
 
-#include "capabilities.h"
+#include "cap.h"
+#include "cap_util.h"
 #include "proc.h"
 #include "stack.h"
 
+/* Read process ID. */
+void SyscallReadPid(void);
+
+/* Read cap at cs. */
+void SyscallCapRead(uint64_t cs);
+/* Move cap from cs to cd. */
+void SyscallCapMove(uint64_t cd, uint64_t cs);
+/* Revoke cap at cs */
+void SyscallCapRevoke(uint64_t cs);
+/* Delete cap at cs */
+void SyscallCapDelete(uint64_t cs);
+
+/* Make memory slice at cd using memory slice at cs. */
+void SyscallMemorySlice(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
+                        uint64_t rwx);
+
+/* Split memory slice at cs, put them in cd0 and cd1. */
+void SyscallMemorySplit(uint64_t cd0, uint64_t cd1, uint64_t cs, uint64_t mid);
+
+Cap *curr_get_cap(uint64_t idx) {
+        return &current->cap_table[idx % N_CAPS];
+}
+
 /* Get process ID */
-void SyscallPid(void) {
+void SyscallReadPid(void) {
         current->args[0] = current->pid;
 }
 
-/* Initialize a process using a supervisor. */
-void SyscallInit(uintptr_t cid_sup, uintptr_t cid_pmp) {
-        current->args[0] = 0;
-        /* Check if valid capability index */
-        Cap *cap_sup = &current->cap_table[cid_sup % N_CAPS];
-        Cap *cap_pmp = &current->cap_table[cid_pmp % N_CAPS];
-
-        /* Check if capability type is supervisor */
-        if (!cap_is_type(cap_sup, CAP_SUPERVISOR) ||
-            !cap_is_type(cap_pmp, CAP_PMP_ENTRY))
-                return;
-        /* Get the superviser cap */
-        CapSupervisor sup = cap_get_supervisor(cap_sup);
-        assert(sup.pid < N_PROC);
-        /* Get the supervisee */
-        Proc *proc = &processes[sup.pid];
-        /* Check if the supervisee has halted. */
-        if (proc->state != PROC_HALTED)
-                return;
-
-        /* Now everything is set */
-        /* Clean stack. */
-        for (int i = 0; i < (STACK_SIZE / 8); i++)
-                proc_stack[sup.pid][i] = 0;
-        /* Revoke then delete all capabilities */
-        for (int i = 0; i < N_CAPS; i++) {
-                CapRevoke(&proc->cap_table[i]);
-                CapDelete(&proc->cap_table[i]);
-        }
-
-        /* Sets PMP capability */
-        /* TODO: Unload PMP cap in supervisor */
-        /* Move PMP capabilitiy to supervisee */
-        CapMove(&proc->cap_table[0], cap_pmp);
-        /* TODO: Load PMP cap in supervisor */
-        /* Set success */
-        current->args[0] = 1;
-}
-
 /* Read a capability. */
-void SyscallReadCap(uintptr_t cid) {
-        Cap *cap = &current->cap_table[cid % N_CAPS];
-        /* Read fields first */
-        current->args[0] = cap->field0;
-        current->args[1] = cap->field1;
-        /* Fence so we read first then check if deleted */
-        fence(r, r);
-        if (cap_is_deleted(cap)) {
-                /* If deleted, then set args. */
+void SyscallCapRead(uintptr_t cs) {
+        Cap *cap = curr_get_cap(cs);
+        if (cap_get_data(cap, &current->args[1])) {
+                current->args[0] = 1;
+        } else {
                 current->args[0] = 0;
                 current->args[1] = 0;
+                current->args[2] = 0;
         }
 }
 
-/* Move a capability internally */
-void SyscallMove(uintptr_t cid_dest, uintptr_t cid_src) {
-        if (cid_dest == cid_src) {
-                current->args[0] = 0;
-                return;
-        }
-        Cap *cap_dest = &current->cap_table[cid_dest % N_CAPS];
-        Cap *cap_src = &current->cap_table[cid_src % N_CAPS];
-        if (!cap_is_deleted(cap_dest) || cap_is_deleted(cap_src)) {
-                current->args[0] = 0;
-                return;
-        }
-        current->args[0] = CapMove(cap_dest, cap_src);
+void SyscallCapMove(uintptr_t cd, uintptr_t cs) {
+        current->args[0] = -1;
 }
 
-/* Revoke on a capability, deleting children */
-void SyscallRevoke(uintptr_t cid) {
-        Cap *cap = &current->cap_table[cid % N_CAPS];
-        if (cap_is_deleted(cap))
-                current->args[0] = 0;
-        CapRevoke(cap);
-        current->args[0] = 1;
+void SyscallCapRevoke(uintptr_t cs) {
+        current->args[0] = -1;
 }
 
-/* Deletes a capability */
-void SyscallDelete(uintptr_t cid) {
-        Cap *cap = &current->cap_table[cid % N_CAPS];
-        current->args[0] = CapDelete(cap);
+void SyscallCapDelete(uintptr_t cs) {
+        current->args[0] = -1;
 }
 
-/* Create a slice of a capability */
-void SyscallSlice(uintptr_t cid_src, uintptr_t cid_dest, uint64_t field0,
-                  uint64_t field1) {
-        current->args[0] = 0;
-        Cap *cap_src = &current->cap_table[cid_src % N_CAPS];
-        Cap *cap_dest = &current->cap_table[cid_dest % N_CAPS];
-        if (!cap_is_deleted(cap_dest) || cap_is_deleted(cap_src))
-                return;
-        cap_dest->field0 = field0;
-        cap_dest->field1 = field1;
-        if (!cap_is_valid(cap_dest) || !cap_is_child(cap_src, cap_dest))
-                return;
-        /* If parent has a child, error. */
-        Cap *cap_next = cap_src->next;
-        if (cap_next != NULL && cap_is_child(cap_src, cap_next))
-                return;
-        /* Validate slices */
-        current->args[0] = CapInsert(cap_src, cap_dest);
-}
-
-/* Creates two slices of a capability */
-void SyscallSplit(uintptr_t cid_src, uintptr_t cid_dest0, uint64_t field00,
-                  uint64_t field01, uintptr_t cid_dest1, uint64_t field10,
-                  uint64_t field11) {
-        current->args[0] = 0;
-        Cap *cap_src = &current->cap_table[cid_src % N_CAPS];
-        Cap *cap_dest0 = &current->cap_table[cid_dest0 % N_CAPS];
-        Cap *cap_dest1 = &current->cap_table[cid_dest1 % N_CAPS];
-        if (!cap_is_deleted(cap_dest0) || !cap_is_deleted(cap_dest1))
-                return;
-        cap_dest0->field0 = field00;
-        cap_dest0->field1 = field01;
-        cap_dest1->field0 = field10;
-        cap_dest1->field1 = field11;
-        /* Validate slices */
-        if (!cap_is_valid(cap_dest0) || !cap_is_valid(cap_dest1))
-                return;
-        if (!cap_is_child(cap_src, cap_dest0) ||
-            !cap_is_child(cap_src, cap_dest1))
-                return;
-        Cap *next = cap_src->next;
-        if (next != NULL && cap_is_child(cap_src, next))
-                return;
-        if (cap_is_type(cap_dest0, CAP_MEMORY_SLICE)) {
-                if (cap_is_type(cap_dest1, CAP_MEMORY_SLICE) &&
-                    cap_is_intersect_ms_ms(cap_get_memory_slice(cap_dest0),
-                                           cap_get_memory_slice(cap_dest1))) {
-                        return;
-                } else if (cap_is_intersect_ms_pe(
-                               cap_get_memory_slice(cap_dest0),
-                               cap_get_pmp_entry(cap_dest1))) {
-                        return;
-                }
-        } else if (cap_is_type(cap_dest0, CAP_PMP_ENTRY)) {
-                if (cap_is_type(cap_dest1, CAP_MEMORY_SLICE) &&
-                    cap_is_intersect_ms_pe(cap_get_memory_slice(cap_dest1),
-                                           cap_get_pmp_entry(cap_dest0))) {
-                        return;
-                } else if (cap_is_intersect_pe_pe(
-                               cap_get_pmp_entry(cap_dest0),
-                               cap_get_pmp_entry(cap_dest1))) {
-                        return;
-                }
-        } else if (cap_is_type(cap_dest0, CAP_TIME_SLICE) &&
-                   cap_is_type(cap_dest1, CAP_TIME_SLICE) &&
-                   cap_is_intersect_ts_ts(cap_get_time_slice(cap_dest0),
-                                          cap_get_time_slice(cap_dest1))) {
-                return;
-        }
-        current->args[0] =
-            CapInsert(cap_src, cap_dest0) && CapInsert(cap_src, cap_dest1);
-}
-
-/* Supervisor moves a capability between itself and a supervisee */
-void SyscallSupMove(uint64_t cid_sup, uint64_t cid_dest, uint64_t cid_src,
-                    uint64_t grant) {
-        current->args[0] = 0;
-        Cap *cap_sup = &current->cap_table[cid_sup % N_CAPS];
-        if (!cap_is_type(cap_sup, CAP_SUPERVISOR))
-                return;
-        CapSupervisor sup = cap_get_supervisor(cap_sup);
-        Cap *cap_dest, *cap_src;
-        if (grant) {
-                cap_dest = &processes[sup.pid].cap_table[cid_dest % N_CAPS];
-                cap_src = &current->cap_table[cid_src % N_CAPS];
+void SyscallMemorySlice(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
+                        uint64_t rwx) {
+        Cap *src = curr_get_cap(cs);
+        Cap *dest = curr_get_cap(cd);
+        CapMemorySlice ms_src = cap_get_memory_slice(src);
+        CapMemorySlice ms_dest = cap_mk_memory_slice(begin, end, rwx);
+        if (!ms_src.valid || !cap_is_deleted(dest) || !ms_dest.valid ||
+            !cap_is_child_ms_ms(ms_src, ms_dest)) {
+                current->args[0] = -1;
         } else {
-                cap_dest = &current->cap_table[cid_dest % N_CAPS];
-                cap_src = &processes[sup.pid].cap_table[cid_src % N_CAPS];
+                cap_set_memory_slice(dest, ms_dest);
+                current->args[0] = CapAppend(dest, src);
         }
-
-        if (!cap_is_deleted(cap_dest) || cap_is_deleted(cap_src))
-                return;
-        current->args[0] = CapMove(cap_dest, cap_src);
 }
 
-/* Supervisor halts a process */
-void SyscallSupHalt(uint64_t cid_sup);
+void SyscallMemorySplit(uint64_t cd0, uint64_t cd1, uint64_t cs, uint64_t mid) {
+        Cap *src = curr_get_cap(cs);
+        Cap *dest0 = curr_get_cap(cd0);
+        Cap *dest1 = curr_get_cap(cd1);
 
-/* Supervisor resumes a process */
-void SyscallSupResume(uint64_t cid_sup);
+        CapMemorySlice ms_src = cap_get_memory_slice(src);
+        CapMemorySlice ms_dest0 =
+            cap_mk_memory_slice(ms_src.begin, mid, ms_src.rwx);
+        CapMemorySlice ms_dest1 =
+            cap_mk_memory_slice(mid, ms_src.end, ms_src.rwx);
+
+        if (!ms_src.valid || !cap_is_deleted(dest0) || !cap_is_deleted(dest1) ||
+            !ms_dest0.valid || !ms_dest1.valid) {
+                current->args[0] = -1;
+        } else {
+                cap_set_memory_slice(dest0, ms_dest0);
+                cap_set_memory_slice(dest1, ms_dest1);
+                current->args[0] =
+                    CapAppend(dest0, src) && CapAppend(dest1, src);
+        }
+}

@@ -29,6 +29,7 @@ _start:
         /*** Initialize core's control and status registers. ***/
         /* Set the trap entry function. */
         la      t0,AsmTrapEntry
+        ori     t0,t0,1
         csrw    mtvec,t0
         /* Enable machine timer interrupt. */
         li      t0,128
@@ -57,12 +58,11 @@ __wait: la      t0,lock
 
 
         /*** Here we start executing the kernel. ***/
-        /* Set return address to AsmSwitchToProc. */
-1:      la      ra,AsmSwitchToProc
-        /* Set thread pointer to 0. */
+1:      /* Set thread pointer to 0. */
         li      tp,0
         /* Jump to scheduler. */
-        tail    Sched
+        call    Sched
+        tail    AsmResumeProc
 
 .section .data.init
 /* This lock is used for process initialization */

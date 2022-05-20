@@ -4,7 +4,7 @@
 
 enum ordering { relaxed, acquire, release, sequential };
 
-#define fence(pred, succ) __asm__ volatile("fence " #pred "," #succ)
+#define fence(pred, succ) __asm__("fence " #pred "," #succ)
 
 #define __amoop(op, ptr, value, order)                                        \
         ({                                                                    \
