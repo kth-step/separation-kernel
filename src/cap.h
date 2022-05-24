@@ -23,9 +23,3 @@ void CapRevoke(Cap *cap);
 bool CapDelete(Cap *cap);
 bool CapMove(Cap *dest, Cap *src);
 bool CapAppend(Cap *node, Cap *prev);
-
-uint64_t CapSliceTS(Cap *src, Cap *dest, uint64_t data[2]);
-uint64_t CapSplitTS(Cap *src, Cap *dest0, Cap *dest1, uint64_t data0[2], uint64_t data1[2]);
-
-uint64_t CapSliceMS(Cap *src, Cap *dest, uint64_t data[2]);
-uint64_t CapSplitMS(Cap *src, Cap *dest0, Cap *dest1, uint64_t data0[2], uint64_t data1[2]);

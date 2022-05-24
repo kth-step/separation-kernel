@@ -6,8 +6,8 @@
 #include <stddef.h>
 
 #include "atomic.h"
-#include "sched.h"
 #include "cap_util.h"
+#include "sched.h"
 
 /** Capability table */
 Cap cap_tables[N_PROC][N_CAPS];
@@ -76,39 +76,59 @@ bool CapDelete(Cap *curr) {
         }
 }
 
-/*
 void cap_revoke_ms(Cap *curr) {
-        Cap *next = curr->next;
-        CapMemorySlice ms = cap_get_memory_slice(curr);
-        while (!cap_is_deleted(curr) && next) {
-                sched_preemption();
-                // Get the previous node
-                // Lock curr
+        CapMemorySlice parent = cap_get_memory_slice(curr);
+        if (!parent.valid)
+                return;
+        do {
+                Cap *next = curr->next;
+                if (!next)
+                        break;
+                // TODO: Fix PMP Entry case
+                CapMemorySlice child = cap_get_memory_slice(next);
+                if (!child.valid)
+                        break;
+                if (!cap_is_child_ms_ms(parent, child))
+                        break;
                 if (!cap_try_mark(curr))
                         continue;
                 cap_delete(curr, next);
-                // Unlock curr
                 cap_unmark(curr);
-                next = curr->next;
-        }
+        } while (!cap_is_deleted(curr));
 }
+
 void cap_revoke_ts(Cap *curr) {
-        Cap *next = curr->next;
-        CapTimeSlice ts = cap_get_time_slice(curr);
-        while (!cap_is_deleted(curr) && next) {
-                sched_preemption();
-                // Lock curr
+        CapTimeSlice parent = cap_get_time_slice(curr);
+        if (!parent.valid)
+                return;
+        do {
+                Cap *next = curr->next;
+                if (!next)
+                        break;
+                CapTimeSlice child = cap_get_time_slice(next);
+                if (!child.valid)
+                        break;
+                if (!cap_is_child_ts_ts(parent, child))
+                        break;
                 if (!cap_try_mark(curr))
                         continue;
                 cap_delete(curr, next);
-                // Unlock curr
                 cap_unmark(curr);
-                next = curr->next;
-        }
+        } while (!cap_is_deleted(curr));
 }
-*/
 
 void CapRevoke(Cap *curr) {
+        CapType type = cap_get_type(curr);
+        switch (type) {
+                case CAP_MEMORY_SLICE:
+                        cap_revoke_ms(curr);
+                        break;
+                case CAP_TIME_SLICE:
+                        cap_revoke_ts(curr);
+                        break;
+                default:
+                        break;
+        }
 }
 
 /**
@@ -135,7 +155,7 @@ bool CapAppend(Cap *node, Cap *prev) {
  * Uses a CapInsert followed by CapDelete.
  */
 bool CapMove(Cap *dest, Cap *src) {
-        if (cap_is_deleted(src))
+        if (cap_is_deleted(src) || !cap_is_deleted(dest))
                 return false;
         dest->data[0] = src->data[0];
         dest->data[1] = src->data[1];
@@ -146,22 +166,4 @@ bool CapMove(Cap *dest, Cap *src) {
                 return true;
         }
         return false;
-}
-
-uint64_t CapSliceTS(Cap *src, Cap *dest, uint64_t data[2]) {
-        return -1;
-}
-
-uint64_t CapSplitTS(Cap *src, Cap *dest0, Cap *dest1, uint64_t data0[2],
-                    uint64_t data1[2]) {
-        return -1;
-}
-
-uint64_t CapSliceMS(Cap *src, Cap *dest, uint64_t data[2]) {
-        return -1;
-}
-
-uint64_t CapSplitMS(Cap *src, Cap *dest0, Cap *dest1, uint64_t data0[2],
-                    uint64_t data1[2]) {
-        return -1;
 }

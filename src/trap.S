@@ -49,8 +49,8 @@ __syscall_trampoline:
         j       SyscallCapDelete
         j       SyscallMemorySlice
         j       SyscallMemorySplit
-        j       __hang
-        j       __hang
+        j       SyscallTimeSlice
+        j       SyscallTimeSplit
         j       __hang
         j       __hang
         j       __hang
@@ -135,9 +135,9 @@ __exception:
 __trampoline:
         /* Store user pc */
         sd      t3,(11*8)(sp)
-        add     ra,ra,t1
         csrsi   mstatus,1
         /* Jump to trampoline */
+        add     ra,ra,t1
         jalr    ra,0(ra)
         csrci   mstatus,1
 
@@ -225,23 +225,33 @@ __timer_handler:
         sd      t5,(30*8)(sp)
         sd      t6,(31*8)(sp)
 
+        /* Store PC */
         csrr    t1,mepc
         sd      t1,(0*8)(sp)
+
+        /* Store SP */
         csrr    t0,mscratch
         sd      t0,(2*8)(sp)
 
+        /* Swap core and process sp */
         amoswap.d.aqrl  sp,sp,(tp)
+
+        /* Call scheduler */
         call    Sched
         
 AsmResumeProc:
+        /* Swap core and process sp */
         amoswap.d.aqrl  sp,sp,(tp)
 
+        /* Save kernel gp and TP */
         sd      gp,(-1*8)(sp)
         sd      tp,(-2*8)(sp)
 
+        /* Load PC */
         ld      t1,(2*8)(sp)
         csrw    mscratch,t1
 
+        /* Load SP */
         ld      t0,(0*8)(sp)
         csrw    mepc,t0
 
