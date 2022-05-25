@@ -11,6 +11,10 @@
 /** Capability table */
 Cap cap_tables[N_PROC][N_CAPS];
 
+/* Make one sentinel node per core, one for memory, one for channels and one for
+ * supervisor capabilies */
+Cap sentinel[N_CORES + 3][2];
+
 /*
  * Tries to delete node curr.
  * Assumption: prev = NULL or is_marked(prev->prev)
@@ -135,4 +139,16 @@ bool CapMove(Cap *dest, Cap *src) {
         dest->data[0] = src->data[0];
         dest->data[1] = src->data[1];
         return CapAppend(src, dest) && CapDelete(src);
+}
+
+Cap *CapInitSentinel(int i) {
+        sentinel[i][0].next = &sentinel[i][1];
+        sentinel[i][1].prev = &sentinel[i][0];
+        sentinel[i][0].data[0] = 0;
+        sentinel[i][0].data[1] = 0;
+        sentinel[i][1].data[0] = 0;
+        sentinel[i][1].data[1] = 0;
+        /* Return the head of the sentinel node */
+        /* We append capbilities to this head */
+        return &sentinel[i][0];
 }

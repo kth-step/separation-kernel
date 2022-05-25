@@ -14,7 +14,7 @@ DA=$(BUILD_DIR)/$(PROGRAM).da
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
-CFLAGS+=-O2 -gdwarf-2
+CFLAGS+=-Og -gdwarf-2
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+= -DDEBUG
 CFLAGS+=-Wall -fanalyzer

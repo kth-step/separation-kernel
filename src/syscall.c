@@ -54,12 +54,12 @@ void SyscallCapMove(uintptr_t cd, uintptr_t cs) {
         current->args[0] = CapMove(dest, src);
 }
 
-void SyscallCapRevoke(uintptr_t cs) {
-        CapRevoke(curr_get_cap(cs));
+void SyscallCapDelete(uintptr_t cs) {
+        current->args[0] = CapDelete(curr_get_cap(cs));
 }
 
-void SyscallCapDelete(uintptr_t cs) {
-        current->args[0] = -1;
+void SyscallCapRevoke(uintptr_t cs) {
+        CapRevoke(curr_get_cap(cs));
 }
 
 void SyscallMemorySlice(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
@@ -100,11 +100,13 @@ void SyscallMemorySplit(uint64_t cd0, uint64_t cd1, uint64_t cs, uint64_t mid) {
 }
 
 void SyscallTimeSlice(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
-                      uint64_t tsid, uint64_t fuel) {
+                      uint64_t tsid, uint64_t tsid_end) {
         Cap *src = curr_get_cap(cs);
         Cap *dest = curr_get_cap(cd);
         CapTimeSlice ts_src = cap_get_time_slice(src);
-        CapTimeSlice ts_dest = cap_mk_time_slice(begin, end, tsid, fuel);
+        CapTimeSlice ts_dest =
+            cap_mk_time_slice(ts_src.hartid, begin, end, tsid, tsid_end);
+
         if (!ts_src.valid || !cap_is_deleted(dest) || !ts_dest.valid ||
             !cap_is_child_ts_ts(ts_src, ts_dest)) {
                 current->args[0] = -1;
@@ -121,10 +123,11 @@ void SyscallTimeSplit(uint64_t cd0, uint64_t cd1, uint64_t cs,
         Cap *dest1 = curr_get_cap(cd1);
 
         CapTimeSlice ts_src = cap_get_time_slice(src);
-        CapTimeSlice ts_dest0 = cap_mk_time_slice(ts_src.begin, mid_quantum,
-                                                  ts_src.tsid + 1, mid_id);
-        CapTimeSlice ts_dest1 = cap_mk_time_slice(
-            mid_quantum, ts_src.end, mid_id, ts_src.tsid + ts_src.fuel);
+        CapTimeSlice ts_dest0 = cap_mk_time_slice(
+            ts_src.hartid, ts_src.begin, mid_quantum, ts_src.tsid + 1, mid_id);
+        CapTimeSlice ts_dest1 =
+            cap_mk_time_slice(ts_src.hartid, mid_quantum, ts_src.end, mid_id,
+                              ts_src.tsid_end);
 
         if (!ts_src.valid || !cap_is_deleted(dest0) || !cap_is_deleted(dest1) ||
             !ts_dest0.valid || !ts_dest1.valid) {

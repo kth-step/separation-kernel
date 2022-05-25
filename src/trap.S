@@ -45,8 +45,8 @@ __syscall_trampoline:
         j       SyscallReadPid
         j       SyscallCapRead
         j       SyscallCapMove
-        j       SyscallCapRevoke
         j       SyscallCapDelete
+        j       SyscallCapRevoke
         j       SyscallMemorySlice
         j       SyscallMemorySplit
         j       SyscallTimeSlice

@@ -40,7 +40,43 @@ static void proc_init_proc(int pid) {
         proc->state = PROC_HALTED;
 }
 
+void proc_init_memory(Cap *pmp, Cap *memory) {
+        uint64_t begin = USER_MEMORY_BEGIN;
+        uint64_t end = USER_MEMORY_END;
+        uint64_t pmp_length = BOOT_PMP_LENGTH;
+        uint64_t pmp_addr = begin | ((pmp_length -1) >> 1);
+        CapPmpEntry pe = cap_mk_pmp_entry(pmp_addr, CAP_RX);
+        CapMemorySlice ms = cap_mk_memory_slice(begin, end, CAP_RWX);
+        cap_set_pmp_entry(pmp, pe);
+        cap_set_memory_slice(memory, ms);
+        Cap *sentinel = CapInitSentinel(0);
+        CapAppend(memory, sentinel);
+        CapAppend(pmp, sentinel);
+}
+
+void proc_init_channels(Cap *channel) {
+}
+
+void proc_init_time(Cap time[N_PROC]) {
+        for (int i = 0; i < N_PROC; i++) {
+                Cap *sentinel = CapInitSentinel(1 + i);
+                uint8_t begin = 0;
+                uint8_t end = N_QUANTUM;
+                uint8_t tsid = 0;
+                uint8_t fuel = 255;
+                CapTimeSlice ts = cap_mk_time_slice(i, begin, end, tsid, fuel);
+                cap_set_time_slice(&time[i], ts);
+                CapAppend(&time[i], sentinel);
+        }
+}
+
+
+
 static void proc_init_boot_proc(Proc *boot) {
+        Cap *cap_table = boot->cap_table;
+        proc_init_memory(&cap_table[0], &cap_table[1]);
+        proc_init_channels(&cap_table[2]);
+        proc_init_time(&cap_table[3]);
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
         *boot->ksp = (uintptr_t)user_code;  // Temporary code.

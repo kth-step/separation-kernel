@@ -10,6 +10,16 @@ typedef enum cap_type {
         CAP_ENDPOINT
 } CapType;
 
+typedef enum cap_rwx {
+        CAP_R = 1,
+        CAP_W = 2,
+        CAP_RW = 3,
+        CAP_X = 4,
+        CAP_RX = 5,
+        CAP_WX = 6,
+        CAP_RWX = 7,
+} CapRWX;
+
 typedef struct cap_memory_slice {
         bool valid;
         uint64_t begin;
@@ -25,10 +35,11 @@ typedef struct cap_pmp_entry {
 
 typedef struct cap_time_slice {
         bool valid;
+        uint8_t hartid;
         uint8_t begin;
         uint8_t end;
         uint8_t tsid;
-        uint8_t fuel;
+        uint8_t tsid_end;
 } CapTimeSlice;
 
 typedef struct cap_endpoint {
@@ -63,8 +74,9 @@ static inline void cap_get_pmp_entry_bounds(const CapPmpEntry pe,
                                             uint64_t *begin, uint64_t *end);
 
 /* Time slice */
-static inline CapTimeSlice cap_mk_time_slice(uint8_t begin, uint8_t end,
-                                             uint8_t tsid, uint8_t fuel);
+static inline CapTimeSlice cap_mk_time_slice(uint8_t hartid, uint8_t begin,
+                                             uint8_t end, uint8_t tsid,
+                                             uint8_t tsid_end);
 static inline CapTimeSlice cap_get_time_slice(const Cap *cap);
 static inline bool cap_set_time_slice(Cap *cap, const CapTimeSlice ms);
 
@@ -173,14 +185,15 @@ void cap_get_pmp_entry_bounds(const CapPmpEntry pe, uint64_t *begin,
         *end = *begin + length;
 }
 
-CapTimeSlice cap_mk_time_slice(uint8_t begin, uint8_t end, uint8_t tsid,
-                               uint8_t fuel) {
+CapTimeSlice cap_mk_time_slice(uint8_t hartid, uint8_t begin, uint8_t end,
+                               uint8_t tsid, uint8_t tsid_end) {
         CapTimeSlice ts;
         ts.begin = begin;
         ts.end = end;
         ts.tsid = tsid;
-        ts.fuel = fuel;
-        ts.valid = (begin < end) && ((uint16_t)tsid + fuel < 256);
+        ts.tsid_end = tsid_end;
+        ts.hartid = hartid;
+        ts.valid = (begin < end) && (tsid <= tsid_end);
         return ts;
 }
 
@@ -189,20 +202,22 @@ CapTimeSlice cap_get_time_slice(const Cap *cap) {
         if (!cap_get_data(cap, data) || (data[0] & 0xFF) != CAP_TIME_SLICE) {
                 return (CapTimeSlice){.valid = false};
         }
-        uint8_t begin = data[0] >> 8;
-        uint8_t end = data[0] >> 16;
-        uint8_t tsid = data[0] >> 24;
-        uint8_t fuel = data[0] >> 32;
-        return cap_mk_time_slice(begin, end, tsid, fuel);
+        uint8_t hartid = data[0] >> 8;
+        uint8_t begin = data[0] >> 16;
+        uint8_t end = data[0] >> 24;
+        uint8_t tsid = data[0] >> 32;
+        uint8_t tsid_end = data[0] >> 40;
+        return cap_mk_time_slice(hartid, begin, end, tsid, tsid_end);
 }
 
 bool cap_set_time_slice(Cap *cap, const CapTimeSlice ts) {
         uint64_t data[2];
         data[0] = CAP_TIME_SLICE;
-        data[0] |= (uint64_t)ts.begin << 8;
-        data[0] |= (uint64_t)ts.end << 16;
-        data[0] |= (uint64_t)ts.tsid << 24;
-        data[0] |= (uint64_t)ts.fuel << 32;
+        data[0] |= (uint64_t)ts.hartid << 8;
+        data[0] |= (uint64_t)ts.begin << 16;
+        data[0] |= (uint64_t)ts.end << 24;
+        data[0] |= (uint64_t)ts.tsid << 32;
+        data[0] |= (uint64_t)ts.tsid_end << 40;
         data[1] = 0;
         return cap_set_data(cap, data);
 }
@@ -264,9 +279,9 @@ bool cap_is_child_ms_pe(const CapMemorySlice parent, const CapPmpEntry child) {
 }
 
 bool cap_is_child_ts_ts(const CapTimeSlice parent, const CapTimeSlice child) {
-        return parent.begin <= child.begin && child.end <= parent.end &&
-               parent.tsid < child.tsid &&
-               parent.tsid + parent.fuel <= child.tsid + child.fuel;
+        return parent.hartid == child.hartid && parent.begin <= child.begin &&
+               child.end <= parent.end && parent.tsid < child.tsid &&
+               (child.tsid_end <= parent.tsid_end) ;
 }
 
 bool cap_is_child_ep_ep(const CapEndpoint parent, const CapEndpoint child) {

@@ -22,3 +22,5 @@ void CapRevoke(Cap *cap);
 bool CapDelete(Cap *cap);
 bool CapMove(Cap *dest, Cap *src);
 bool CapAppend(Cap *node, Cap *prev);
+
+Cap* CapInitSentinel(int i);
