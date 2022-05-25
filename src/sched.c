@@ -43,7 +43,8 @@ static inline uint64_t sched_get_length(uint64_t s, uint64_t q,
         for (uint64_t qi = q + 1; qi < N_QUANTUM; qi++) {
                 /* If next timeslice has the same pid and tsid, then add to
                  * lenght */
-                uint64_t si = load_explicit(&schedule[qi], acquire);
+                __sync_synchronize();
+                uint64_t si = schedule[qi];
                 if ((s ^ si) & mask)
                         break;
                 length++;
@@ -55,7 +56,8 @@ static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         /* Calculate the current quantum */
         uint64_t q = time % N_QUANTUM;
         /* Get the current quantum schedule */
-        uint64_t s = load_explicit(&schedule[q], acquire);
+        __sync_synchronize();
+        uint64_t s = schedule[q];
         uint64_t pid = sched_get_pid(s, hartid); /* Process ID. */
         /* If msb is 1, return 0 */
         if (pid & 0x80)
@@ -74,17 +76,18 @@ static void release_current(void) {
         if (current) {
                 /* Release the process */
                 current->state = PROC_SUSPENDED;
-                fence(rw, rw);
+                __sync_synchronize();
                 if (current->halt)
-                        compare_and_swap(&current->state, PROC_SUSPENDED,
-                                         PROC_HALTED);
+                        __sync_val_compare_and_swap(
+                            &current->state, PROC_SUSPENDED, PROC_HALTED);
                 current = 0;
         }
 }
 
 bool sched_acquire_proc(Proc *proc) {
         current = proc;
-        return compare_and_swap(&proc->state, PROC_SUSPENDED, PROC_RUNNING);
+        return __sync_bool_compare_and_swap(&proc->state, PROC_SUSPENDED,
+                                            PROC_RUNNING);
 }
 
 void set_timeout(uint64_t quantum) {

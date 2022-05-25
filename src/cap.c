@@ -5,20 +5,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "atomic.h"
 #include "cap_util.h"
 #include "sched.h"
 
 /** Capability table */
 Cap cap_tables[N_PROC][N_CAPS];
-
-static inline bool cap_try_mark(Cap *node) {
-        return !is_marked(amoor(&node->prev, mark_bit));
-}
-
-static inline void cap_unmark(Cap *node) {
-        amoand(&node->prev, ~mark_bit);
-}
 
 /*
  * Tries to delete node curr.
@@ -28,19 +19,16 @@ static inline bool cap_delete(Cap *prev, Cap *curr) {
         /* Mark the curr node if it has the correct prev.
          * The CAS is neccessary to avoid the ABA problem.
          */
-        if (!compare_and_swap(&curr->prev, prev, mark(prev)))
+        if (!__sync_bool_compare_and_swap(&curr->prev, prev, NULL))
                 return false;
         Cap *next = curr->next;
-        if (next != NULL && !compare_and_swap(&next->prev, curr, prev)) {
-                cap_unmark(curr);
+        if (!__sync_bool_compare_and_swap(&next->prev, curr, prev)) {
+                curr->prev = prev;
                 return false;
         }
-        /* Delete has now succeeded,
-         * prev->next is now inconsistent, just fix it.
-         */
+        prev->next = next;
+        __sync_synchronize();
         curr->next = NULL;
-        if (prev)
-                prev->next = next;
         return true;
 }
 
@@ -51,12 +39,10 @@ static inline bool cap_delete(Cap *prev, Cap *curr) {
  */
 static inline bool cap_append(Cap *node, Cap *prev) {
         Cap *next = prev->next;
-        if (next == NULL || compare_and_swap(&next->prev, prev, node)) {
-                fence(w, w);
+        if (__sync_bool_compare_and_swap(&next->prev, prev, node)) {
                 node->next = next;
-                fence(w, w);
                 prev->next = node;
-                fence(w, w);
+                __sync_synchronize();
                 node->prev = prev;
                 return true;
         }
@@ -64,16 +50,14 @@ static inline bool cap_append(Cap *node, Cap *prev) {
 }
 
 bool CapDelete(Cap *curr) {
-        while (1) {
-                Cap *prev = unmark(curr->prev);
-                if (prev != NULL && !cap_try_mark(prev))
+        while (!cap_is_deleted(curr)) {
+                Cap *prev = curr->prev;
+                if (prev == NULL)
                         continue;
-                bool succ = cap_delete(prev, curr);
-                if (prev != NULL)
-                        cap_unmark(prev);
-                if (succ || cap_is_deleted(curr))
-                        return succ;
+                if (cap_delete(prev, curr))
+                        return true;
         }
+        return false;
 }
 
 void cap_revoke_ms(Cap *curr) {
@@ -90,10 +74,7 @@ void cap_revoke_ms(Cap *curr) {
                         break;
                 if (!cap_is_child_ms_ms(parent, child))
                         break;
-                if (!cap_try_mark(curr))
-                        continue;
                 cap_delete(curr, next);
-                cap_unmark(curr);
         } while (!cap_is_deleted(curr));
 }
 
@@ -110,10 +91,7 @@ void cap_revoke_ts(Cap *curr) {
                         break;
                 if (!cap_is_child_ts_ts(parent, child))
                         break;
-                if (!cap_try_mark(curr))
-                        continue;
                 cap_delete(curr, next);
-                cap_unmark(curr);
         } while (!cap_is_deleted(curr));
 }
 
@@ -139,15 +117,12 @@ bool CapAppend(Cap *node, Cap *prev) {
         /* Child node must be empty */
         if (!cap_is_deleted(node))
                 return false;
-        bool succ = false;
         /* While parent is alive, attempt to insert */
-        while (!succ && !cap_is_deleted(prev)) {
-                if (!cap_try_mark(prev))
-                        continue;
-                succ = cap_append(node, prev);
-                cap_unmark(prev);
+        while (!cap_is_deleted(prev)) {
+                if (cap_append(node, prev))
+                        return true;
         }
-        return succ;
+        return false;
 }
 
 /**
@@ -159,11 +134,5 @@ bool CapMove(Cap *dest, Cap *src) {
                 return false;
         dest->data[0] = src->data[0];
         dest->data[1] = src->data[1];
-        if (CapAppend(src, dest)) {
-                // First insert the copy after the parent
-                // Then delete the parent.
-                CapDelete(src);
-                return true;
-        }
-        return false;
+        return CapAppend(src, dest) && CapDelete(src);
 }

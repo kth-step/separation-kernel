@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "atomic.h"
 #include "config.h"
 
 typedef struct cap Cap;

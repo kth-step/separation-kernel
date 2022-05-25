@@ -3,7 +3,6 @@
 
 #include <stddef.h>
 
-#include "atomic.h"
 #include "cap.h"
 #include "cap_util.h"
 #include "config.h"
@@ -35,14 +34,13 @@ static void proc_init_proc(int pid) {
         proc->cap_table = cap_tables[pid];
         for (int i = 0; i < N_CAPS; ++i) {
                 proc->cap_table[i].next = NULL;
-                proc->cap_table[i].prev = (Cap *)mark_bit;
+                proc->cap_table[i].prev = NULL;
         }
         /* Set process to HALTED. */
         proc->state = PROC_HALTED;
 }
 
 static void proc_init_boot_proc(Proc *boot) {
-
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
         *boot->ksp = (uintptr_t)user_code;  // Temporary code.
@@ -62,7 +60,5 @@ void ProcInitProcesses(void) {
 
 void ProcHalt(Proc *proc) {
         proc->halt = true;
-        if (compare_and_swap(&proc->state, PROC_SUSPENDED, PROC_HALTED)) {
-                return;
-        }
+        __sync_bool_compare_and_swap(&proc->state, PROC_SUSPENDED, PROC_HALTED);
 }

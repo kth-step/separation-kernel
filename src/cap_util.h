@@ -1,5 +1,4 @@
 #pragma once
-#include "atomic.h"
 #include "cap.h"
 
 typedef enum cap_type {
