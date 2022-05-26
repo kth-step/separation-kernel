@@ -44,6 +44,9 @@ struct proc {
          * this simplifies inter-process communication.
          */
         uintptr_t args[8];
+
+        uint64_t pmpcfg;
+        uint64_t pmpaddr[8];
         /** Process state.
          * TODO: Comment
          */
@@ -72,3 +75,6 @@ register Proc *current __asm__("tp");
 void ProcInitProcesses(void);
 
 void ProcHalt(Proc *proc);
+
+bool ProcPmpLoad(int8_t pid, uint8_t index, uint64_t rwx, uint64_t addr);
+bool ProcPmpUnload(int8_t pid, uint8_t index);

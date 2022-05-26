@@ -6,6 +6,7 @@
 #include <stddef.h>
 
 #include "cap_util.h"
+#include "proc.h"
 #include "sched.h"
 
 /** Capability table */
@@ -13,8 +14,10 @@ Cap cap_tables[N_PROC][N_CAPS];
 
 /* Make one sentinel node per core, one for memory, one for channels and one for
  * supervisor capabilies */
-Cap sentinel[N_CORES + 3][2];
+#define N_SENTINELS (N_CORES + 4)
+Cap sentinels[N_SENTINELS];
 
+volatile int ep_receiver[N_CHANNELS];
 /*
  * Tries to delete node curr.
  * Assumption: prev = NULL or is_marked(prev->prev)
@@ -141,14 +144,56 @@ bool CapMove(Cap *dest, Cap *src) {
         return CapAppend(src, dest) && CapDelete(src);
 }
 
-Cap *CapInitSentinel(int i) {
-        sentinel[i][0].next = &sentinel[i][1];
-        sentinel[i][1].prev = &sentinel[i][0];
-        sentinel[i][0].data[0] = 0;
-        sentinel[i][0].data[1] = 0;
-        sentinel[i][1].data[0] = 0;
-        sentinel[i][1].data[1] = 0;
+bool CapInterprocessMoveTimeSlice(Cap *dest, Cap *src, int pid_dest,
+                                  int pid_src) {
+        if (!cap_is_deleted(dest) || cap_is_deleted(src))
+                return false;
+        CapTimeSlice ts = cap_get_time_slice(src);
+        if (!ts.valid)
+                return false;
+        uint8_t tsid = ts.tsid;
+        SchedUpdatePidTsid(ts.end, ts.begin, ts.hartid, pid_src, tsid,
+                           pid_dest, tsid);
+        return CapMove(dest, src);
+}
+
+bool CapPmpEntryLoad(int8_t pid, Cap *cap_pmp, int pmp_index) {
+        CapPmpEntry pmp = cap_get_pmp_entry(cap_pmp);
+        if (!pmp.valid)
+                return false;
+        return ProcPmpLoad(pid, pmp_index, pmp.rwx, pmp.addr);
+}
+
+bool CapPmpEntryUnload(int8_t pid, Cap *cap_pmp) {
+        CapPmpEntry pmp = cap_get_pmp_entry(cap_pmp);
+        if (!pmp.valid || pmp.index == -1)
+                return false;
+        return ProcPmpUnload(pid, pmp.index);
+}
+
+bool CapInterprocessMove(Cap *dest, Cap *src, int pid_dest, int pid_src) {
+        CapType type = cap_get_type(src);
+        if (type == CAP_TIME_SLICE) {
+                return CapInterprocessMoveTimeSlice(dest, src, pid_dest,
+                                                    pid_src);
+        } else if (type == CAP_PMP_ENTRY) {
+                CapPmpEntryUnload(pid_src, src);
+        }
+        if (!cap_is_deleted(dest) || cap_is_deleted(src))
+                return false;
+        return CapMove(dest, src);
+}
+
+Cap *CapInitSentinel(void) {
+        static int i = 0;
+        if (i >= N_SENTINELS)
+                return NULL;
+        Cap *sentinel = &sentinels[i++];
+        sentinel->next = sentinel;
+        sentinel->prev = sentinel;
+        sentinel->data[0] = 0;
+        sentinel->data[1] = 0;
         /* Return the head of the sentinel node */
         /* We append capbilities to this head */
-        return &sentinel[i][0];
+        return sentinel;
 }

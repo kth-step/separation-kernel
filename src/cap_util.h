@@ -31,6 +31,7 @@ typedef struct cap_pmp_entry {
         bool valid;
         uint64_t addr;
         uint8_t rwx;
+        int8_t index;
 } CapPmpEntry;
 
 typedef struct cap_time_slice {
@@ -44,7 +45,7 @@ typedef struct cap_time_slice {
 
 typedef struct cap_endpoint {
         bool valid;
-        uint8_t epid;
+        uint16_t epid;
         bool is_receiver;
 } CapEndpoint;
 

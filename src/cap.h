@@ -15,6 +15,8 @@ struct cap {
 };
 
 extern Cap cap_tables[N_PROC][N_CAPS];
+extern volatile int ep_receiver[N_CHANNELS];
+
 
 _Static_assert(sizeof(Cap) == 32, "Capability node size error");
 
@@ -23,4 +25,17 @@ bool CapDelete(Cap *cap);
 bool CapMove(Cap *dest, Cap *src);
 bool CapAppend(Cap *node, Cap *prev);
 
-Cap* CapInitSentinel(int i);
+bool CapInterprocessMove(Cap *dest, Cap *src, int pid_dest, int pid_src);
+
+Cap* CapInitSentinel(void);
+
+static inline int8_t cap_get_recv(uint16_t epid);
+static inline bool cap_cas_recv(uint16_t epid, int old_pid, int new_pid);
+
+int8_t cap_get_recv(uint16_t epid) {
+        return ep_receiver[epid];
+}
+
+bool cap_cas_recv(uint16_t epid, int old_pid, int new_pid) {
+        return __sync_bool_compare_and_swap(&ep_receiver[epid], old_pid, new_pid);
+}

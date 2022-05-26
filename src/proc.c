@@ -44,22 +44,28 @@ void proc_init_memory(Cap *pmp, Cap *memory) {
         uint64_t begin = USER_MEMORY_BEGIN;
         uint64_t end = USER_MEMORY_END;
         uint64_t pmp_length = BOOT_PMP_LENGTH;
-        uint64_t pmp_addr = begin | ((pmp_length -1) >> 1);
+        uint64_t pmp_addr = begin | ((pmp_length - 1) >> 1);
         CapPmpEntry pe = cap_mk_pmp_entry(pmp_addr, CAP_RX);
         CapMemorySlice ms = cap_mk_memory_slice(begin, end, CAP_RWX);
         cap_set_pmp_entry(pmp, pe);
         cap_set_memory_slice(memory, ms);
-        Cap *sentinel = CapInitSentinel(0);
+        Cap *sentinel = CapInitSentinel();
         CapAppend(memory, sentinel);
         CapAppend(pmp, sentinel);
 }
 
 void proc_init_channels(Cap *channel) {
+        uint16_t begin = 0;
+        uint16_t end = N_CHANNELS - 1;
+        CapChannels ch = cap_mk_channels(begin, end);
+        cap_set_channels(channel, ch);
+        Cap *sentinel = CapInitSentinel();
+        CapAppend(channel, sentinel);
 }
 
 void proc_init_time(Cap time[N_PROC]) {
         for (int i = 0; i < N_PROC; i++) {
-                Cap *sentinel = CapInitSentinel(1 + i);
+                Cap *sentinel = CapInitSentinel();
                 uint8_t begin = 0;
                 uint8_t end = N_QUANTUM;
                 uint8_t tsid = 0;
@@ -69,8 +75,6 @@ void proc_init_time(Cap time[N_PROC]) {
                 CapAppend(&time[i], sentinel);
         }
 }
-
-
 
 static void proc_init_boot_proc(Proc *boot) {
         Cap *cap_table = boot->cap_table;
@@ -97,4 +101,38 @@ void ProcInitProcesses(void) {
 void ProcHalt(Proc *proc) {
         proc->halt = true;
         __sync_bool_compare_and_swap(&proc->state, PROC_SUSPENDED, PROC_HALTED);
+}
+
+bool ProcPmpLoad(int8_t pid, uint8_t index, uint64_t rwx, uint64_t addr) {
+        if (index >= 8 || pid >= N_PROC || pid < 0)
+                return false;
+        Proc *proc = &processes[pid];
+        uint64_t cfg = 0x18 | rwx;
+        uint64_t mask = 0xFF << (index * 8);
+        while (1) {
+                uint64_t pmpcfg = proc->pmpcfg;
+                uint64_t new_pmpcfg = pmpcfg | (cfg << (index * 8));
+                if (pmpcfg & mask)
+                        return false;
+                proc->pmpaddr[index] = addr;
+                if (__sync_bool_compare_and_swap(&proc->pmpcfg, pmpcfg,
+                                                 new_pmpcfg))
+                        return true;
+        }
+}
+
+bool ProcPmpUnload(int8_t pid, uint8_t index) {
+        if (index >= 8 || pid >= N_PROC || pid < 0)
+                return false;
+        Proc *proc = &processes[pid];
+        uint64_t mask = 0xFF << (index * 8);
+        while (1) {
+                uint64_t pmpcfg = proc->pmpcfg;
+                uint64_t new_pmpcfg = pmpcfg & ~mask;
+                if (pmpcfg & mask)
+                        return false;
+                if (__sync_bool_compare_and_swap(&proc->pmpcfg, pmpcfg,
+                                                 new_pmpcfg))
+                        return true;
+        }
 }
