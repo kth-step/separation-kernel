@@ -14,7 +14,7 @@
  * stack offset which should be safe. It must fit all registers saved
  * to the stack in switch.S and entry.S.
  */
-#define INIT_STACK_OFFSET 32
+#define INIT_STACK_OFFSET (STACK_SIZE / 8 - 32)
 
 /* Temporary. */
 extern void user_code();
@@ -29,7 +29,9 @@ static void proc_init_proc(int pid) {
         /* Set the process id to */
         proc->pid = pid;
         /* Set the process's kernel stack. */
-        proc->ksp = &proc_stack[pid][STACK_SIZE / 8 - INIT_STACK_OFFSET];
+        proc->ksp = &proc_stack[pid][INIT_STACK_OFFSET];
+        for (int i = INIT_STACK_OFFSET; i < STACK_SIZE/8; i++)
+               proc_stack[pid][i] = 0; 
         /* Set the capability table. */
         proc->cap_table = cap_tables[pid];
         for (int i = 0; i < N_CAPS; ++i) {
