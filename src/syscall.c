@@ -1,40 +1,18 @@
 // See LICENSE file for copyright and license details.
 
+#include "syscall.h"
+
 #include <assert.h>
 #include <stdint.h>
 
 #include "cap.h"
 #include "cap_util.h"
 #include "proc.h"
-#include "stack.h"
 #include "sched.h"
+#include "stack.h"
 
 /* Read process ID. */
 void SyscallReadPid(void);
-
-/* Read cap at cs. */
-void SyscallCapRead(uint64_t cs);
-/* Move cap from cs to cd. */
-void SyscallCapMove(uint64_t cd, uint64_t cs);
-/* Revoke cap at cs */
-void SyscallCapRevoke(uint64_t cs);
-/* Delete cap at cs */
-void SyscallCapDelete(uint64_t cs);
-
-/* Make memory slice at cd using memory slice at cs. */
-void SyscallMemorySlice(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
-                        uint64_t rwx);
-
-/* Split memory slice at cs, put them in cd0 and cd1. */
-void SyscallMemorySplit(uint64_t cd0, uint64_t cd1, uint64_t cs, uint64_t mid);
-
-Cap *proc_get_cap(Proc *p, uint64_t idx) {
-        return &p->cap_table[idx % N_CAPS];
-}
-
-Cap *curr_get_cap(uint64_t idx) {
-        return proc_get_cap(current, idx);
-}
 
 /* Get process ID */
 void SyscallReadPid(void) {
@@ -42,7 +20,7 @@ void SyscallReadPid(void) {
 }
 
 /* Read a capability. */
-void SyscallCapRead(uintptr_t cs) {
+void SyscallReadCap(uintptr_t cs) {
         Cap *cap = curr_get_cap(cs);
         if (cap_get_data(cap, &current->args[1])) {
                 current->args[0] = 1;
@@ -53,21 +31,21 @@ void SyscallCapRead(uintptr_t cs) {
         }
 }
 
-void SyscallCapMove(uintptr_t cd, uintptr_t cs) {
+void SyscallMoveCap(uintptr_t cd, uintptr_t cs) {
         Cap *src = curr_get_cap(cs);
         Cap *dest = curr_get_cap(cd);
         current->args[0] = CapMove(dest, src);
 }
 
-void SyscallCapDelete(uintptr_t cs) {
+void SyscallDeleteCap(uintptr_t cs) {
         current->args[0] = CapDelete(curr_get_cap(cs));
 }
 
-void SyscallCapRevoke(uintptr_t cs) {
+void SyscallRevokeCap(uintptr_t cs) {
         CapRevoke(curr_get_cap(cs));
 }
 
-void SyscallMemorySlice(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
+void SyscallSliceMemory(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
                         uint64_t rwx) {
         Cap *src = curr_get_cap(cs);
         Cap *dest = curr_get_cap(cd);
@@ -82,7 +60,7 @@ void SyscallMemorySlice(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
         }
 }
 
-void SyscallMemorySplit(uint64_t cd0, uint64_t cd1, uint64_t cs, uint64_t mid) {
+void SyscallSplitMemory(uint64_t cd0, uint64_t cd1, uint64_t cs, uint64_t mid) {
         Cap *src = curr_get_cap(cs);
         Cap *dest0 = curr_get_cap(cd0);
         Cap *dest1 = curr_get_cap(cd1);
@@ -104,7 +82,44 @@ void SyscallMemorySplit(uint64_t cd0, uint64_t cd1, uint64_t cs, uint64_t mid) {
         }
 }
 
-void SyscallTimeSlice(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
+void SyscallMakePmp(uint64_t cid_pmp, uint64_t cid_ms, uint64_t addr,
+                    uint64_t rwx) {
+        Cap *cap_pmp = curr_get_cap(cid_pmp);
+        Cap *cap_ms = curr_get_cap(cid_ms);
+        CapMemorySlice ms = cap_get_memory_slice(cap_ms);
+        CapPmpEntry pmp = cap_mk_pmp_entry(addr, rwx & 0x7);
+        if (!ms.valid || !cap_is_deleted(cap_pmp) || !pmp.valid) {
+                current->args[0] = -1;
+                return;
+        }
+        cap_set_pmp_entry(cap_pmp, pmp);
+        current->args[0] = CapAppend(cap_pmp, cap_ms);
+}
+
+void SyscallLoadPmp(uint64_t cid_pmp, uint64_t index) {
+        Cap *cap_pmp = curr_get_cap(cid_pmp);
+        CapPmpEntry pmp = cap_get_pmp_entry(cap_pmp);
+        if (!pmp.valid) {
+                current->args[0] = -1;
+                return;
+        }
+        /* TODO: set index in pmp */
+        current->args[0] = ProcPmpLoad(current->pid, index, pmp.addr, pmp.rwx);
+        /* If cap_pmp is deleted, unload pmp */
+        if (cap_is_deleted(cap_pmp) && current->args[0])
+                ProcPmpUnload(current->pid, index);
+}
+void SyscallUnloadPmp(uint64_t cid_pmp) {
+        Cap *cap_pmp = curr_get_cap(cid_pmp);
+        CapPmpEntry pmp = cap_get_pmp_entry(cap_pmp);
+        if (!pmp.valid) {
+                current->args[0] = -1;
+                return;
+        }
+        current->args[0] = ProcPmpUnload(current->pid, pmp.index);
+}
+
+void SyscallSliceTime(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
                       uint64_t tsid, uint64_t tsid_end) {
         Cap *src = curr_get_cap(cs);
         Cap *dest = curr_get_cap(cd);
@@ -124,7 +139,7 @@ void SyscallTimeSlice(uint64_t cd, uint64_t cs, uint64_t begin, uint64_t end,
         current->args[0] = CapAppend(dest, src);
 }
 
-void SyscallTimeSplit(uint64_t cd0, uint64_t cd1, uint64_t cs,
+void SyscallSplitTime(uint64_t cd0, uint64_t cd1, uint64_t cs,
                       uint64_t mid_quantum, uint64_t mid_id) {
         Cap *src = curr_get_cap(cs);
         Cap *dest0 = curr_get_cap(cd0);
@@ -133,8 +148,9 @@ void SyscallTimeSplit(uint64_t cd0, uint64_t cd1, uint64_t cs,
         CapTimeSlice ts_src = cap_get_time_slice(src);
         CapTimeSlice ts_dest0 = cap_mk_time_slice(
             ts_src.hartid, ts_src.begin, mid_quantum, ts_src.tsid + 1, mid_id);
-        CapTimeSlice ts_dest1 = cap_mk_time_slice(
-            ts_src.hartid, mid_quantum, ts_src.end, mid_id, ts_src.tsid_end);
+        CapTimeSlice ts_dest1 =
+            cap_mk_time_slice(ts_src.hartid, mid_quantum + 1, ts_src.end,
+                              mid_id + 1, ts_src.tsid_end);
 
         if (!ts_src.valid || !cap_is_deleted(dest0) || !cap_is_deleted(dest1) ||
             !ts_dest0.valid || !ts_dest1.valid || dest0 == dest1) {
@@ -151,7 +167,7 @@ void SyscallTimeSplit(uint64_t cd0, uint64_t cd1, uint64_t cs,
         current->args[0] = CapAppend(dest0, src) && CapAppend(dest1, src);
 }
 
-void SyscallChannelsSlice(uint64_t dest, uint64_t src, uint64_t begin,
+void SyscallSliceChannels(uint64_t dest, uint64_t src, uint64_t begin,
                           uint64_t end) {
         Cap *cap_src = curr_get_cap(src);
         Cap *cap_dest = curr_get_cap(dest);
@@ -166,7 +182,7 @@ void SyscallChannelsSlice(uint64_t dest, uint64_t src, uint64_t begin,
         current->args[0] = CapAppend(cap_dest, cap_src);
 }
 
-void SyscallChannelsSplit(uint64_t dest0, uint64_t dest1, uint64_t src,
+void SyscallSplitChannels(uint64_t dest0, uint64_t dest1, uint64_t src,
                           uint64_t mid) {
         Cap *cap_src = curr_get_cap(src);
         Cap *cap_dest0 = curr_get_cap(dest0);
@@ -186,8 +202,7 @@ void SyscallChannelsSplit(uint64_t dest0, uint64_t dest1, uint64_t src,
             CapAppend(cap_dest0, cap_src) && CapAppend(cap_dest1, cap_src);
 }
 
-void SyscallMakeEndpointsReceive(uint64_t cid_recv, uint64_t cid_ch,
-                                 uint64_t epid) {
+void SyscallMakeReceiver(uint64_t cid_recv, uint64_t cid_ch, uint64_t epid) {
         Cap *cap_ch = curr_get_cap(cid_ch);
         Cap *cap_recv = curr_get_cap(cid_recv);
         CapChannels ch = cap_get_channels(cap_ch);
@@ -205,7 +220,7 @@ void SyscallMakeEndpointsReceive(uint64_t cid_recv, uint64_t cid_ch,
         current->args[0] = CapAppend(cap_recv, cap_ch);
 }
 
-void SyscallMakeEndpointsSend(uint64_t cid_send, uint64_t cid_recv) {
+void SyscallMakeSender(uint64_t cid_send, uint64_t cid_recv) {
         Cap *cap_recv = curr_get_cap(cid_recv);
         Cap *cap_send = curr_get_cap(cid_send);
         CapEndpoint ep_recv = cap_get_endpoint(cap_recv);
@@ -270,4 +285,113 @@ void SyscallSend(uint64_t cid_send, uint64_t caps_src, uint64_t is_blocking,
                         current->args[0] = 1;
                 }
         } while (is_blocking);
+}
+
+void SyscallHalt(uint64_t cid_sup) {
+        Cap *cap_sup = curr_get_cap(cid_sup);
+        CapSupervisor sup = cap_get_supervisor(cap_sup);
+        if (!sup.valid) {
+                current->args[0] = -1;
+                return;
+        }
+        Proc *proc = &processes[sup.pid];
+        proc->halt = 1;
+        current->args[0] = __sync_bool_compare_and_swap(
+            &current->state, PROC_SUSPENDED, PROC_HALTED);
+}
+
+void SyscallResume(uint64_t cid_sup) {
+        Cap *cap_sup = curr_get_cap(cid_sup);
+        CapSupervisor sup = cap_get_supervisor(cap_sup);
+        if (!sup.valid) {
+                current->args[0] = -1;
+                return;
+        }
+        Proc *proc = &processes[sup.pid];
+        proc->halt = 0;
+        current->args[0] = __sync_bool_compare_and_swap(
+            &proc->state, PROC_HALTED, PROC_SUSPENDED);
+}
+
+void SyscallGiveCap(uint64_t cid_sup, uint64_t cid_dest, uint64_t cid_src) {
+        Cap *cap_sup = curr_get_cap(cid_sup);
+        CapSupervisor sup = cap_get_supervisor(cap_sup);
+        if (!sup.valid) {
+                current->args[0] = -1;
+                return;
+        }
+        Proc *proc = &processes[sup.pid];
+        if (proc->state != PROC_HALTED) {
+                current->args[0] = -2;
+                return;
+        }
+        Cap *cap_src = curr_get_cap(cid_src);
+        Cap *cap_dest = proc_get_cap(proc, cid_dest);
+        if (cap_is_deleted(cap_src) || !cap_is_deleted(cap_dest)) {
+                current->args[0] = -3;
+                return;
+        }
+        current->args[0] =
+            CapInterprocessMove(cap_dest, cap_src, proc->pid, current->pid);
+}
+
+void SyscallTakeCap(uint64_t cid_sup, uint64_t cid_dest, uint64_t cid_src) {
+        Cap *cap_sup = curr_get_cap(cid_sup);
+        CapSupervisor sup = cap_get_supervisor(cap_sup);
+        if (!sup.valid) {
+                current->args[0] = -1;
+                return;
+        }
+        Proc *proc = &processes[sup.pid];
+        if (proc->state != PROC_HALTED) {
+                current->args[0] = -2;
+                return;
+        }
+        Cap *cap_src = proc_get_cap(proc, cid_src);
+        Cap *cap_dest = curr_get_cap(cid_dest);
+        if (cap_is_deleted(cap_src) || !cap_is_deleted(cap_dest)) {
+                current->args[0] = -3;
+                return;
+        }
+        current->args[0] =
+            CapInterprocessMove(cap_dest, cap_src, current->pid, proc->pid);
+}
+
+void SyscallSupReadCap(uint64_t cid_sup, uint64_t cid) {
+        Cap *cap_sup = curr_get_cap(cid_sup);
+        CapSupervisor sup = cap_get_supervisor(cap_sup);
+        if (!sup.valid) {
+                current->args[0] = -1;
+                return;
+        }
+        Proc *proc = &processes[sup.pid];
+        Cap *cap = proc_get_cap(proc, cid);
+        if (proc->state != PROC_HALTED) {
+                current->args[0] = -1;
+                return;
+        }
+        if (cap_get_data(cap, &current->args[1])) {
+                current->args[0] = 1;
+        } else {
+                current->args[0] = 0;
+                current->args[1] = 0;
+                current->args[2] = 0;
+        }
+}
+
+void SyscallReset(uint64_t cid_sup, uint64_t cid_pmp) {
+        Cap *cap_sup = curr_get_cap(cid_sup);
+        CapSupervisor sup = cap_get_supervisor(cap_sup);
+        if (!sup.valid || processes[sup.pid].state != PROC_HALTED) {
+                current->args[0] = -1;
+                return;
+        }
+        Cap *cap_pmp = curr_get_cap(cid_pmp);
+        CapPmpEntry pmp = cap_get_pmp_entry(cap_pmp);
+        if (!pmp.valid) {
+                current->args[0] = -1;
+                return;
+        }
+        ProcPmpUnload(current->pid, pmp.index);
+        current->args[0] = ProcReset(sup.pid, cap_pmp);
 }

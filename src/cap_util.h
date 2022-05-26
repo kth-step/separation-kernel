@@ -7,7 +7,8 @@ typedef enum cap_type {
         CAP_PMP_ENTRY,
         CAP_TIME_SLICE,
         CAP_CHANNELS,
-        CAP_ENDPOINT
+        CAP_ENDPOINT,
+        CAP_SUPERVISOR
 } CapType;
 
 typedef enum cap_rwx {
@@ -37,8 +38,8 @@ typedef struct cap_pmp_entry {
 typedef struct cap_time_slice {
         bool valid;
         uint8_t hartid;
-        uint8_t begin;
-        uint8_t end;
+        uint16_t begin;
+        uint16_t end;
         uint8_t tsid;
         uint8_t tsid_end;
 } CapTimeSlice;
@@ -54,6 +55,11 @@ typedef struct cap_channels {
         uint8_t begin;
         uint8_t end;
 } CapChannels;
+
+typedef struct cap_supervisor {
+        bool valid;
+        int8_t pid;
+} CapSupervisor;
 
 /* Basic capability utilities */
 static inline bool cap_is_deleted(const Cap *cap);
@@ -75,8 +81,8 @@ static inline void cap_get_pmp_entry_bounds(const CapPmpEntry pe,
                                             uint64_t *begin, uint64_t *end);
 
 /* Time slice */
-static inline CapTimeSlice cap_mk_time_slice(uint8_t hartid, uint8_t begin,
-                                             uint8_t end, uint8_t tsid,
+static inline CapTimeSlice cap_mk_time_slice(uint8_t hartid, uint16_t begin,
+                                             uint16_t end, uint8_t tsid,
                                              uint8_t tsid_end);
 static inline CapTimeSlice cap_get_time_slice(const Cap *cap);
 static inline bool cap_set_time_slice(Cap *cap, const CapTimeSlice ms);
@@ -90,6 +96,11 @@ static inline bool cap_set_endpoint(Cap *cap, const CapEndpoint ep);
 static inline CapChannels cap_mk_channels(uint8_t begin, uint8_t end);
 static inline CapChannels cap_get_channels(const Cap *cap);
 static inline bool cap_set_channels(Cap *cap, const CapChannels ep);
+
+/* Supervisor */
+static inline CapSupervisor cap_mk_supervisor(int8_t pid);
+static inline CapSupervisor cap_get_supervisor(const Cap *cap);
+static inline bool cap_set_supervisor(Cap *cap, const CapSupervisor ep);
 
 /* Is child predicates */
 static inline bool cap_is_child_ms_ms(const CapMemorySlice parent,
@@ -137,7 +148,7 @@ CapMemorySlice cap_mk_memory_slice(uint64_t begin, uint64_t end, uint8_t rwx) {
         ms.begin = begin;
         ms.end = end;
         ms.rwx = rwx;
-        ms.valid = (begin >= end || rwx == 0);
+        ms.valid = (begin < end && rwx != 0);
         return ms;
 }
 
@@ -186,7 +197,7 @@ void cap_get_pmp_entry_bounds(const CapPmpEntry pe, uint64_t *begin,
         *end = *begin + length;
 }
 
-CapTimeSlice cap_mk_time_slice(uint8_t hartid, uint8_t begin, uint8_t end,
+CapTimeSlice cap_mk_time_slice(uint8_t hartid, uint16_t begin, uint16_t end,
                                uint8_t tsid, uint8_t tsid_end) {
         CapTimeSlice ts;
         ts.begin = begin;
@@ -204,10 +215,10 @@ CapTimeSlice cap_get_time_slice(const Cap *cap) {
                 return (CapTimeSlice){.valid = false};
         }
         uint8_t hartid = data[0] >> 8;
-        uint8_t begin = data[0] >> 16;
-        uint8_t end = data[0] >> 24;
-        uint8_t tsid = data[0] >> 32;
-        uint8_t tsid_end = data[0] >> 40;
+        uint16_t begin = data[0] >> 16;
+        uint16_t end = data[0] >> 32;
+        uint8_t tsid = data[0] >> 48;
+        uint8_t tsid_end = data[0] >> 56;
         return cap_mk_time_slice(hartid, begin, end, tsid, tsid_end);
 }
 
@@ -216,9 +227,9 @@ bool cap_set_time_slice(Cap *cap, const CapTimeSlice ts) {
         data[0] = CAP_TIME_SLICE;
         data[0] |= (uint64_t)ts.hartid << 8;
         data[0] |= (uint64_t)ts.begin << 16;
-        data[0] |= (uint64_t)ts.end << 24;
-        data[0] |= (uint64_t)ts.tsid << 32;
-        data[0] |= (uint64_t)ts.tsid_end << 40;
+        data[0] |= (uint64_t)ts.end << 32;
+        data[0] |= (uint64_t)ts.tsid << 48;
+        data[0] |= (uint64_t)ts.tsid_end << 56;
         data[1] = 0;
         return cap_set_data(cap, data);
 }
@@ -266,6 +277,27 @@ bool cap_set_channels(Cap *cap, const CapChannels ch) {
         return cap_set_data(cap, data);
 }
 
+static inline CapSupervisor cap_mk_supervisor(int8_t pid) {
+        bool valid = pid >= 0 && pid < N_PROC;
+        return (CapSupervisor){.pid = pid, .valid = valid};
+}
+
+static inline CapSupervisor cap_get_supervisor(const Cap *cap) {
+        uint64_t data[2];
+        if (!cap_get_data(cap, data) || (data[0] & 0xFF) != CAP_SUPERVISOR) {
+                return (CapSupervisor){.valid = false};
+        }
+        return cap_mk_supervisor(data[0] >> 8);
+}
+
+static inline bool cap_set_supervisor(Cap *cap, const CapSupervisor sup) {
+        uint64_t data[2];
+        data[0] = CAP_SUPERVISOR;
+        data[0] |= sup.pid << 8;
+        data[1] = 0;
+        return cap_set_data(cap, data);
+}
+
 bool cap_is_child_ms_ms(const CapMemorySlice parent,
                         const CapMemorySlice child) {
         return parent.begin <= child.begin && child.end <= parent.end &&
@@ -282,7 +314,7 @@ bool cap_is_child_ms_pe(const CapMemorySlice parent, const CapPmpEntry child) {
 bool cap_is_child_ts_ts(const CapTimeSlice parent, const CapTimeSlice child) {
         return parent.hartid == child.hartid && parent.begin <= child.begin &&
                child.end <= parent.end && parent.tsid < child.tsid &&
-               (child.tsid_end <= parent.tsid_end) ;
+               (child.tsid_end <= parent.tsid_end);
 }
 
 bool cap_is_child_ep_ep(const CapEndpoint parent, const CapEndpoint child) {

@@ -33,9 +33,10 @@ static void proc_init_proc(int pid) {
         /* Set the capability table. */
         proc->cap_table = cap_tables[pid];
         for (int i = 0; i < N_CAPS; ++i) {
-                proc->cap_table[i].next = NULL;
-                proc->cap_table[i].prev = NULL;
+                CapRevoke(&cap_tables[pid][i]);
+                CapDelete(&cap_tables[pid][i]);
         }
+        proc->epid = -1;
         /* Set process to HALTED. */
         proc->state = PROC_HALTED;
 }
@@ -63,11 +64,11 @@ void proc_init_channels(Cap *channel) {
         CapAppend(channel, sentinel);
 }
 
-void proc_init_time(Cap time[N_PROC]) {
-        for (int i = 0; i < N_PROC; i++) {
+void proc_init_time(Cap time[N_CORES]) {
+        for (int i = 0; i < N_CORES; i++) {
                 Cap *sentinel = CapInitSentinel();
-                uint8_t begin = 0;
-                uint8_t end = N_QUANTUM;
+                uint16_t begin = 0;
+                uint16_t end = N_QUANTUM - 1;
                 uint8_t tsid = 0;
                 uint8_t fuel = 255;
                 CapTimeSlice ts = cap_mk_time_slice(i, begin, end, tsid, fuel);
@@ -76,11 +77,21 @@ void proc_init_time(Cap time[N_PROC]) {
         }
 }
 
+void proc_init_supervisor(Cap cap_sups[N_PROC]) {
+        Cap *sentinel = CapInitSentinel();
+        for (int i = 0; i < N_PROC; i++) {
+                CapSupervisor sup = cap_mk_supervisor(i);
+                cap_set_supervisor(&cap_sups[i], sup);
+                CapAppend(&cap_sups[i], sentinel);
+        }
+}
+
 static void proc_init_boot_proc(Proc *boot) {
         Cap *cap_table = boot->cap_table;
         proc_init_memory(&cap_table[0], &cap_table[1]);
         proc_init_channels(&cap_table[2]);
         proc_init_time(&cap_table[3]);
+        proc_init_supervisor(&cap_table[3 + N_CORES]);
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
         *boot->ksp = (uintptr_t)user_code;  // Temporary code.
@@ -103,7 +114,28 @@ void ProcHalt(Proc *proc) {
         __sync_bool_compare_and_swap(&proc->state, PROC_SUSPENDED, PROC_HALTED);
 }
 
-bool ProcPmpLoad(int8_t pid, uint8_t index, uint64_t rwx, uint64_t addr) {
+bool ProcReset(int8_t pid, Cap *cap_pmp) {
+        if (pid < 0 || pid >= N_PROC) {
+                return false;
+        }
+        Proc *proc = &processes[pid];
+        if (proc->state != PROC_HALTED)
+                return false;
+        CapPmpEntry pmp = cap_get_pmp_entry(cap_pmp);
+        if (!pmp.valid)
+                return false;
+        proc_init_proc(pid);
+        uint64_t begin, end;
+        cap_get_pmp_entry_bounds(pmp, &begin, &end);
+        bool pmp_done = CapMove(&proc->cap_table[0], cap_pmp) &&
+                        ProcPmpLoad(pid, 0, pmp.addr, pmp.rwx);
+        if (pmp_done) {
+                *proc->ksp = (uintptr_t)user_code;  // Temporary code.
+        }
+        return pmp_done;
+}
+
+bool ProcPmpLoad(int8_t pid, uint8_t index, uint64_t addr, uint8_t rwx) {
         if (index >= 8 || pid >= N_PROC || pid < 0)
                 return false;
         Proc *proc = &processes[pid];

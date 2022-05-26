@@ -141,7 +141,7 @@ bool CapMove(Cap *dest, Cap *src) {
                 return false;
         dest->data[0] = src->data[0];
         dest->data[1] = src->data[1];
-        return CapAppend(src, dest) && CapDelete(src);
+        return CapAppend(dest, src) && CapDelete(src);
 }
 
 bool CapInterprocessMoveTimeSlice(Cap *dest, Cap *src, int pid_dest,
@@ -161,7 +161,7 @@ bool CapPmpEntryLoad(int8_t pid, Cap *cap_pmp, int pmp_index) {
         CapPmpEntry pmp = cap_get_pmp_entry(cap_pmp);
         if (!pmp.valid)
                 return false;
-        return ProcPmpLoad(pid, pmp_index, pmp.rwx, pmp.addr);
+        return ProcPmpLoad(pid, pmp_index, pmp.addr, pmp.rwx);
 }
 
 bool CapPmpEntryUnload(int8_t pid, Cap *cap_pmp) {

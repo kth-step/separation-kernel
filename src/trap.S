@@ -43,21 +43,29 @@ __exception_trampoline:
 __syscall_trampoline:
         /* System calls */
         j       SyscallReadPid
-        j       SyscallCapRead
-        j       SyscallCapMove
-        j       SyscallCapDelete
-        j       SyscallCapRevoke
-        j       SyscallMemorySlice
-        j       SyscallMemorySplit
-        j       SyscallTimeSlice
-        j       SyscallTimeSplit
-        j       __hang
-        j       __hang
-        j       __hang
-        j       __hang
-        j       __hang
-        j       __hang
-        j       __hang
+        j       SyscallReadCap
+        j       SyscallMoveCap
+        j       SyscallDeleteCap
+        j       SyscallRevokeCap
+        j       SyscallSliceMemory
+        j       SyscallSplitMemory
+        j       SyscallMakePmp
+        j       SyscallLoadPmp
+        j       SyscallUnloadPmp
+        j       SyscallSliceTime
+        j       SyscallSplitTime
+        j       SyscallSliceChannels
+        j       SyscallSplitChannels
+        j       SyscallMakeReceiver
+        j       SyscallMakeSender
+        j       SyscallReceive
+        j       SyscallSend
+        j       SyscallHalt
+        j       SyscallResume
+        j       SyscallGiveCap
+        j       SyscallTakeCap
+        j       SyscallSupReadCap
+        j       SyscallReset
 .option pop
 
 __exception_handler:
@@ -109,7 +117,7 @@ __exception_handler:
 
 __syscall:
         /* Number of syscall is 16 for now. */
-        li      t2,16
+        li      t2,24
         /* If t0 >= 16, invalid syscall */
         bge     t0,t2,__exception
         /* Load address to syscall trampoline */
@@ -135,11 +143,11 @@ __exception:
 __trampoline:
         /* Store user pc */
         sd      t3,(11*8)(sp)
-        csrsi   mstatus,1
+        csrwi   mstatus,8
         /* Jump to trampoline */
         add     ra,ra,t1
         jalr    ra,0(ra)
-        csrci   mstatus,1
+        csrwi   mstatus,0
 
 __exception_exit:
         /* Write user sp to mscratch. */

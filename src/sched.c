@@ -18,7 +18,7 @@
 uint64_t schedule[N_QUANTUM];
 
 static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
-        return ((s >> (hartid * 8 + 8)) & 0xFF);
+        return ((s >> (hartid * 16)) & 0xFF);
 }
 
 static inline int sched_is_invalid_pid(int8_t pid) {
@@ -150,7 +150,7 @@ static inline void sched_update(uint8_t begin, uint8_t end, uint8_t hartid,
         uint64_t mask = 0xFFFF << (hartid * 16);
         uint64_t expected64 = expected << (hartid * 16);
         uint64_t desired64 = desired << (hartid * 16);
-        for (int i = begin; i < end; i++) {
+        for (int i = begin; i <= end; i++) {
                 uint64_t s = schedule[i];
                 if ((s & mask) != expected64)
                         break;

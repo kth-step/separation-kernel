@@ -75,6 +75,7 @@ register Proc *current __asm__("tp");
 void ProcInitProcesses(void);
 
 void ProcHalt(Proc *proc);
+bool ProcReset(int8_t pid, Cap *pmp);
 
-bool ProcPmpLoad(int8_t pid, uint8_t index, uint64_t rwx, uint64_t addr);
+bool ProcPmpLoad(int8_t pid, uint8_t index, uint64_t addr, uint8_t rwx);
 bool ProcPmpUnload(int8_t pid, uint8_t index);

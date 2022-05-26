@@ -12,7 +12,7 @@
 #define TICKS_PER_SECOND 10000000UL
 
 /* Number of time slices in a major frame. */
-#define N_QUANTUM 60
+#define N_QUANTUM 256
 /* Number of ticks per quantum. */
 #define TICKS (TICKS_PER_SECOND/N_QUANTUM)
 /* Number of slack ticks (buffer) for scheduler. */
