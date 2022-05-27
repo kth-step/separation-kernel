@@ -201,7 +201,7 @@ __timer_handler:
         csrrw   sp,mscratch,sp
         bnez    sp,1f
 __timer_handler_machine:
-        csrrw   sp,mscratch,zero
+        csrr    sp,mscratch
         /* Store kernel gp, tp */
         sd      gp,(-1*8)(sp)
         sd      tp,(-2*8)(sp)
@@ -265,15 +265,18 @@ AsmResumeProc:
         /* Swap core and process sp */
         amoswap.d  sp,sp,(tp)
 
+        csrw    mscratch,sp
 
         /* Load mstatus */
         ld      t0,(-3*8)(sp)
         csrw    mstatus,t0
-        
-        /* Load SP */
-        ld      t0,(-5*8)(sp)
-        csrw    mscratch,t0
 
+        beqz    t0,1f
+        /* MPP = 1 */
+        sd      sp,(-5*8)(sp)
+        csrw    mscratch,zero
+1:
+        
         /* Load PC */
         ld      t1,(11*8)(tp)
         csrw    mepc,t1
@@ -312,7 +315,6 @@ AsmResumeProc:
         ld      t0,(-8*8)(sp)
         ld      tp,(-7*8)(sp)
         ld      gp,(-6*8)(sp)
-        //ld      sp,(-5*8)(sp)
         ld      ra,(-4*8)(sp)
-        csrrw   sp,mscratch,sp
+        ld      sp,(-5*8)(sp)
         mret
