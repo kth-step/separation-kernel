@@ -37,6 +37,10 @@ _start:
         /* Set mstatus to 0, so we go to user-mode when executing mret. */
         csrw    mstatus,x0
 
+        csrw    pmpcfg0,0x0f
+        li      t0,-1
+        csrw    pmpaddr0,t0
+
         /* If hartid != 0, then jump to __wait. */
         csrr    t0,mhartid
         bnez    t0,__wait

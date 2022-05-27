@@ -73,28 +73,27 @@ __exception_handler:
         csrrw   sp,mscratch,sp
 #ifdef DEBUG
         /* If mscratch is 0, we have bug in the kernel */
-        beqz    sp,__hang
+        beqz    sp,__mhang
 #endif
-        addi    sp,sp,-32*8
         /* Store user gp, tp registers. */
-        sd      gp,(0*8)(sp)
-        sd      tp,(1*8)(sp)
+        sd      gp,(-3*8)(sp)
+        sd      tp,(-4*8)(sp)
         /* Load kernel gp and tp. */
         ld      gp,(-1*8)(sp)   /* points to kernel global data */
         ld      tp,(-2*8)(sp)   /* points to current pcb */
         /* Store user t0-t6, ra registers. */
-        sd      t0,(2*8)(sp)
-        sd      t1,(3*8)(sp)
-        sd      t2,(4*8)(sp)
-        sd      t3,(5*8)(sp)
-        sd      t4,(6*8)(sp)
-        sd      t5,(7*8)(sp)
-        sd      t6,(8*8)(sp)
-        sd      ra,(9*8)(sp)
+        sd      t0,(-5*8)(sp)
+        sd      t1,(-6*8)(sp)
+        sd      t2,(-7*8)(sp)
+        sd      t3,(-8*8)(sp)
+        sd      t4,(-9*8)(sp)
+        sd      t5,(-10*8)(sp)
+        sd      t6,(-11*8)(sp)
+        sd      ra,(-12*8)(sp)
 
         /* Write user sp to stack. */
         csrrw   t3,mscratch,zero
-        sd      t3,(10*8)(sp)
+        sd      t3,(-13*8)(sp)
 
         /* Save user a0-a7. */
         sd      a0,(3*8)(tp)
@@ -142,20 +141,28 @@ __exception:
 
 __trampoline:
         /* Store user pc */
-        sd      t3,(11*8)(sp)
+        sd      t3,(-14*8)(sp)
+
+        /* Fix sp and enable preemption */
+        addi    sp,sp,-14*8
         csrwi   mstatus,8
+
         /* Jump to trampoline */
         add     ra,ra,t1
         jalr    ra,0(ra)
+
+        /* Fix sp and disable preemption */
         csrwi   mstatus,0
+        addi    sp,sp,14*8
 
 __exception_exit:
-        /* Write user sp to mscratch. */
-        ld      t0,(10*8)(sp)
-        csrw    mscratch,t0
         /* Write user pc to mepc. */
-        ld      t3,(11*8)(sp)
+        ld      t3,(-14*8)(sp)
+        beqz    t3,__hang
         csrw    mepc,t3
+        /* Write user sp to mscratch. */
+        ld      t0,(-13*8)(sp)
+        csrw    mscratch,t0
         /* Load user a0-a7. */
         ld      a7,(10*8)(tp)
         ld      a6,(9*8)(tp)
@@ -166,138 +173,146 @@ __exception_exit:
         ld      a1,(4*8)(tp)
         ld      a0,(3*8)(tp)
         /* Load process ra,t0-t6 register. */
-        ld      ra,(9*8)(sp)
-        ld      t6,(8*8)(sp)
-        ld      t5,(7*8)(sp)
-        ld      t4,(6*8)(sp)
-        ld      t3,(5*8)(sp)
-        ld      t2,(4*8)(sp)
-        ld      t1,(3*8)(sp)
-        ld      t0,(2*8)(sp)
+        ld      ra,(-12*8)(sp)
+        ld      t6,(-11*8)(sp)
+        ld      t5,(-10*8)(sp)
+        ld      t4,(-9*8)(sp)
+        ld      t3,(-8*8)(sp)
+        ld      t2,(-7*8)(sp)
+        ld      t1,(-6*8)(sp)
+        ld      t0,(-5*8)(sp)
         /* Store kernel gp and tp. */
         sd      tp,(-2*8)(sp)
         sd      gp,(-1*8)(sp)
         /* Load user gp and tp. */
-        ld      tp,(1*8)(sp)
-        ld      gp,(0*8)(sp)
+        ld      tp,(-4*8)(sp)
+        ld      gp,(-3*8)(sp)
         /* Load process sp, store kernel sp. */
-        addi    sp,sp,32*8
         csrrw   sp,mscratch,sp
         /* Go to user mode. */
         mret
 
 __hang: 
         j       __hang
+__mhang: 
+        j       __mhang
 
 __timer_handler:
         csrrw   sp,mscratch,sp
         bnez    sp,1f
+__timer_handler_machine:
         csrrw   sp,mscratch,zero
-        addi    sp,sp,(-32*8)
-        sd      gp,(3*8)(sp)
-        sd      tp,(4*8)(sp)
-        j       2f
+        /* Store kernel gp, tp */
+        sd      gp,(-1*8)(sp)
+        sd      tp,(-2*8)(sp)
 1:      
-        addi    sp,sp,(-32*8)
-        sd      gp,(3*8)(sp)
-        sd      tp,(4*8)(sp)
-        ld      gp,(-1*8)(sp)
+        sd      ra,(-4*8)(sp)
+        //sd      sp,(-5*8)(sp)
+        sd      gp,(-6*8)(sp)
+        sd      tp,(-7*8)(sp)
+        sd      t0,(-8*8)(sp)
+        sd      t1,(-9*8)(sp)
+        sd      t2,(-10*8)(sp)
+        sd      s0,(-11*8)(sp)
+        sd      s1,(-12*8)(sp)
+        sd      a0,(-13*8)(sp)
+        sd      a1,(-14*8)(sp)
+        sd      a2,(-15*8)(sp)
+        sd      a3,(-16*8)(sp)
+        sd      a4,(-17*8)(sp)
+        sd      a5,(-18*8)(sp)
+        sd      a6,(-19*8)(sp)
+        sd      a7,(-20*8)(sp)
+        sd      s2,(-21*8)(sp)
+        sd      s3,(-22*8)(sp)
+        sd      s4,(-23*8)(sp)
+        sd      s5,(-24*8)(sp)
+        sd      s6,(-25*8)(sp)
+        sd      s7,(-26*8)(sp)
+        sd      s8,(-27*8)(sp)
+        sd      s9,(-28*8)(sp)
+        sd      s10,(-29*8)(sp)
+        sd      s11,(-30*8)(sp)
+        sd      t3,(-31*8)(sp)
+        sd      t4,(-32*8)(sp)
+        sd      t5,(-33*8)(sp)
+        sd      t6,(-34*8)(sp)
+
+        /* Load kernel gp, tp */
         ld      tp,(-2*8)(sp)
-2:
-        sd      ra,(1*8)(sp)
-        sd      t0,(5*8)(sp)
-        sd      t1,(6*8)(sp)
-        sd      t2,(7*8)(sp)
-        sd      s0,(8*8)(sp)
-        sd      s1,(9*8)(sp)
-        sd      a0,(10*8)(sp)
-        sd      a1,(11*8)(sp)
-        sd      a2,(12*8)(sp)
-        sd      a3,(13*8)(sp)
-        sd      a4,(14*8)(sp)
-        sd      a5,(15*8)(sp)
-        sd      a6,(16*8)(sp)
-        sd      a7,(17*8)(sp)
-        sd      s2,(18*8)(sp)
-        sd      s3,(19*8)(sp)
-        sd      s4,(20*8)(sp)
-        sd      s5,(21*8)(sp)
-        sd      s6,(22*8)(sp)
-        sd      s7,(23*8)(sp)
-        sd      s8,(24*8)(sp)
-        sd      s9,(25*8)(sp)
-        sd      s10,(26*8)(sp)
-        sd      s11,(27*8)(sp)
-        sd      t3,(28*8)(sp)
-        sd      t4,(29*8)(sp)
-        sd      t5,(30*8)(sp)
-        sd      t6,(31*8)(sp)
+        ld      gp,(-1*8)(sp)
 
         /* Store PC */
         csrr    t1,mepc
-        sd      t1,(0*8)(sp)
+        sd      t1,(11*8)(tp)
 
         /* Store SP */
         csrr    t0,mscratch
-        sd      t0,(2*8)(sp)
+        sd      t0,(-5*8)(sp)
         
+        /* Store mstatus */
         csrr    t0,mstatus
-        sd      t0,(-1*8)(sp)
+        sd      t0,(-3*8)(sp)
+
 
         /* Swap core and process sp */
-        amoswap.d.aqrl  sp,sp,(tp)
+        amoswap.d  sp,sp,(tp)
 
         /* Call scheduler */
         call    Sched
         
 AsmResumeProc:
         /* Swap core and process sp */
-        amoswap.d.aqrl  sp,sp,(tp)
-        ld      t0,(-1*8)(sp)
-        csrw    mstatus,t0
+        amoswap.d  sp,sp,(tp)
 
-        /* Save kernel gp and TP */
+
+        /* Load mstatus */
+        ld      t0,(-3*8)(sp)
+        csrw    mstatus,t0
+        
+        /* Load SP */
+        ld      t0,(-5*8)(sp)
+        csrw    mscratch,t0
+
+        /* Load PC */
+        ld      t1,(11*8)(tp)
+        csrw    mepc,t1
+
+        /* Store kernel gp, tp */
         sd      gp,(-1*8)(sp)
         sd      tp,(-2*8)(sp)
 
-        /* Load PC */
-        ld      t1,(2*8)(sp)
-        csrw    mscratch,t1
 
-        /* Load SP */
-        ld      t0,(0*8)(sp)
-        csrw    mepc,t0
-
-        ld      t6,(31*8)(sp)
-        ld      t5,(30*8)(sp)
-        ld      t4,(29*8)(sp)
-        ld      t3,(28*8)(sp)
-        ld      s11,(27*8)(sp)
-        ld      s10,(26*8)(sp)
-        ld      s9,(25*8)(sp)
-        ld      s8,(24*8)(sp)
-        ld      s7,(23*8)(sp)
-        ld      s6,(22*8)(sp)
-        ld      s5,(21*8)(sp)
-        ld      s4,(20*8)(sp)
-        ld      s3,(19*8)(sp)
-        ld      s2,(18*8)(sp)
-        ld      a7,(17*8)(sp)
-        ld      a6,(16*8)(sp)
-        ld      a5,(15*8)(sp)
-        ld      a4,(14*8)(sp)
-        ld      a3,(13*8)(sp)
-        ld      a2,(12*8)(sp)
-        ld      a1,(11*8)(sp)
-        ld      a0,(10*8)(sp)
-        ld      s1,(9*8)(sp)
-        ld      s0,(8*8)(sp)
-        ld      t2,(7*8)(sp)
-        ld      t1,(6*8)(sp)
-        ld      t0,(5*8)(sp)
-        ld      tp,(4*8)(sp)
-        ld      gp,(3*8)(sp)
-        ld      ra,(1*8)(sp)
-        addi    sp,sp,32*8
+        ld      t6,(-34*8)(sp)
+        ld      t5,(-33*8)(sp)
+        ld      t4,(-32*8)(sp)
+        ld      t3,(-31*8)(sp)
+        ld      s11,(-30*8)(sp)
+        ld      s10,(-29*8)(sp)
+        ld      s9,(-28*8)(sp)
+        ld      s8,(-27*8)(sp)
+        ld      s7,(-26*8)(sp)
+        ld      s6,(-25*8)(sp)
+        ld      s5,(-24*8)(sp)
+        ld      s4,(-23*8)(sp)
+        ld      s3,(-22*8)(sp)
+        ld      s2,(-21*8)(sp)
+        ld      a7,(-20*8)(sp)
+        ld      a6,(-19*8)(sp)
+        ld      a5,(-18*8)(sp)
+        ld      a4,(-17*8)(sp)
+        ld      a3,(-16*8)(sp)
+        ld      a2,(-15*8)(sp)
+        ld      a1,(-14*8)(sp)
+        ld      a0,(-13*8)(sp)
+        ld      s1,(-12*8)(sp)
+        ld      s0,(-11*8)(sp)
+        ld      t2,(-10*8)(sp)
+        ld      t1,(-9*8)(sp)
+        ld      t0,(-8*8)(sp)
+        ld      tp,(-7*8)(sp)
+        ld      gp,(-6*8)(sp)
+        //ld      sp,(-5*8)(sp)
+        ld      ra,(-4*8)(sp)
         csrrw   sp,mscratch,sp
         mret

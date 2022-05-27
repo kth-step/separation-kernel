@@ -29,8 +29,8 @@ static void proc_init_proc(int pid) {
         /* Set the process id to */
         proc->pid = pid;
         /* Set the process's kernel stack. */
-        proc->ksp = &proc_stack[pid][INIT_STACK_OFFSET];
-        for (int i = INIT_STACK_OFFSET; i < STACK_SIZE/8; i++)
+        proc->ksp = &proc_stack[pid][STACK_SIZE/8];
+        for (int i = 0; i < STACK_SIZE/8; i++)
                proc_stack[pid][i] = 0; 
         /* Set the capability table. */
         proc->cap_table = cap_tables[pid];
@@ -38,6 +38,7 @@ static void proc_init_proc(int pid) {
                 CapRevoke(&cap_tables[pid][i]);
                 CapDelete(&cap_tables[pid][i]);
         }
+        proc->pc = 0;
         proc->epid = -1;
         /* Set process to HALTED. */
         proc->state = PROC_HALTED;
@@ -96,7 +97,7 @@ static void proc_init_boot_proc(Proc *boot) {
         proc_init_supervisor(&cap_table[3 + N_CORES]);
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
-        *boot->ksp = (uintptr_t)user_code;  // Temporary code.
+        boot->pc = (uintptr_t)user_code;  // Temporary code.
 
         /* Set boot process to running. */
         boot->state = PROC_SUSPENDED;
@@ -132,7 +133,7 @@ bool ProcReset(int8_t pid, Cap *cap_pmp) {
         bool pmp_done = CapMove(&proc->cap_table[0], cap_pmp) &&
                         ProcPmpLoad(pid, 0, pmp.addr, pmp.rwx);
         if (pmp_done) {
-                *proc->ksp = (uintptr_t)user_code;  // Temporary code.
+                proc->pc = (uintptr_t)user_code;  // Temporary code.
         }
         return pmp_done;
 }

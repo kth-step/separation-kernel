@@ -44,6 +44,7 @@ struct proc {
          * this simplifies inter-process communication.
          */
         uintptr_t args[8];
+        uintptr_t pc;
 
         uint64_t pmpcfg;
         uint64_t pmpaddr[8];
