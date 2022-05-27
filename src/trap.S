@@ -240,6 +240,9 @@ __timer_handler:
         /* Store SP */
         csrr    t0,mscratch
         sd      t0,(2*8)(sp)
+        
+        csrr    t0,mstatus
+        sd      t0,(-1*8)(sp)
 
         /* Swap core and process sp */
         amoswap.d.aqrl  sp,sp,(tp)
@@ -250,6 +253,8 @@ __timer_handler:
 AsmResumeProc:
         /* Swap core and process sp */
         amoswap.d.aqrl  sp,sp,(tp)
+        ld      t0,(-1*8)(sp)
+        csrw    mstatus,t0
 
         /* Save kernel gp and TP */
         sd      gp,(-1*8)(sp)
