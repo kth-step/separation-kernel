@@ -297,7 +297,8 @@ void SyscallHalt(uint64_t cid_sup) {
         Proc *proc = &processes[sup.pid];
         proc->halt = 1;
         current->args[0] = __sync_bool_compare_and_swap(
-            &current->state, PROC_SUSPENDED, PROC_HALTED);
+                               &proc->state, PROC_SUSPENDED, PROC_HALTED) ||
+                           proc->state == PROC_HALTED;
 }
 
 void SyscallResume(uint64_t cid_sup) {
