@@ -46,8 +46,10 @@ struct proc {
         uintptr_t args[8];
         uintptr_t pc;
 
-        uint64_t pmpcfg;
-        uint64_t pmpaddr[8];
+        /* The pmp configurations are stored in these capabilities */
+        /* pmp_table[i].data[1] = pmpicfg | pmpaddri */
+        Cap pmp_table[8];
+
         /** Process state.
          * TODO: Comment
          */
@@ -77,6 +79,3 @@ void ProcInitProcesses(void);
 
 void ProcHalt(Proc *proc);
 bool ProcReset(int8_t pid, Cap *pmp);
-
-bool ProcPmpLoad(int8_t pid, uint8_t index, uint64_t addr, uint8_t rwx);
-bool ProcPmpUnload(int8_t pid, uint8_t index);

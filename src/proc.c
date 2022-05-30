@@ -124,37 +124,3 @@ void ProcHalt(Proc *proc) {
 bool ProcReset(int8_t pid, Cap *cap_pmp) {
         return false;
 }
-
-bool ProcPmpLoad(int8_t pid, uint8_t index, uint64_t addr, uint8_t rwx) {
-        if (index >= 8 || pid >= N_PROC || pid < 0)
-                return false;
-        Proc *proc = &processes[pid];
-        uint64_t cfg = 0x18 | rwx;
-        uint64_t mask = 0xFF << (index * 8);
-        while (1) {
-                uint64_t pmpcfg = proc->pmpcfg;
-                uint64_t new_pmpcfg = pmpcfg | (cfg << (index * 8));
-                if (pmpcfg & mask)
-                        return false;
-                proc->pmpaddr[index] = addr;
-                if (__sync_bool_compare_and_swap(&proc->pmpcfg, pmpcfg,
-                                                 new_pmpcfg))
-                        return true;
-        }
-}
-
-bool ProcPmpUnload(int8_t pid, uint8_t index) {
-        if (index >= 8 || pid >= N_PROC || pid < 0)
-                return false;
-        Proc *proc = &processes[pid];
-        uint64_t mask = 0xFF << (index * 8);
-        while (1) {
-                uint64_t pmpcfg = proc->pmpcfg;
-                uint64_t new_pmpcfg = pmpcfg & ~mask;
-                if (pmpcfg & mask)
-                        return false;
-                if (__sync_bool_compare_and_swap(&proc->pmpcfg, pmpcfg,
-                                                 new_pmpcfg))
-                        return true;
-        }
-}

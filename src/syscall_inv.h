@@ -113,8 +113,19 @@ uint64_t SyscallMemorySlice(const CapMemorySlice ms, Cap *cap, uint64_t a1,
         }
 }
 
-static inline uint64_t pe_load(const CapPmpEntry pe, Cap *cap, uint8_t index) {
-        return -1;
+static inline uint64_t pe_load(const CapPmpEntry pe, Cap *parent,
+                               uint8_t index) {
+        if (index > 8)
+                return -1;
+        Cap *child = &current->pmp_table[index];
+        CapLoadedPmp lp_child = cap_mk_loaded_pmp(pe.addr, pe.rwx);
+        if (!cap_set_loaded_pmp(child, lp_child))
+                return -1;
+        if (!CapAppend(child, parent)) {
+                child->data[1] = 0;
+                return 0;
+        }
+        return 1;
 }
 
 /*** PMP ENTRY HANDLE ***/
@@ -130,7 +141,7 @@ uint64_t SyscallPmpEntry(const CapPmpEntry pe, Cap *cap, uint64_t a1,
                         return CapMove(curr_get_cap(a1), cap);
                 case 2:
                         /* Delete cap */
-                        /* Revoke unloads PMP */
+                        /* Revoke unloads PMP by deleting a CapLoadedPmp */
                         CapRevoke(cap);
                         return CapDelete(cap);
                 case 3:
@@ -301,6 +312,8 @@ uint64_t SyscallReceiver(const CapReceiver receiver, Cap *cap, uint64_t a1,
                 case 3:
                         /* Delete time slice */
                         return CapRevoke(cap);
+                case 4:
+                        /* Receive message */
                 default:
                         return -1;
         }
@@ -323,6 +336,8 @@ uint64_t SyscallSender(const CapSender sender, Cap *cap, uint64_t a1,
                 case 3:
                         /* Delete time slice */
                         return CapRevoke(cap);
+                case 4:
+                        /* Send message */
                 default:
                         return -1;
         }

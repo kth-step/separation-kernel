@@ -52,8 +52,6 @@ uint64_t S3K_READ_CAP(uint64_t cid, uint64_t data[2]) {
         register uint64_t a1 __asm__("a1");
         register uint64_t a2 __asm__("a2");
         register uint64_t a7 __asm__("a7");
-        if (cid == 0)
-                return 0;
         a0 = cid;
         a7 = 0;
         __asm__ volatile("ecall" : "+r"(a0), "=r"(a1), "=r"(a2) : "r"(a7));
