@@ -18,7 +18,7 @@ void user_main(uintptr_t pid, uint64_t begin, uint64_t end) {
                 int code;
                 uint64_t addr = USER_MEMORY_BEGIN + ((0x2000 - 1) >> 1);
                 while (S3K_HALT(6) != 1)
-                S3K_REVOKE_CAP(1);
+                        S3K_REVOKE_CAP(1);
                 code = S3K_MAKE_PMP(25, 1, addr, 3);
                 printf("Make PMP = %d\n", code);
                 S3K_REVOKE_CAP(4);

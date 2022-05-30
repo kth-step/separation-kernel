@@ -20,7 +20,7 @@ extern volatile int ep_receiver[N_CHANNELS];
 
 _Static_assert(sizeof(Cap) == 32, "Capability node size error");
 
-void CapRevoke(Cap *cap);
+bool CapRevoke(Cap *cap);
 bool CapDelete(Cap *cap);
 bool CapMove(Cap *dest, Cap *src);
 bool CapAppend(Cap *node, Cap *prev);

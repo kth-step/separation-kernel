@@ -34,6 +34,8 @@ static inline bool cap_delete(Cap *prev, Cap *curr) {
                 return false;
         }
         prev->next = next;
+        curr->data[0] = 0;
+        curr->data[1] = 0;
         __sync_synchronize();
         curr->next = NULL;
         return true;
@@ -67,53 +69,18 @@ bool CapDelete(Cap *curr) {
         return false;
 }
 
-void cap_revoke_ms(Cap *curr) {
-        CapMemorySlice parent = cap_get_memory_slice(curr);
-        if (!parent.valid)
-                return;
-        do {
+bool CapRevoke(Cap *curr) {
+        const CapUnion parent = cap_get(curr);
+        int counter = 0;
+        while (!cap_is_deleted(curr)) {
                 Cap *next = curr->next;
-                if (!next)
+                CapUnion child = cap_get(next);
+                if (!cap_is_child(parent, child))
                         break;
-                // TODO: Fix PMP Entry case
-                CapMemorySlice child = cap_get_memory_slice(next);
-                if (!child.valid)
-                        break;
-                if (!cap_is_child_ms_ms(parent, child))
-                        break;
-                cap_delete(curr, next);
-        } while (!cap_is_deleted(curr));
-}
-
-void cap_revoke_ts(Cap *curr) {
-        CapTimeSlice parent = cap_get_time_slice(curr);
-        if (!parent.valid)
-                return;
-        do {
-                Cap *next = curr->next;
-                if (!next)
-                        break;
-                CapTimeSlice child = cap_get_time_slice(next);
-                if (!child.valid)
-                        break;
-                if (!cap_is_child_ts_ts(parent, child))
-                        break;
-                cap_delete(curr, next);
-        } while (!cap_is_deleted(curr));
-}
-
-void CapRevoke(Cap *curr) {
-        CapType type = cap_get_type(curr);
-        switch (type) {
-                case CAP_MEMORY_SLICE:
-                        cap_revoke_ms(curr);
-                        break;
-                case CAP_TIME_SLICE:
-                        cap_revoke_ts(curr);
-                        break;
-                default:
-                        break;
+                if (cap_delete(curr, next))
+                        counter++;
         }
+        return counter > 0;
 }
 
 /**
@@ -144,44 +111,8 @@ bool CapMove(Cap *dest, Cap *src) {
         return CapAppend(dest, src) && CapDelete(src);
 }
 
-bool CapInterprocessMoveTimeSlice(Cap *dest, Cap *src, int pid_dest,
-                                  int pid_src) {
-        if (!cap_is_deleted(dest) || cap_is_deleted(src))
-                return false;
-        CapTimeSlice ts = cap_get_time_slice(src);
-        if (!ts.valid)
-                return false;
-        uint8_t tsid = ts.tsid;
-        SchedUpdatePidTsid(ts.end, ts.begin, ts.hartid, pid_src, tsid,
-                           pid_dest, tsid);
-        return CapMove(dest, src);
-}
-
-bool CapPmpEntryLoad(int8_t pid, Cap *cap_pmp, int pmp_index) {
-        CapPmpEntry pmp = cap_get_pmp_entry(cap_pmp);
-        if (!pmp.valid)
-                return false;
-        return ProcPmpLoad(pid, pmp_index, pmp.addr, pmp.rwx);
-}
-
-bool CapPmpEntryUnload(int8_t pid, Cap *cap_pmp) {
-        CapPmpEntry pmp = cap_get_pmp_entry(cap_pmp);
-        if (!pmp.valid || pmp.index == -1)
-                return false;
-        return ProcPmpUnload(pid, pmp.index);
-}
-
 bool CapInterprocessMove(Cap *dest, Cap *src, int pid_dest, int pid_src) {
-        CapType type = cap_get_type(src);
-        if (type == CAP_TIME_SLICE) {
-                return CapInterprocessMoveTimeSlice(dest, src, pid_dest,
-                                                    pid_src);
-        } else if (type == CAP_PMP_ENTRY) {
-                CapPmpEntryUnload(pid_src, src);
-        }
-        if (!cap_is_deleted(dest) || cap_is_deleted(src))
-                return false;
-        return CapMove(dest, src);
+        return false;
 }
 
 Cap *CapInitSentinel(void) {

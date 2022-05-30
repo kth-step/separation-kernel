@@ -29,9 +29,9 @@ static void proc_init_proc(int pid) {
         /* Set the process id to */
         proc->pid = pid;
         /* Set the process's kernel stack. */
-        proc->ksp = &proc_stack[pid][STACK_SIZE/8];
-        for (int i = 0; i < STACK_SIZE/8; i++)
-               proc_stack[pid][i] = 0; 
+        proc->ksp = &proc_stack[pid][STACK_SIZE / 8];
+        for (int i = 0; i < STACK_SIZE / 8; i++)
+                proc_stack[pid][i] = 0;
         /* Set the capability table. */
         proc->cap_table = cap_tables[pid];
         for (int i = 0; i < N_CAPS; ++i) {
@@ -68,24 +68,28 @@ void proc_init_channels(Cap *channel) {
 }
 
 void proc_init_time(Cap time[N_CORES]) {
-        for (int i = 0; i < N_CORES; i++) {
-                Cap *sentinel = CapInitSentinel();
-                uint16_t begin = 0;
-                uint16_t end = N_QUANTUM - 1;
-                uint8_t tsid = 0;
-                uint8_t fuel = 255;
-                CapTimeSlice ts = cap_mk_time_slice(i, begin, end, tsid, fuel);
-                cap_set_time_slice(&time[i], ts);
-                CapAppend(&time[i], sentinel);
+        Cap *sentinel;
+        uint16_t begin, end;
+        uint8_t tsid, fuel;
+        CapTimeSlice ts;
+        for (int hartid = 0; hartid < N_CORES; hartid++) {
+                sentinel = CapInitSentinel();
+                begin = 0;
+                end = N_QUANTUM - 1;
+                tsid = 0;
+                fuel = 255;
+                ts = cap_mk_time_slice(hartid, begin, end, tsid, fuel);
+                cap_set_time_slice(&time[hartid], ts);
+                CapAppend(&time[hartid], sentinel);
         }
 }
 
 void proc_init_supervisor(Cap cap_sups[N_PROC]) {
         Cap *sentinel = CapInitSentinel();
-        for (int i = 0; i < N_PROC; i++) {
-                CapSupervisor sup = cap_mk_supervisor(i);
-                cap_set_supervisor(&cap_sups[i], sup);
-                CapAppend(&cap_sups[i], sentinel);
+        for (int pid = 0; pid < N_PROC; pid++) {
+                CapSupervisor sup = cap_mk_supervisor(pid);
+                cap_set_supervisor(&cap_sups[pid], sup);
+                CapAppend(&cap_sups[pid], sentinel);
         }
 }
 
@@ -118,24 +122,7 @@ void ProcHalt(Proc *proc) {
 }
 
 bool ProcReset(int8_t pid, Cap *cap_pmp) {
-        if (pid < 0 || pid >= N_PROC) {
-                return false;
-        }
-        Proc *proc = &processes[pid];
-        if (proc->state != PROC_HALTED)
-                return false;
-        CapPmpEntry pmp = cap_get_pmp_entry(cap_pmp);
-        if (!pmp.valid)
-                return false;
-        proc_init_proc(pid);
-        uint64_t begin, end;
-        cap_get_pmp_entry_bounds(pmp, &begin, &end);
-        bool pmp_done = CapMove(&proc->cap_table[0], cap_pmp) &&
-                        ProcPmpLoad(pid, 0, pmp.addr, pmp.rwx);
-        if (pmp_done) {
-                proc->pc = (uintptr_t)user_code;  // Temporary code.
-        }
-        return pmp_done;
+        return false;
 }
 
 bool ProcPmpLoad(int8_t pid, uint8_t index, uint64_t addr, uint8_t rwx) {

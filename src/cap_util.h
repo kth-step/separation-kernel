@@ -1,13 +1,15 @@
 #pragma once
 #include "cap.h"
+#include "pmp.h"
 
 typedef enum cap_type {
-        CAP_INVALID = 0,
+        CAP_EMPTY = 0,
         CAP_MEMORY_SLICE,
         CAP_PMP_ENTRY,
         CAP_TIME_SLICE,
         CAP_CHANNELS,
-        CAP_ENDPOINT,
+        CAP_RECEIVER,
+        CAP_SENDER,
         CAP_SUPERVISOR
 } CapType;
 
@@ -22,21 +24,18 @@ typedef enum cap_rwx {
 } CapRWX;
 
 typedef struct cap_memory_slice {
-        bool valid;
         uint64_t begin;
         uint64_t end;
         uint8_t rwx;
 } CapMemorySlice;
 
 typedef struct cap_pmp_entry {
-        bool valid;
         uint64_t addr;
         uint8_t rwx;
         int8_t index;
 } CapPmpEntry;
 
 typedef struct cap_time_slice {
-        bool valid;
         uint8_t hartid;
         uint16_t begin;
         uint16_t end;
@@ -44,22 +43,33 @@ typedef struct cap_time_slice {
         uint8_t tsid_end;
 } CapTimeSlice;
 
-typedef struct cap_endpoint {
-        bool valid;
-        uint16_t epid;
-        bool is_receiver;
-} CapEndpoint;
+typedef struct cap_receiver {
+        uint16_t channel;
+} CapReceiver;
+
+typedef struct cap_sender {
+        uint16_t channel;
+} CapSender;
 
 typedef struct cap_channels {
-        bool valid;
         uint8_t begin;
         uint8_t end;
 } CapChannels;
 
 typedef struct cap_supervisor {
-        bool valid;
         int8_t pid;
 } CapSupervisor;
+
+typedef struct cap_union {
+        CapType type;
+        CapMemorySlice memory_slice;
+        CapPmpEntry pmp_entry;
+        CapTimeSlice time_slice;
+        CapChannels channels;
+        CapReceiver receiver;
+        CapSender sender;
+        CapSupervisor supervisor;
+} CapUnion;
 
 /* Basic capability utilities */
 static inline bool cap_is_deleted(const Cap *cap);
@@ -67,55 +77,59 @@ static inline bool cap_get_data(const Cap *cap, uint64_t data[2]);
 static inline bool cap_set_data(Cap *cap, const uint64_t data[2]);
 static inline CapType cap_get_type(const Cap *cap);
 
-/* Memory slice */
+/* Capability makers */
 static inline CapMemorySlice cap_mk_memory_slice(uint64_t begin, uint64_t end,
                                                  uint8_t rwx);
-static inline CapMemorySlice cap_get_memory_slice(const Cap *cap);
-static inline bool cap_set_memory_slice(Cap *cap, const CapMemorySlice ms);
-
-/* PMP entry */
 static inline CapPmpEntry cap_mk_pmp_entry(uint64_t addr, uint8_t rwx);
-static inline CapPmpEntry cap_get_pmp_entry(const Cap *cap);
-static inline bool cap_set_pmp_entry(Cap *cap, const CapPmpEntry pe);
-static inline void cap_get_pmp_entry_bounds(const CapPmpEntry pe,
-                                            uint64_t *begin, uint64_t *end);
-
-/* Time slice */
 static inline CapTimeSlice cap_mk_time_slice(uint8_t hartid, uint16_t begin,
                                              uint16_t end, uint8_t tsid,
                                              uint8_t tsid_end);
-static inline CapTimeSlice cap_get_time_slice(const Cap *cap);
-static inline bool cap_set_time_slice(Cap *cap, const CapTimeSlice ms);
-
-/* Endpoint */
-static inline CapEndpoint cap_mk_endpoint(uint8_t epid, bool is_receiver);
-static inline CapEndpoint cap_get_endpoint(const Cap *cap);
-static inline bool cap_set_endpoint(Cap *cap, const CapEndpoint ep);
-
-/* Channels */
 static inline CapChannels cap_mk_channels(uint8_t begin, uint8_t end);
-static inline CapChannels cap_get_channels(const Cap *cap);
-static inline bool cap_set_channels(Cap *cap, const CapChannels ep);
+static inline CapSender cap_mk_sender(uint8_t channel);
+static inline CapReceiver cap_mk_receiver(uint8_t channel);
+static inline CapSupervisor cap_mk_supervisor(uint8_t pid);
 
-/* Supervisor */
-static inline CapSupervisor cap_mk_supervisor(int8_t pid);
-static inline CapSupervisor cap_get_supervisor(const Cap *cap);
-static inline bool cap_set_supervisor(Cap *cap, const CapSupervisor ep);
+/* Capability setters */
+static inline bool cap_set(Cap *cap, const CapUnion cunion);
+static inline bool cap_set_memory_slice(Cap *cap, const CapMemorySlice ms);
+static inline bool cap_set_pmp_entry(Cap *cap, const CapPmpEntry pe);
+static inline bool cap_set_time_slice(Cap *cap, const CapTimeSlice ts);
+static inline bool cap_set_channels(Cap *cap, const CapChannels ch);
+static inline bool cap_set_sender(Cap *cap, const CapSender sender);
+static inline bool cap_set_receiver(Cap *cap, const CapReceiver receiver);
+static inline bool cap_set_supervisor(Cap *cap, const CapSupervisor sup);
 
-/* Is child predicates */
+/* Capability getters */
+static inline CapUnion cap_get(const Cap *cap);
+static inline CapUnion cap_get_union(const uint64_t data[2]);
+static inline CapMemorySlice cap_get_memory_slice(const uint64_t data[2]);
+static inline CapPmpEntry cap_get_pmp_entry(const uint64_t data[2]);
+static inline CapTimeSlice cap_get_time_slice(const uint64_t data[2]);
+static inline CapChannels cap_get_channels(const uint64_t data[2]);
+static inline CapSender cap_get_sender(const uint64_t data[2]);
+static inline CapReceiver cap_get_receiver(const uint64_t data[2]);
+static inline CapSupervisor cap_get_supervisor(const uint64_t data[2]);
+
+/* Is child */
+static inline bool cap_is_child(const CapUnion parent, const CapUnion child);
+static inline bool cap_is_child_ms(const CapMemorySlice parent,
+                                   const CapUnion child);
 static inline bool cap_is_child_ms_ms(const CapMemorySlice parent,
                                       const CapMemorySlice child);
 static inline bool cap_is_child_ms_pe(const CapMemorySlice parent,
                                       const CapPmpEntry child);
+static inline bool cap_is_child_ts(const CapTimeSlice parent,
+                                   const CapUnion child);
 static inline bool cap_is_child_ts_ts(const CapTimeSlice parent,
                                       const CapTimeSlice child);
-
-static inline bool cap_is_child_ep_ep(const CapEndpoint parent,
-                                      const CapEndpoint child);
-static inline bool cap_is_child_ch_ep(const CapChannels parent,
-                                      const CapEndpoint child);
+static inline bool cap_is_child_ch(const CapChannels parent,
+                                   const CapUnion child);
 static inline bool cap_is_child_ch_ch(const CapChannels parent,
                                       const CapChannels child);
+static inline bool cap_is_child_ch_recv(const CapChannels parent,
+                                        const CapReceiver child);
+static inline bool cap_is_child_ch_send(const CapChannels parent,
+                                        const CapSender child);
 
 bool cap_is_deleted(const Cap *cap) {
         return cap->next == NULL;
@@ -125,177 +139,177 @@ bool cap_get_data(const Cap *cap, uint64_t data[2]) {
         data[0] = cap->data[0];
         data[1] = cap->data[1];
         __sync_synchronize();
-        return !cap_is_deleted(cap);
-}
-
-bool cap_set_data(Cap *cap, const uint64_t data[2]) {
-        if (!cap_is_deleted(cap))
+        if (cap_is_deleted(cap)) {
+                data[0] = 0;
+                data[1] = 0;
                 return false;
-        cap->data[0] = data[0];
-        cap->data[1] = data[1];
+        }
         return true;
 }
 
-CapType cap_get_type(const Cap *cap) {
+bool cap_set_data(Cap *cap, const uint64_t data[2]) {
+        if (cap_is_deleted(cap)) {
+                cap->data[0] = data[0];
+                cap->data[1] = data[1];
+                return true;
+        }
+        return false;
+}
+
+static inline CapType cap_get_type(const Cap *cap) {
         uint64_t data[2];
-        if (cap_get_data(cap, data))
-                return (CapType)(data[0] & 0xFF);
-        return CAP_INVALID;
+        cap_get_data(cap, data);
+        return data[0] & 0xFF;
 }
 
 CapMemorySlice cap_mk_memory_slice(uint64_t begin, uint64_t end, uint8_t rwx) {
-        CapMemorySlice ms;
-        ms.begin = begin;
-        ms.end = end;
-        ms.rwx = rwx;
-        ms.valid = (begin < end && rwx != 0);
-        return ms;
-}
-
-CapMemorySlice cap_get_memory_slice(const Cap *cap) {
-        uint64_t data[2];
-        if (!cap_get_data(cap, data) || (data[0] & 0xFF) != CAP_MEMORY_SLICE) {
-                return (CapMemorySlice){.valid = false};
-        }
-        return cap_mk_memory_slice(data[0] >> 8, data[1] >> 8, data[1] & 0xFF);
-}
-
-bool cap_set_memory_slice(Cap *cap, CapMemorySlice ms) {
-        uint64_t data[2];
-        data[0] = CAP_MEMORY_SLICE;
-        data[0] |= ms.begin << 8;
-        data[1] = ms.rwx;
-        data[1] |= ms.end << 8;
-        return cap_set_data(cap, data);
+        return (CapMemorySlice){begin, end, rwx};
 }
 
 CapPmpEntry cap_mk_pmp_entry(uint64_t addr, uint8_t rwx) {
-        bool valid = ((addr >> 56) == 0) || rwx != 0;
-        return (CapPmpEntry){.valid = valid, .addr = addr, .rwx = rwx};
-}
-
-CapPmpEntry cap_get_pmp_entry(const Cap *cap) {
-        uint64_t data[2];
-        if (!cap_get_data(cap, data) || (data[0] & 0xFF) != CAP_PMP_ENTRY) {
-                return (CapPmpEntry){.valid = false};
-        }
-        return cap_mk_pmp_entry(data[0] >> 8, data[1] & 0xFF);
-}
-
-bool cap_set_pmp_entry(Cap *cap, const CapPmpEntry pe) {
-        uint64_t data[2];
-        data[0] = CAP_PMP_ENTRY;
-        data[0] |= pe.addr << 8;
-        data[1] = pe.rwx;
-        return cap_set_data(cap, data);
-}
-
-void cap_get_pmp_entry_bounds(const CapPmpEntry pe, uint64_t *begin,
-                              uint64_t *end) {
-        *begin = pe.addr & (pe.addr + 1);
-        uint64_t length = (pe.addr ^ (pe.addr + 1)) + 1;
-        *end = *begin + length;
+        return (CapPmpEntry){addr, rwx};
 }
 
 CapTimeSlice cap_mk_time_slice(uint8_t hartid, uint16_t begin, uint16_t end,
                                uint8_t tsid, uint8_t tsid_end) {
-        CapTimeSlice ts;
-        ts.begin = begin;
-        ts.end = end;
-        ts.tsid = tsid;
-        ts.tsid_end = tsid_end;
-        ts.hartid = hartid;
-        ts.valid = (begin < end) && (tsid <= tsid_end);
-        return ts;
+        return (CapTimeSlice){hartid, begin, end, tsid, tsid_end};
 }
 
-CapTimeSlice cap_get_time_slice(const Cap *cap) {
+CapReceiver cap_mk_receiver(uint8_t channel) {
+        return (CapReceiver){channel};
+}
+
+CapSender cap_mk_sender(uint8_t channel) {
+        return (CapSender){channel};
+}
+CapChannels cap_mk_channels(uint8_t begin, uint8_t end) {
+        return (CapChannels){begin, end};
+}
+
+CapSupervisor cap_mk_supervisor(uint8_t pid) {
+        return (CapSupervisor){pid};
+}
+
+bool cap_set(Cap *cap, const CapUnion cunion) {
         uint64_t data[2];
-        if (!cap_get_data(cap, data) || (data[0] & 0xFF) != CAP_TIME_SLICE) {
-                return (CapTimeSlice){.valid = false};
+        data[0] = data[1] = 0;
+        switch (cunion.type) {
+                case CAP_EMPTY:
+                        break;
+                case CAP_MEMORY_SLICE:
+                        CapMemorySlice ms = cunion.memory_slice;
+                        data[0] = CAP_MEMORY_SLICE | ms.begin << 8;
+                        data[1] = ms.end << 8 | ms.rwx;
+                        break;
+                case CAP_PMP_ENTRY:
+                        CapPmpEntry pe = cunion.pmp_entry;
+                        data[0] = CAP_PMP_ENTRY | pe.addr << 8;
+                        data[1] = pe.rwx;
+                        break;
+                case CAP_TIME_SLICE:
+                        CapTimeSlice ts = cunion.time_slice;
+                        data[0] = CAP_TIME_SLICE | ts.hartid << 8 |
+                                  ts.begin << 16 | (uint64_t)ts.end << 32 |
+                                  (uint64_t)ts.tsid << 48 |
+                                  (uint64_t)ts.tsid_end << 56;
+                        data[1] = 0;
+                        break;
+                case CAP_CHANNELS:
+                        CapChannels ch = cunion.channels;
+                        data[0] = CAP_CHANNELS | ch.begin << 8 | ch.end << 16;
+                        data[1] = 0;
+                        break;
+                case CAP_RECEIVER:
+                        CapReceiver receiver = cunion.receiver;
+                        data[0] = CAP_RECEIVER | receiver.channel << 8;
+                        data[1] = 0;
+                        break;
+                case CAP_SENDER:
+                        CapSender sender = cunion.sender;
+                        data[0] = CAP_SENDER | sender.channel << 8;
+                        data[1] = 0;
+                        break;
+                case CAP_SUPERVISOR:
+                        CapSupervisor sup = cunion.supervisor;
+                        data[0] = CAP_SUPERVISOR | sup.pid << 8;
+                        data[1] = 0;
+                        break;
         }
-        uint8_t hartid = data[0] >> 8;
-        uint16_t begin = data[0] >> 16;
-        uint16_t end = data[0] >> 32;
-        uint8_t tsid = data[0] >> 48;
-        uint8_t tsid_end = data[0] >> 56;
-        return cap_mk_time_slice(hartid, begin, end, tsid, tsid_end);
+        return cap_set_data(cap, data);
+}
+
+bool cap_set_memory_slice(Cap *cap, const CapMemorySlice ms) {
+        return cap_set(
+            cap, (CapUnion){.memory_slice = ms, .type = CAP_MEMORY_SLICE});
+}
+
+bool cap_set_pmp_entry(Cap *cap, const CapPmpEntry pe) {
+        return cap_set(cap, (CapUnion){.pmp_entry = pe, .type = CAP_PMP_ENTRY});
 }
 
 bool cap_set_time_slice(Cap *cap, const CapTimeSlice ts) {
-        uint64_t data[2];
-        data[0] = CAP_TIME_SLICE;
-        data[0] |= (uint64_t)ts.hartid << 8;
-        data[0] |= (uint64_t)ts.begin << 16;
-        data[0] |= (uint64_t)ts.end << 32;
-        data[0] |= (uint64_t)ts.tsid << 48;
-        data[0] |= (uint64_t)ts.tsid_end << 56;
-        data[1] = 0;
-        return cap_set_data(cap, data);
-}
-
-CapEndpoint cap_mk_endpoint(uint8_t epid, bool is_receiver) {
-        return (CapEndpoint){
-            .valid = true, .epid = epid, .is_receiver = is_receiver};
-}
-
-CapEndpoint cap_get_endpoint(const Cap *cap) {
-        uint64_t data[2];
-        if (!cap_get_data(cap, data) || (data[0] & 0xFF) != CAP_ENDPOINT) {
-                return (CapEndpoint){.valid = false};
-        }
-        return cap_mk_endpoint(data[0] >> 8, data[0] >> 16);
-}
-
-bool cap_set_endpoint(Cap *cap, const CapEndpoint ep) {
-        uint64_t data[2];
-        data[0] = CAP_ENDPOINT;
-        data[0] |= (uint64_t)ep.epid << 8;
-        data[0] |= (uint64_t)ep.is_receiver << 16;
-        data[1] = 0;
-        return cap_set_data(cap, data);
-}
-
-CapChannels cap_mk_channels(uint8_t begin, uint8_t end) {
-        return (CapChannels){.valid = begin < end, .begin = begin, .end = end};
-}
-
-CapChannels cap_get_channels(const Cap *cap) {
-        uint64_t data[2];
-        if (!cap_get_data(cap, data) || (data[0] & 0xFF) != CAP_ENDPOINT) {
-                return (CapChannels){.valid = false};
-        }
-        return cap_mk_channels(data[0] >> 8, data[0] >> 16);
+        return cap_set(cap,
+                       (CapUnion){.time_slice = ts, .type = CAP_TIME_SLICE});
 }
 
 bool cap_set_channels(Cap *cap, const CapChannels ch) {
-        uint64_t data[2];
-        data[0] = CAP_ENDPOINT;
-        data[0] |= (uint64_t)ch.begin << 8;
-        data[0] |= (uint64_t)ch.end << 16;
-        data[1] = 0;
-        return cap_set_data(cap, data);
+        return cap_set(cap, (CapUnion){.channels = ch, .type = CAP_CHANNELS});
 }
 
-static inline CapSupervisor cap_mk_supervisor(int8_t pid) {
-        bool valid = pid >= 0 && pid < N_PROC;
-        return (CapSupervisor){.pid = pid, .valid = valid};
+bool cap_set_receiver(Cap *cap, const CapReceiver receiver) {
+        return cap_set(cap,
+                       (CapUnion){.receiver = receiver, .type = CAP_RECEIVER});
 }
 
-static inline CapSupervisor cap_get_supervisor(const Cap *cap) {
+bool cap_set_sender(Cap *cap, const CapSender sender) {
+        return cap_set(cap, (CapUnion){.sender = sender, .type = CAP_SENDER});
+}
+
+bool cap_set_supervisor(Cap *cap, const CapSupervisor sup) {
+        return cap_set(cap,
+                       (CapUnion){.supervisor = sup, .type = CAP_SUPERVISOR});
+}
+
+CapUnion cap_get(const Cap *cap) {
         uint64_t data[2];
-        if (!cap_get_data(cap, data) || (data[0] & 0xFF) != CAP_SUPERVISOR) {
-                return (CapSupervisor){.valid = false};
-        }
+        cap_get_data(cap, data);
+        return cap_get_union(data);
+}
+
+CapUnion cap_get_union(const uint64_t data[2]) {
+        return (CapUnion){data[0] & 0xFF,          cap_get_memory_slice(data),
+                          cap_get_pmp_entry(data), cap_get_time_slice(data),
+                          cap_get_channels(data),  cap_get_receiver(data),
+                          cap_get_sender(data),    cap_get_supervisor(data)};
+}
+
+CapMemorySlice cap_get_memory_slice(const uint64_t data[2]) {
+        return cap_mk_memory_slice(data[0] >> 8, data[1] >> 8, data[1] & 0xFF);
+}
+
+CapPmpEntry cap_get_pmp_entry(const uint64_t data[2]) {
+        return cap_mk_pmp_entry(data[0] >> 8, data[1] & 0x7);
+}
+
+CapTimeSlice cap_get_time_slice(const uint64_t data[2]) {
+        return cap_mk_time_slice(data[0] >> 8, data[0] >> 16, data[0] >> 32,
+                                 data[0] >> 48, data[0] >> 56);
+}
+
+CapChannels cap_get_channels(const uint64_t data[2]) {
+        return cap_mk_channels(data[0] >> 8, data[0] >> 16);
+}
+
+CapReceiver cap_get_receiver(const uint64_t data[2]) {
+        return cap_mk_receiver(data[0] >> 8);
+}
+
+CapSender cap_get_sender(const uint64_t data[2]) {
+        return cap_mk_sender(data[0] >> 8);
+}
+
+CapSupervisor cap_get_supervisor(const uint64_t data[2]) {
         return cap_mk_supervisor(data[0] >> 8);
-}
-
-static inline bool cap_set_supervisor(Cap *cap, const CapSupervisor sup) {
-        uint64_t data[2];
-        data[0] = CAP_SUPERVISOR;
-        data[0] |= sup.pid << 8;
-        data[1] = 0;
-        return cap_set_data(cap, data);
 }
 
 bool cap_is_child_ms_ms(const CapMemorySlice parent,
@@ -306,26 +320,74 @@ bool cap_is_child_ms_ms(const CapMemorySlice parent,
 
 bool cap_is_child_ms_pe(const CapMemorySlice parent, const CapPmpEntry child) {
         uint64_t begin, end;
-        cap_get_pmp_entry_bounds(child, &begin, &end);
+        pmp_napot_bounds(child.addr, &begin, &end);
         return parent.begin <= begin && end <= parent.end &&
                (child.rwx & parent.rwx) == child.rwx;
 }
 
+bool cap_is_child_ms(const CapMemorySlice parent, const CapUnion child) {
+        switch (child.type) {
+                case CAP_MEMORY_SLICE:
+                        return cap_is_child_ms_ms(parent, child.memory_slice);
+                case CAP_PMP_ENTRY:
+                        return cap_is_child_ms_pe(parent, child.pmp_entry);
+                default:
+                        return false;
+        }
+}
+
 bool cap_is_child_ts_ts(const CapTimeSlice parent, const CapTimeSlice child) {
-        return parent.hartid == child.hartid && parent.begin <= child.begin &&
-               child.end <= parent.end && parent.tsid < child.tsid &&
-               (child.tsid_end <= parent.tsid_end);
+        return parent.begin <= child.begin && child.end <= parent.end &&
+               parent.tsid < child.tsid && child.tsid_end <= parent.tsid_end;
 }
 
-bool cap_is_child_ep_ep(const CapEndpoint parent, const CapEndpoint child) {
-        return parent.epid == child.epid && parent.is_receiver &&
-               !child.is_receiver;
-}
-
-bool cap_is_child_ch_ep(const CapChannels parent, const CapEndpoint child) {
-        return parent.begin <= child.epid && child.epid < parent.end;
+bool cap_is_child_ts(const CapTimeSlice parent, const CapUnion child) {
+        switch (child.type) {
+                case CAP_TIME_SLICE:
+                        return cap_is_child_ts_ts(parent, child.time_slice);
+                default:
+                        return false;
+        }
 }
 
 bool cap_is_child_ch_ch(const CapChannels parent, const CapChannels child) {
         return parent.begin <= child.begin && child.end <= parent.end;
+}
+
+bool cap_is_child_ch_recv(const CapChannels parent, const CapReceiver child) {
+        return parent.begin <= child.channel && child.channel <= parent.end;
+}
+
+bool cap_is_child_ch_send(const CapChannels parent, const CapSender child) {
+        return parent.begin <= child.channel && child.channel <= parent.end;
+}
+
+bool cap_is_child_ch(const CapChannels parent, const CapUnion child) {
+        switch (child.type) {
+                case CAP_CHANNELS:
+                        return cap_is_child_ch_ch(parent, child.channels);
+                case CAP_RECEIVER:
+                        return cap_is_child_ch_recv(parent, child.receiver);
+                case CAP_SENDER:
+                        return cap_is_child_ch_send(parent, child.sender);
+                default:
+                        return false;
+        }
+}
+
+bool cap_is_child(const CapUnion parent, const CapUnion child) {
+        switch (parent.type) {
+                case CAP_MEMORY_SLICE:
+                        return cap_is_child_ms(parent.memory_slice, child);
+                case CAP_TIME_SLICE:
+                        return cap_is_child_ts(parent.time_slice, child);
+                case CAP_CHANNELS:
+                        return cap_is_child_ch(parent.channels, child);
+                case CAP_PMP_ENTRY:
+                        /* TODO: IMPLEMENT HIDDEN PMP_ENTRY */
+                        return false;
+                default:
+                        return false;
+        }
+        return false;
 }

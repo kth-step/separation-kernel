@@ -40,32 +40,6 @@ __exception_trampoline:
         j       __hang  /* 13: Load page fault */
         j       __hang  /* 14: Reserved */
         j       __hang  /* 15: Store/AMO page fault */
-__syscall_trampoline:
-        /* System calls */
-        j       SyscallReadPid
-        j       SyscallReadCap
-        j       SyscallMoveCap
-        j       SyscallDeleteCap
-        j       SyscallRevokeCap
-        j       SyscallSliceMemory
-        j       SyscallSplitMemory
-        j       SyscallMakePmp
-        j       SyscallLoadPmp
-        j       SyscallUnloadPmp
-        j       SyscallSliceTime
-        j       SyscallSplitTime
-        j       SyscallSliceChannels
-        j       SyscallSplitChannels
-        j       SyscallMakeReceiver
-        j       SyscallMakeSender
-        j       SyscallReceive
-        j       SyscallSend
-        j       SyscallHalt
-        j       SyscallResume
-        j       SyscallGiveCap
-        j       SyscallTakeCap
-        j       SyscallSupReadCap
-        j       SyscallReset
 .option pop
 
 __exception_handler:
@@ -115,18 +89,24 @@ __exception_handler:
         bne     t1,t2,__exception
 
 __syscall:
-        /* Number of syscall is 16 for now. */
-        li      t2,24
-        /* If t0 >= 16, invalid syscall */
-        bge     t0,t2,__exception
         /* Load address to syscall trampoline */
-        la      ra,__syscall_trampoline
+        la      ra,SyscallHandler
         /* Adds 4 to pc (jumping over ecall instruction */
         addi    t3,t3,4
-        /* Make offset to trampoline address */
-        slli    t1,t0,2
-        /* Jump to trampoline */
-        j       __trampoline
+        /* Store user pc */
+        sd      t3,(-14*8)(sp)
+
+        /* Fix sp and enable preemption */
+        addi    sp,sp,-14*8
+        csrwi   mstatus,8
+
+        call    SyscallHandler
+
+        /* Fix sp and disable preemption */
+        csrwi   mstatus,0
+        addi    sp,sp,14*8
+
+        j       __exception_exit
 
 __exception:
         la      ra,__exception_trampoline
@@ -139,11 +119,9 @@ __exception:
         /* Make offset to trampoline address. */
         slli    t1,t1,2
 
-__trampoline:
         /* Store user pc */
         sd      t3,(-14*8)(sp)
 
-        /* Fix sp and enable preemption */
         addi    sp,sp,-14*8
         csrwi   mstatus,8
 

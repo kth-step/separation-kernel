@@ -165,4 +165,3 @@ void SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
         else
                 sched_update(begin, end, hartid, expected, desired);
 }
-
