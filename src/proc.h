@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "cap.h"
+#include "cap_util.h"
 #include "config.h"
 #include "lock.h"
 
@@ -56,7 +57,9 @@ struct proc {
         ProcState state;
         bool halt;
 
-        int epid;
+        /* If listen_channel != -1, the process is waiting for a message from
+         * the channel */
+        int listen_channel;
 };
 
 /** Processes
@@ -78,4 +81,25 @@ register Proc *current __asm__("tp");
 void ProcInitProcesses(void);
 
 void ProcHalt(Proc *proc);
-bool ProcReset(int8_t pid, Cap *pmp);
+void ProcReset(int pid);
+
+static inline bool ProcLoadPmp(Proc *proc, CapPmpEntry pe, Cap *cap,
+                               uint64_t index) {
+        if (index > 8)
+                return -1;
+        Cap *child = &proc->pmp_table[index];
+        CapLoadedPmp lp_child = cap_mk_loaded_pmp(pe.addr, pe.rwx);
+        if (!cap_set(child, cap_serialize_loaded_pmp(lp_child)))
+                return 0;
+        if (!CapAppend(child, cap)) {
+                child->data[1] = 0;
+                return 0;
+        }
+        return 1;
+}
+
+static inline bool ProcUnloadPmp(Proc *proc, uint64_t index) {
+        if (index > 8)
+                return -1;
+        return CapDelete(&proc->pmp_table[index]);
+}

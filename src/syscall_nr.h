@@ -1,0 +1,34 @@
+#pragma once
+
+#define SYSNR_GET_PID 1
+
+#define SYSNR_READ_CAP 0
+#define SYSNR_MOVE_CAP 1
+#define SYSNR_DELETE_CAP 2
+#define SYSNR_REVOKE_CAP 3
+
+#define SYSNR_MS_SLICE 4
+#define SYSNR_MS_SPLIT 5
+#define SYSNR_MS_INSTANCIATE 6
+
+#define SYSNR_PE_UNLOAD 4
+#define SYSNR_PE_LOAD 5
+
+#define SYSNR_TS_SLICE 4
+#define SYSNR_TS_SPLIT 5
+
+#define SYSNR_CH_SLICE 4
+#define SYSNR_CH_SPLIT 5
+#define SYSNR_CH_INSTANCIATE 6
+
+#define SYSNR_RC_RECEIVE 4
+
+#define SYSNR_SN_SEND 4
+
+#define SYSNR_SP_IS_HALTED 4
+#define SYSNR_SP_HALT 5
+#define SYSNR_SP_RESUME 6
+#define SYSNR_SP_RESET 7
+#define SYSNR_SP_READ 8
+#define SYSNR_SP_GIVE 9
+#define SYSNR_SP_TAKE 10

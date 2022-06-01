@@ -8,28 +8,28 @@
 uint64_t SyscallCap(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
                     uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7) {
         Cap *cap = curr_get_cap(a0);
-        CapUnion cu = cap_get(cap);
-        switch (cu.type) {
+        const CapData cd = cap_get(cap);
+        switch (cap_get_type(cd)) {
                 case CAP_MEMORY_SLICE:
-                        return SyscallMemorySlice(cu.memory_slice, cap, a1, a2,
+                        return SyscallMemorySlice(cap_deserialize_memory_slice(cd), cap, a1, a2,
                                                   a3, a4, a5, a6, a7);
                 case CAP_PMP_ENTRY:
-                        return SyscallPmpEntry(cu.pmp_entry, cap, a1, a2, a3,
+                        return SyscallPmpEntry(cap_deserialize_pmp_entry(cd), cap, a1, a2, a3,
                                                a4, a5, a6, a7);
                 case CAP_TIME_SLICE:
-                        return SyscallTimeSlice(cu.time_slice, cap, a1, a2, a3,
+                        return SyscallTimeSlice(cap_deserialize_time_slice(cd), cap, a1, a2, a3,
                                                 a4, a5, a6, a7);
                 case CAP_CHANNELS:
-                        return SyscallChannels(cu.channels, cap, a1, a2, a3, a4,
+                        return SyscallChannels(cap_deserialize_channels(cd), cap, a1, a2, a3, a4,
                                                a5, a6, a7);
                 case CAP_RECEIVER:
-                        return SyscallReceiver(cu.receiver, cap, a1, a2, a3, a4,
+                        return SyscallReceiver(cap_deserialize_receiver(cd), cap, a1, a2, a3, a4,
                                                a5, a6, a7);
                 case CAP_SENDER:
-                        return SyscallSender(cu.sender, cap, a1, a2, a3, a4, a5,
+                        return SyscallSender(cap_deserialize_sender(cd), cap, a1, a2, a3, a4, a5,
                                              a6, a7);
                 case CAP_SUPERVISOR:
-                        return SyscallSupervisor(cu.supervisor, cap, a1, a2, a3,
+                        return SyscallSupervisor(cap_deserialize_supervisor(cd), cap, a1, a2, a3,
                                                  a4, a5, a6, a7);
                 default:
                         return -1;
@@ -41,10 +41,13 @@ uint64_t SyscallNoCap(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4,
         switch (a7) {
                 case 0:
                         /* Get the first PMP */
-                        return cap_get_data(curr_get_cap(0), &current->args[1]);
+                        return cap_get_arr(curr_get_cap(0), &current->args[1]);
                 case 1:
                         /* Get the Process ID */
                         return current->pid;
+                case 2:
+                        /* Unload PMP entry at a1, but not entry 0 */
+                        return (a1 > 0) ? ProcUnloadPmp(current, a1) : 0;
                 default:
                         return -1;
         }

@@ -109,6 +109,7 @@ __syscall:
         j       __exception_exit
 
 __exception:
+        j       __hang
         la      ra,__exception_trampoline
         /* Set a0 to mcause */
         mv      a0,t1

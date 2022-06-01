@@ -5,6 +5,7 @@
 #include "cap_util.h"
 #include "proc.h"
 #include "syscall.h"
+#include "syscall_nr.h"
 
 static inline uint64_t SyscallMemorySlice(const CapMemorySlice ms, Cap *cap,
                                           uint64_t a1, uint64_t a2, uint64_t a3,
@@ -39,16 +40,18 @@ static inline uint64_t SyscallSupervisor(const CapSupervisor sup, Cap *cap,
 static inline uint64_t ms_slice(const CapMemorySlice ms, Cap *parent,
                                 Cap *child, uint64_t begin, uint64_t end,
                                 uint64_t rwx) {
+        /* Check memory slice validity */
+        if (!(begin < end))
+                return -1;
+        /* Check bounds */
+        if (!(ms.begin <= begin && end <= ms.end && (rwx & ms.rwx) == rwx))
+                return -1;
         /* Check if has child */
         if (cap_is_child_ms(ms, cap_get(parent->next)))
                 return -1;
 
-        /* Check bounds */
-        if (ms.begin > begin || end > ms.end || (rwx & ms.rwx) != rwx)
-                return -1;
-
         CapMemorySlice ms_child = cap_mk_memory_slice(begin, end, ms.rwx);
-        return cap_set_memory_slice(child, ms_child) &&
+        return cap_set(child, cap_serialize_memory_slice(ms_child)) &&
                CapAppend(child, parent);
 }
 
@@ -60,52 +63,53 @@ static inline uint64_t ms_split(const CapMemorySlice ms, Cap *parent,
         if (cap_is_child_ms(ms, cap_get(parent->next)))
                 return -1;
         /* Check bounds */
-        if (ms.begin >= mid || mid >= ms.end)
+        if (!(ms.begin < mid && mid < ms.end))
                 return -1;
 
         CapMemorySlice ms_child0 = cap_mk_memory_slice(ms.begin, mid, ms.rwx);
         CapMemorySlice ms_child1 = cap_mk_memory_slice(mid, ms.end, ms.rwx);
-        return cap_set_memory_slice(child0, ms_child0) &&
-               cap_set_memory_slice(child1, ms_child1) &&
+        return cap_set(child0, cap_serialize_memory_slice(ms_child0)) &&
+               cap_set(child1, cap_serialize_memory_slice(ms_child1)) &&
                CapAppend(child0, parent) && CapAppend(child1, parent);
 }
 
 static inline uint64_t ms_instanciate(const CapMemorySlice ms, Cap *parent,
                                       Cap *child, uint64_t addr, uint64_t rwx) {
         /* Check if it has a memory slice as child */
-        CapUnion next = cap_get(parent->next);
-        if (cap_is_child_ms(ms, next) && next.type == CAP_MEMORY_SLICE)
+        CapData next = cap_get(parent->next);
+        if (cap_is_child_ms(ms, next) && cap_get_type(next) == CAP_MEMORY_SLICE)
                 return -1;
 
         /* Check bounds */
         uint64_t begin, end;
         pmp_napot_bounds(addr, &begin, &end);
-        if (ms.begin > begin || end > ms.end || begin >= end ||
-            (rwx & ms.rwx) != rwx)
+        if (!(ms.begin <= begin && end <= ms.end && begin < end &&
+              (rwx & ms.rwx) == rwx))
                 return -1;
 
         CapPmpEntry pe_child = cap_mk_pmp_entry(addr, rwx);
-        return cap_set_pmp_entry(child, pe_child) && CapAppend(child, parent);
+        return cap_set(child, cap_serialize_pmp_entry(pe_child)) &&
+               CapAppend(child, parent);
 }
 
 uint64_t SyscallMemorySlice(const CapMemorySlice ms, Cap *cap, uint64_t a1,
                             uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
-                            uint64_t a6, uint64_t a7) {
-        switch (a7) {
-                case 0:
-                        return cap_get_data(cap, &current->args[1]);
-                case 1:
+                            uint64_t a6, uint64_t sysnr) {
+        switch (sysnr) {
+                case SYSNR_READ_CAP:
+                        return cap_get_arr(cap, &current->args[1]);
+                case SYSNR_MOVE_CAP:
                         return CapMove(curr_get_cap(a1), cap);
-                case 2:
+                case SYSNR_DELETE_CAP:
                         return CapDelete(cap);
-                case 3:
+                case SYSNR_REVOKE_CAP:
                         return CapRevoke(cap);
-                case 4:
+                case SYSNR_MS_SLICE:
                         return ms_slice(ms, cap, curr_get_cap(a1), a2, a3, a4);
-                case 5:
+                case SYSNR_MS_SPLIT:
                         return ms_split(ms, cap, curr_get_cap(a1),
                                         curr_get_cap(a2), a3);
-                case 6:
+                case SYSNR_MS_INSTANCIATE:
                         return ms_instanciate(ms, cap, curr_get_cap(a1), a2,
                                               a3);
                 default:
@@ -119,7 +123,7 @@ static inline uint64_t pe_load(const CapPmpEntry pe, Cap *parent,
                 return -1;
         Cap *child = &current->pmp_table[index];
         CapLoadedPmp lp_child = cap_mk_loaded_pmp(pe.addr, pe.rwx);
-        if (!cap_set_loaded_pmp(child, lp_child))
+        if (!cap_set(child, cap_serialize_loaded_pmp(lp_child)))
                 return -1;
         if (!CapAppend(child, parent)) {
                 child->data[1] = 0;
@@ -133,23 +137,23 @@ uint64_t SyscallPmpEntry(const CapPmpEntry pe, Cap *cap, uint64_t a1,
                          uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
                          uint64_t a6, uint64_t a7) {
         switch (a7) {
-                case 0:
+                case SYSNR_READ_CAP:
                         /* Read cap */
-                        return cap_get_data(cap, &current->args[1]);
-                case 1:
+                        return cap_get_arr(cap, &current->args[1]);
+                case SYSNR_MOVE_CAP:
                         /* Move cap */
                         return CapMove(curr_get_cap(a1), cap);
-                case 2:
+                case SYSNR_DELETE_CAP:
                         /* Delete cap */
                         /* Revoke unloads PMP by deleting a CapLoadedPmp */
                         CapRevoke(cap);
                         return CapDelete(cap);
-                case 3:
+                case SYSNR_PE_UNLOAD:
                         /* Unload cap */
                         return CapRevoke(cap);
-                case 4:
+                case SYSNR_PE_LOAD:
                         /* Load cap */
-                        return pe_load(pe, cap, a1);
+                        return ProcLoadPmp(current, pe, cap, a1);
                 default:
                         return -1;
         }
@@ -159,33 +163,38 @@ uint64_t SyscallPmpEntry(const CapPmpEntry pe, Cap *cap, uint64_t a1,
 static inline uint64_t ts_slice(const CapTimeSlice ts, Cap *parent, Cap *child,
                                 uint64_t begin, uint64_t end, uint64_t tsid,
                                 uint64_t tsid_end) {
-        CapUnion next = cap_get(parent->next);
-        if (cap_is_child_ts(ts, next))
+        /* Check validity of time slice */
+        if (!(begin < end && tsid < tsid_end))
                 return -1;
-        if (ts.begin > begin || end > ts.end || begin >= end ||
-            ts.tsid >= tsid || ts.tsid_end > tsid_end || tsid > tsid_end)
+        /* Check containment */
+        if (!(ts.begin <= begin && end <= ts.end && ts.tsid < tsid &&
+              tsid_end <= ts.tsid_end))
+                return -1;
+        if (cap_is_child_ts(ts, cap_get(parent->next)))
                 return -1;
         CapTimeSlice ts_child =
             cap_mk_time_slice(ts.hartid, begin, end, tsid, tsid_end);
         /* TODO: update schedule */
-        return cap_set_time_slice(child, ts_child) && CapAppend(child, parent);
+        return cap_set(child, cap_serialize_time_slice(ts_child)) &&
+               CapAppend(child, parent);
 }
 
 static inline uint64_t ts_split(const CapTimeSlice ts, Cap *parent, Cap *child0,
                                 Cap *child1, uint64_t qmid, uint64_t tsmid) {
-        CapUnion next = cap_get(parent->next);
-        if (cap_is_child_ts(ts, next) || child0 == child1)
+        /* Check that qmid and tsmid are in middle of parents time slice and
+         * tsid intervals */
+        if (!(ts.begin < qmid && qmid < ts.end && (ts.tsid + 1) < tsmid &&
+              tsmid < ts.tsid_end))
                 return -1;
-        if (ts.begin >= qmid || (qmid + 1) >= ts.end || ts.tsid >= tsmid ||
-            (tsmid + 1) > ts.tsid_end)
+        if (cap_is_child_ts(ts, cap_get(parent->next)) || child0 == child1)
                 return -1;
         CapTimeSlice ts_child0 =
             cap_mk_time_slice(ts.hartid, ts.begin, qmid, ts.tsid + 1, tsmid);
         CapTimeSlice ts_child1 = cap_mk_time_slice(ts.hartid, qmid + 1, ts.end,
                                                    tsmid + 1, ts.tsid_end);
         /* TODO: update schedule, must be after append */
-        return cap_set_time_slice(child0, ts_child0) &&
-               cap_set_time_slice(child1, ts_child1) &&
+        return cap_set(child0, cap_serialize_time_slice(ts_child0)) &&
+               cap_set(child1, cap_serialize_time_slice(ts_child1)) &&
                CapAppend(child0, parent) && CapAppend(child1, parent);
 }
 
@@ -193,25 +202,25 @@ uint64_t SyscallTimeSlice(const CapTimeSlice ts, Cap *cap, uint64_t a1,
                           uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
                           uint64_t a6, uint64_t a7) {
         switch (a7) {
-                case 0:
+                case SYSNR_READ_CAP:
                         /* Read cap */
-                        return cap_get_data(cap, &current->args[1]);
-                case 1:
+                        return cap_get_arr(cap, &current->args[1]);
+                case SYSNR_MOVE_CAP:
                         /* Move cap */
                         return CapMove(curr_get_cap(a1), cap);
-                case 2:
+                case SYSNR_DELETE_CAP:
                         /* Delete time slice */
                         /* TODO: update schedule */
                         return CapDelete(cap);
-                case 3:
+                case SYSNR_REVOKE_CAP:
                         /* Revoke time slice */
                         /* TODO: update schedule */
                         return CapRevoke(cap);
-                case 4:
+                case SYSNR_TS_SLICE:
                         /* Slice time */
                         return ts_slice(ts, cap, curr_get_cap(a1), a2, a3, a4,
                                         a5);
-                case 5:
+                case SYSNR_TS_SPLIT:
                         /* Split time */
                         return ts_split(ts, cap, curr_get_cap(a1),
                                         curr_get_cap(a2), a3, a4);
@@ -223,15 +232,15 @@ uint64_t SyscallTimeSlice(const CapTimeSlice ts, Cap *cap, uint64_t a1,
 /*** CHANNELS HANDLE ***/
 uint64_t ch_slice(const CapChannels ch, Cap *parent, Cap *child, uint64_t begin,
                   uint64_t end) {
-        CapUnion next = cap_get(parent->next);
-        if (cap_is_child_ch(ch, next))
+        if (cap_is_child_ch(ch, cap_get(parent->next)))
                 return -1;
         if (begin > end)
                 return -1;
         CapChannels ch_child = cap_mk_channels(begin, end);
         if (cap_is_child_ch_ch(ch, ch_child))
                 return -1;
-        return cap_set_channels(child, ch_child) && CapAppend(child, parent);
+        return cap_set(child, cap_serialize_channels(ch_child)) &&
+               CapAppend(child, parent);
 }
 
 uint64_t ch_split(const CapChannels ch, Cap *parent, Cap *child0, Cap *child1,
@@ -244,8 +253,8 @@ uint64_t ch_split(const CapChannels ch, Cap *parent, Cap *child0, Cap *child1,
                 return -1;
         CapChannels ch_child0 = cap_mk_channels(ch.begin, mid);
         CapChannels ch_child1 = cap_mk_channels(mid, ch.end);
-        return cap_set_channels(child0, ch_child0) &&
-               cap_set_channels(child1, ch_child1) &&
+        return cap_set(child0, cap_serialize_channels(ch_child0)) &&
+               cap_set(child1, cap_serialize_channels(ch_child1)) &&
                CapAppend(child0, parent) && CapAppend(child1, parent);
 }
 
@@ -258,8 +267,8 @@ uint64_t ch_instanciate(const CapChannels ch, Cap *parent, Cap *child0,
         CapSender send_child1 = cap_mk_sender(channel);
         if (!(ch.begin <= channel && channel <= ch.end))
                 return -1;
-        return cap_set_receiver(child0, recv_child0) &&
-               cap_set_sender(child1, send_child1) &&
+        return cap_set(child0, cap_serialize_receiver(recv_child0)) &&
+               cap_set(child1, cap_serialize_sender(send_child1)) &&
                CapAppend(child0, parent) && CapAppend(child1, parent);
 }
 
@@ -267,26 +276,26 @@ uint64_t SyscallChannels(const CapChannels ch, Cap *cap, uint64_t a1,
                          uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
                          uint64_t a6, uint64_t a7) {
         switch (a7) {
-                case 0:
+                case SYSNR_READ_CAP:
                         /* Read cap */
-                        return cap_get_data(cap, &current->args[1]);
-                case 1:
+                        return cap_get_arr(cap, &current->args[1]);
+                case SYSNR_MOVE_CAP:
                         /* Move cap */
                         return CapMove(curr_get_cap(a1), cap);
-                case 2:
+                case SYSNR_DELETE_CAP:
                         /* Delete channels */
                         return CapDelete(cap);
-                case 3:
+                case SYSNR_REVOKE_CAP:
                         /* Revoke all channels  */
                         return CapRevoke(cap);
-                case 4:
+                case SYSNR_CH_SLICE:
                         /* Slice channels */
                         return ch_slice(ch, cap, curr_get_cap(a1), a2, a3);
-                case 5:
+                case SYSNR_CH_SPLIT:
                         /* Split channels */
                         return ch_split(ch, cap, curr_get_cap(a1),
                                         curr_get_cap(a2), a3);
-                case 6:
+                case SYSNR_CH_INSTANCIATE:
                         /* Instanciate channels, make receiver and sender */
                         return ch_instanciate(ch, cap, curr_get_cap(a1),
                                               curr_get_cap(a2), a3);
@@ -295,28 +304,40 @@ uint64_t SyscallChannels(const CapChannels ch, Cap *cap, uint64_t a1,
         }
 }
 
+uint64_t sn_recv(uint64_t channel) {
+        current->listen_channel = channel;
+        while (current->listen_channel == channel) {
+                asm volatile("");
+        }
+        /* We just wait to receive a message, sender does all the job */
+        return current->args[0];
+}
+
 /*** RECEIVER HANDLER ***/
 uint64_t SyscallReceiver(const CapReceiver receiver, Cap *cap, uint64_t a1,
                          uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
                          uint64_t a6, uint64_t a7) {
         switch (a7) {
-                case 0:
+                case SYSNR_READ_CAP:
                         /* Read cap */
-                        return cap_get_data(cap, &current->args[1]);
-                case 1:
+                        return cap_get_arr(cap, &current->args[1]);
+                case SYSNR_MOVE_CAP:
                         /* Move cap */
                         return CapMove(curr_get_cap(a1), cap);
-                case 2:
+                case SYSNR_DELETE_CAP:
                         /* Delete time slice */
                         return CapDelete(cap);
-                case 3:
-                        /* Delete time slice */
-                        return CapRevoke(cap);
-                case 4:
+                case SYSNR_RC_RECEIVE:
                         /* Receive message */
+                        return sn_recv(receiver.channel);
                 default:
                         return -1;
         }
+}
+
+uint64_t sn_send(uint64_t channel, uint64_t caps_to_send, uint64_t msg[4]) {
+        /* TODO */
+        return -1;
 }
 
 /*** SENDER HANDLER ***/
@@ -324,54 +345,106 @@ uint64_t SyscallSender(const CapSender sender, Cap *cap, uint64_t a1,
                        uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
                        uint64_t a6, uint64_t a7) {
         switch (a7) {
-                case 0:
+                case SYSNR_READ_CAP:
                         /* Read cap */
-                        return cap_get_data(cap, &current->args[1]);
-                case 1:
+                        return cap_get_arr(cap, &current->args[1]);
+                case SYSNR_MOVE_CAP:
                         /* Move cap */
                         return CapMove(curr_get_cap(a1), cap);
-                case 2:
+                case SYSNR_DELETE_CAP:
                         /* Delete time slice */
                         return CapDelete(cap);
-                case 3:
-                        /* Delete time slice */
-                        return CapRevoke(cap);
-                case 4:
+                case SYSNR_SN_SEND:
                         /* Send message */
+                        return sn_send(sender.channel, a1,
+                                       (uint64_t[4]){a2, a3, a4, a5});
                 default:
                         return -1;
         }
+}
+
+static inline uint64_t sup_halt(Proc *supervisee) {
+        /* Check if supervisee has halted or is to halt */
+        if (supervisee->state == PROC_HALTED || supervisee->halt)
+                return false;
+        ProcHalt(supervisee);
+        return true;
+}
+
+static inline uint64_t sup_is_halted(Proc *supervisee) {
+        return supervisee->state == PROC_HALTED;
+}
+
+static inline uint64_t sup_resume(Proc *supervisee) {
+        if (supervisee->state == PROC_HALTED) {
+                supervisee->state = PROC_SUSPENDED;
+                return true;
+        }
+        return false;
+}
+
+static inline uint64_t sup_reset(Proc *supervisee, Cap *pmp_cap) {
+        CapData cd = cap_get(pmp_cap);
+        if (cap_get_type(cd) != CAP_PMP_ENTRY)
+                return -1;
+        CapPmpEntry pe = cap_deserialize_pmp_entry(cd);
+        if (supervisee->state != PROC_HALTED)
+                return -1;
+        /* Reset the process */
+        ProcReset(supervisee->pid);
+        return CapMove(&supervisee->cap_table[0], pmp_cap) &&
+               ProcLoadPmp(supervisee, pe, pmp_cap, 0);
+}
+
+static inline uint64_t sup_read(Proc *supervisee, uint64_t cid) {
+        return cap_get_arr(proc_get_cap(supervisee, cid), &current->args[1]);
+}
+
+static inline uint64_t sup_give(Proc *supervisee, uint64_t cid_dest,
+                                uint64_t cid_src) {
+        return 0;
+}
+
+static inline uint64_t sup_take(Proc *supervisee, uint64_t cid_dest,
+                                uint64_t cid_src) {
+        return 0;
 }
 
 /*** SUPERVISOR HANDLER ***/
 uint64_t SyscallSupervisor(const CapSupervisor sup, Cap *cap, uint64_t a1,
                            uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
                            uint64_t a6, uint64_t a7) {
+        Proc *supervisee = &processes[sup.pid];
         switch (a7) {
-                case 0:
+                case SYSNR_READ_CAP:
                         /* Read cap */
-                        return cap_get_data(cap, &current->args[1]);
-                case 1:
+                        return cap_get_arr(cap, &current->args[1]);
+                case SYSNR_MOVE_CAP:
                         /* Move cap */
                         return CapMove(curr_get_cap(a1), cap);
-                case 2:
+                case SYSNR_DELETE_CAP:
                         /* Delete time slice */
                         return CapDelete(cap);
-                case 3:
-                        /* Delete time slice */
-                        return CapRevoke(cap);
-                case 4:
+                case SYSNR_SP_IS_HALTED:
+                        return sup_is_halted(supervisee);
+                case SYSNR_SP_HALT:
                         /* Halt process */
-                case 5:
+                        return sup_halt(supervisee);
+                case SYSNR_SP_RESUME:
                         /* Resume process */
-                case 6:
+                        return sup_resume(supervisee);
+                case SYSNR_SP_RESET:
                         /* Reset process */
-                case 7:
+                        return sup_reset(supervisee, curr_get_cap(a1));
+                case SYSNR_SP_READ:
                         /* Read cap */
-                case 8:
+                        return sup_read(supervisee, a1);
+                case SYSNR_SP_GIVE:
                         /* Give cap */
-                case 9:
+                        return sup_give(supervisee, a1, a2);
+                case SYSNR_SP_TAKE:
                         /* Take cap */
+                        return sup_take(supervisee, a1, a2);
                 default:
                         return -1;
         }

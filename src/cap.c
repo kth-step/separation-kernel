@@ -70,11 +70,11 @@ bool CapDelete(Cap *curr) {
 }
 
 bool CapRevoke(Cap *curr) {
-        const CapUnion parent = cap_get(curr);
+        const CapData parent = cap_get(curr);
         int counter = 0;
         while (!cap_is_deleted(curr)) {
                 Cap *next = curr->next;
-                CapUnion child = cap_get(next);
+                CapData child = cap_get(next);
                 if (!cap_is_child(parent, child))
                         break;
                 if (cap_delete(curr, next))

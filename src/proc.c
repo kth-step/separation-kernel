@@ -23,23 +23,26 @@ extern void user_code();
 Proc processes[N_PROC];
 
 /* Initializes one process. */
-static void proc_init_proc(int pid) {
+void ProcReset(int pid) {
         /* Get the PCB */
-        Proc *proc = processes + pid;
+        Proc *proc = &processes[pid];
         /* Set the process id to */
         proc->pid = pid;
         /* Set the process's kernel stack. */
         proc->ksp = &proc_stack[pid][STACK_SIZE / 8];
         for (int i = 0; i < STACK_SIZE / 8; i++)
                 proc_stack[pid][i] = 0;
-        /* Set the capability table. */
+        /* Zero the capability table. */
         proc->cap_table = cap_tables[pid];
         for (int i = 0; i < N_CAPS; ++i) {
-                CapRevoke(&cap_tables[pid][i]);
-                CapDelete(&cap_tables[pid][i]);
+                Cap *cap = &cap_tables[pid][i];
+                if (!cap_is_deleted(cap)) {
+                        CapRevoke(cap);
+                        CapDelete(cap);
+                }
         }
         proc->pc = 0;
-        proc->epid = -1;
+        proc->listen_channel = -1;
         /* Set process to HALTED. */
         proc->state = PROC_HALTED;
 }
@@ -49,10 +52,10 @@ void proc_init_memory(Cap *pmp, Cap *memory) {
         uint64_t end = USER_MEMORY_END;
         uint64_t pmp_length = BOOT_PMP_LENGTH;
         uint64_t pmp_addr = begin | ((pmp_length - 1) >> 1);
-        CapPmpEntry pe = cap_mk_pmp_entry(pmp_addr, CAP_RX);
-        CapMemorySlice ms = cap_mk_memory_slice(begin, end, CAP_RWX);
-        cap_set_pmp_entry(pmp, pe);
-        cap_set_memory_slice(memory, ms);
+        CapPmpEntry pe = cap_mk_pmp_entry(pmp_addr, 5);
+        CapMemorySlice ms = cap_mk_memory_slice(begin, end, 7);
+        cap_set(pmp, cap_serialize_pmp_entry(pe));
+        cap_set(memory, cap_serialize_memory_slice(ms));
         Cap *sentinel = CapInitSentinel();
         CapAppend(memory, sentinel);
         CapAppend(pmp, sentinel);
@@ -62,7 +65,7 @@ void proc_init_channels(Cap *channel) {
         uint16_t begin = 0;
         uint16_t end = N_CHANNELS - 1;
         CapChannels ch = cap_mk_channels(begin, end);
-        cap_set_channels(channel, ch);
+        cap_set(channel, cap_serialize_channels(ch));
         Cap *sentinel = CapInitSentinel();
         CapAppend(channel, sentinel);
 }
@@ -79,7 +82,7 @@ void proc_init_time(Cap time[N_CORES]) {
                 tsid = 0;
                 fuel = 255;
                 ts = cap_mk_time_slice(hartid, begin, end, tsid, fuel);
-                cap_set_time_slice(&time[hartid], ts);
+                cap_set(&time[hartid], cap_serialize_time_slice(ts));
                 CapAppend(&time[hartid], sentinel);
         }
 }
@@ -88,7 +91,7 @@ void proc_init_supervisor(Cap cap_sups[N_PROC]) {
         Cap *sentinel = CapInitSentinel();
         for (int pid = 0; pid < N_PROC; pid++) {
                 CapSupervisor sup = cap_mk_supervisor(pid);
-                cap_set_supervisor(&cap_sups[pid], sup);
+                cap_set(&cap_sups[pid], cap_serialize_supervisor(sup));
                 CapAppend(&cap_sups[pid], sentinel);
         }
 }
@@ -111,7 +114,7 @@ static void proc_init_boot_proc(Proc *boot) {
 void ProcInitProcesses(void) {
         /* Initialize processes. */
         for (int i = 0; i < N_PROC; i++)
-                proc_init_proc(i);
+                ProcReset(i);
         /*** Boot process ***/
         proc_init_boot_proc(&processes[0]);
 }
@@ -119,8 +122,4 @@ void ProcInitProcesses(void) {
 void ProcHalt(Proc *proc) {
         proc->halt = true;
         __sync_bool_compare_and_swap(&proc->state, PROC_SUSPENDED, PROC_HALTED);
-}
-
-bool ProcReset(int8_t pid, Cap *cap_pmp) {
-        return false;
 }
