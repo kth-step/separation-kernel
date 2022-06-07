@@ -5,9 +5,9 @@ BUILD_DIR=build
 
 include config.mk
 
-S_SRCS=$(wildcard src/*.S)
-C_SRCS=$(wildcard src/*.c)
+SRCS=$(wildcard src/*.S) $(wildcard src/*.c)
 HDRS=$(wildcard inc/*.h)
+DEPS=$(HDRS) $(SRCS) $(wildcard src/*/*.c) $(LDS)
 
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
 DA=$(BUILD_DIR)/$(PROGRAM).da
@@ -19,10 +19,12 @@ CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+= -DDEBUG
 CFLAGS+=-Wall -fanalyzer
 CFLAGS+=-Iinc
+CFLAGS+=-MMD
 
 # Commands
+.PHONY: all settings format clean size qemu
 
-.PHONY: all settings format clean size debug-qemu qemu
+# Show settings, compile elf and make a disassembly by default.
 all: settings $(ELF) $(DA)
 
 settings:
@@ -34,30 +36,32 @@ settings:
 
 format:
 	@echo "Formatting code"
-	@clang-format -i $(HDRS) $(C_SRCS) 
+	@clang-format -i $(HDRS) $(filter %.c, $(SRCS)) 
 
 clean:
 	@echo "Cleaning"
 	@rm -f $(ELF) $(DA)
 
-size:
+size: $(ELF)
 	@echo "Size of binary:"
 	@$(SIZE) $(ELF)
 
-qemu debug-qemu: $(ELF)
+qemu: $(ELF)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
 
-# Build instructions
-
+# Make target directory
 $(BUILD_DIR):
 	@mkdir -p $@
 
+# If makefile or config changes, rebuild elf.
 $(ELF): Makefile config.mk | $(BUILD_DIR)
 
-$(BUILD_DIR)/%.elf: $(HDRS) $(C_SRCS) $(S_SRCS) config.lds
-	@echo "Compiling ELF file:\t$(S_SRCS)$(C_SRCS) ==> $@"
-	@$(CC) $(CFLAGS) -o $@ $(S_SRCS) $(C_SRCS)
+# Compile elf file
+$(ELF): $(DEPS)
+	@echo "Compiling ELF file: $(SRCS) ==> $@"
+	@$(CC) $(CFLAGS) -o $@ $(SRCS)
 
-$(BUILD_DIR)/%.da: $(ELF)
-	@echo "Producing DA file:\t$^ ==> $@"
+# Disassmble elf file
+$(DA): $(ELF)
+	@echo "Producing DA file: $^ ==> $@"
 	@$(OBJDUMP) -d $< > $@
