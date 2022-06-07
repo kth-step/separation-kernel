@@ -26,7 +26,7 @@ bool CapAppend(Cap *node, Cap *prev);
 
 bool CapInterprocessMove(Cap *dest, Cap *src, int pid_dest, int pid_src);
 
-Cap* CapInitSentinel(void);
+Cap *CapInitSentinel(void);
 
 static inline int8_t cap_get_recv(uint16_t epid);
 static inline bool cap_cas_recv(uint16_t epid, int old_pid, int new_pid);
@@ -36,5 +36,6 @@ int8_t cap_get_recv(uint16_t epid) {
 }
 
 bool cap_cas_recv(uint16_t epid, int old_pid, int new_pid) {
-        return __sync_bool_compare_and_swap(&ep_receiver[epid], old_pid, new_pid);
+        return __sync_bool_compare_and_swap(&ep_receiver[epid], old_pid,
+                                            new_pid);
 }

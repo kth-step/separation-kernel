@@ -14,9 +14,9 @@
 /* Number of time slices in a major frame. */
 #define N_QUANTUM 256
 /* Number of ticks per quantum. */
-#define TICKS (TICKS_PER_SECOND/N_QUANTUM)
+#define TICKS (TICKS_PER_SECOND / N_QUANTUM)
 /* Number of slack ticks (buffer) for scheduler. */
-#define SLACK_TICKS (TICKS/10)
+#define SLACK_TICKS (TICKS / 10)
 
 /* Stack size. */
 #define STACK_SIZE 1024
@@ -30,4 +30,3 @@
 #define BOOT_PMP_LENGTH 0x1000UL
 
 #define N_CHANNELS 256
-

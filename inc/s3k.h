@@ -145,7 +145,9 @@ static inline uint64_t S3K_SPLIT_CHANNELS(uint64_t src, uint64_t dest0,
         return S3K_SYSCALL4(SYSNR_CH_SPLIT, src, dest0, dest1, mid);
 }
 
-static inline uint64_t S3K_INSTANCIATE_CHANNEL(uint64_t src, uint64_t dest0, uint64_t dest1, uint64_t channel) {
+static inline uint64_t S3K_INSTANCIATE_CHANNEL(uint64_t src, uint64_t dest0,
+                                               uint64_t dest1,
+                                               uint64_t channel) {
         return -1;
 }
 static inline uint64_t S3K_MAKE_SENDER(uint64_t cid_send, uint64_t cid_recv) {
