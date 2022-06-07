@@ -17,7 +17,6 @@ struct cap {
 extern Cap cap_tables[N_PROC][N_CAPS];
 extern volatile int ep_receiver[N_CHANNELS];
 
-
 _Static_assert(sizeof(Cap) == 32, "Capability node size error");
 
 bool CapRevoke(Cap *cap);

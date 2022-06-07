@@ -18,7 +18,7 @@ void user_main(uintptr_t pid, uint64_t begin, uint64_t end) {
                 int code;
                 uint64_t addr = USER_MEMORY_BEGIN + ((0x2000 - 1) >> 1);
 
-                code = S3K_MAKE_PMP(1,25, addr, 3);
+                code = S3K_MAKE_PMP(1, 25, addr, 3);
                 printf("Make PMP = %d\n", code);
 
                 code = S3K_SPLIT_TIME(4, 10, 11, 250, 128);

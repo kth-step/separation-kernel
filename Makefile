@@ -5,9 +5,9 @@ BUILD_DIR=build
 
 include config.mk
 
-S_SRCS=$(wildcard src/*.S) 
+S_SRCS=$(wildcard src/*.S)
 C_SRCS=$(wildcard src/*.c)
-C_HDRS=$(wildcard src/*.h)
+HDRS=$(wildcard inc/*.h)
 
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
 DA=$(BUILD_DIR)/$(PROGRAM).da
@@ -18,6 +18,7 @@ CFLAGS+=-O2 -gdwarf-2
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+= -DDEBUG
 CFLAGS+=-Wall -fanalyzer
+CFLAGS+=-Iinc
 
 # Commands
 
@@ -33,7 +34,7 @@ settings:
 
 format:
 	@echo "Formatting code"
-	@clang-format -i $(H_HDRS) $(C_SRCS) 
+	@clang-format -i $(HDRS) $(C_SRCS) 
 
 clean:
 	@echo "Cleaning"
@@ -53,7 +54,7 @@ $(BUILD_DIR):
 
 $(ELF): Makefile config.mk | $(BUILD_DIR)
 
-$(BUILD_DIR)/%.elf: $(C_HDRS) $(C_SRCS) $(S_SRCS) config.lds
+$(BUILD_DIR)/%.elf: $(HDRS) $(C_SRCS) $(S_SRCS) config.lds
 	@echo "Compiling ELF file:\t$(S_SRCS)$(C_SRCS) ==> $@"
 	@$(CC) $(CFLAGS) -o $@ $(S_SRCS) $(C_SRCS)
 

@@ -1,3 +1,4 @@
+// See LICENSE file for copyright and license details.
 #pragma once
 
 #define SYSNR_GET_PID 1
