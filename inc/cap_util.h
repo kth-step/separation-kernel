@@ -163,7 +163,7 @@ bool cap_set(Cap *cap, const CapData cd) {
         return cap_set_arr(cap, data);
 }
 
-static inline CapType cap_get_type(const CapData cd) {
+CapType cap_get_type(const CapData cd) {
         return cd.data0 & 0xFF;
 }
 
