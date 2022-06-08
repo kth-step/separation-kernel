@@ -5,39 +5,38 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "cap_util.h"
 #include "proc.h"
 #include "sched.h"
 
 /** Capability table */
-Cap cap_tables[N_PROC][N_CAPS];
+CapNode cap_tables[N_PROC][N_CAPS];
 
 /* Make one sentinel node per core, one for memory, one for channels and one for
  * supervisor capabilies */
 #define N_SENTINELS (N_CORES + 4)
-Cap sentinels[N_SENTINELS];
+CapNode sentinels[N_SENTINELS];
 
 volatile int ep_receiver[N_CHANNELS];
 /*
  * Tries to delete node curr.
  * Assumption: prev = NULL or is_marked(prev->prev)
  */
-static inline bool cap_delete(Cap *prev, Cap *curr) {
+static inline bool cap_delete(CapNode *prev, CapNode *curr) {
         /* Mark the curr node if it has the correct prev.
          * The CAS is neccessary to avoid the ABA problem.
          */
         if (!__sync_bool_compare_and_swap(&curr->prev, prev, NULL))
                 return false;
-        Cap *next = curr->next;
+        CapNode *next = curr->next;
         if (!__sync_bool_compare_and_swap(&next->prev, curr, prev)) {
                 curr->prev = prev;
                 return false;
         }
-        prev->next = next;
-        curr->data[0] = 0;
-        curr->data[1] = 0;
-        __sync_synchronize();
+        /* TODO: Figure out the ordering of operations */
         curr->next = NULL;
+        prev->next = next;
+        curr->word0 = 0;
+        curr->word1 = 0;
         return true;
 }
 
@@ -46,21 +45,23 @@ static inline bool cap_delete(Cap *prev, Cap *curr) {
  * Returns 1 if successful, otherwise 0.
  * Assumption: parent != NULL and is_marked(parent->prev)
  */
-static inline bool cap_append(Cap *node, Cap *prev) {
-        Cap *next = prev->next;
+static inline bool cap_append(const Cap cap, CapNode *node, CapNode *prev) {
+        CapNode *next = prev->next;
         if (__sync_bool_compare_and_swap(&next->prev, prev, node)) {
-                node->next = next;
+                /* TODO: Figure out the ordering of operations */
                 prev->next = node;
-                __sync_synchronize();
+                node->word0 = cap.word0;
+                node->word1 = cap.word1;
+                node->next = next;
                 node->prev = prev;
                 return true;
         }
         return false;
 }
 
-bool CapDelete(Cap *curr) {
+bool CapDelete(CapNode *curr) {
         while (!cap_is_deleted(curr)) {
-                Cap *prev = curr->prev;
+                CapNode *prev = curr->prev;
                 if (prev == NULL)
                         continue;
                 if (cap_delete(prev, curr))
@@ -69,12 +70,12 @@ bool CapDelete(Cap *curr) {
         return false;
 }
 
-bool CapRevoke(Cap *curr) {
-        const CapData parent = cap_get(curr);
+bool CapRevoke(CapNode *curr) {
+        const Cap parent = cn_get(curr);
         int counter = 0;
         while (!cap_is_deleted(curr)) {
-                Cap *next = curr->next;
-                CapData child = cap_get(next);
+                CapNode *next = curr->next;
+                Cap child = cn_get(next);
                 if (!cap_is_child(parent, child))
                         break;
                 if (cap_delete(curr, next))
@@ -87,13 +88,13 @@ bool CapRevoke(Cap *curr) {
  * Insert a child capability after the parent
  * only if the parent is not deleted.
  */
-bool CapAppend(Cap *node, Cap *prev) {
+bool CapInsert(const Cap cap, CapNode *node, CapNode *prev) {
         /* Child node must be empty */
         if (!cap_is_deleted(node))
                 return false;
         /* While parent is alive, attempt to insert */
         while (!cap_is_deleted(prev)) {
-                if (cap_append(node, prev))
+                if (cap_append(cap, node, prev))
                         return true;
         }
         return false;
@@ -103,27 +104,26 @@ bool CapAppend(Cap *node, Cap *prev) {
  * Moves the capability in src to dest.
  * Uses a CapInsert followed by CapDelete.
  */
-bool CapMove(Cap *dest, Cap *src) {
+bool CapMove(CapNode *dest, CapNode *src) {
         if (cap_is_deleted(src) || !cap_is_deleted(dest))
                 return false;
-        dest->data[0] = src->data[0];
-        dest->data[1] = src->data[1];
-        return CapAppend(dest, src) && CapDelete(src);
+        Cap cap = cn_get(src);
+        return CapInsert(cap, dest, src) && CapDelete(src);
 }
 
-bool CapInterprocessMove(Cap *dest, Cap *src, int pid_dest, int pid_src) {
+bool CapInterprocessMove(CapNode *dest, CapNode *src, int pid_dest, int pid_src) {
         return false;
 }
 
-Cap *CapInitSentinel(void) {
+CapNode *CapInitSentinel(void) {
         static int i = 0;
         if (i >= N_SENTINELS)
                 return NULL;
-        Cap *sentinel = &sentinels[i++];
+        CapNode *sentinel = &sentinels[i++];
         sentinel->next = sentinel;
         sentinel->prev = sentinel;
-        sentinel->data[0] = 0;
-        sentinel->data[1] = 0;
+        sentinel->word0 = 0;
+        sentinel->word1 = 0;
         /* Return the head of the sentinel node */
         /* We append capbilities to this head */
         return sentinel;

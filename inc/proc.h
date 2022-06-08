@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 #include "cap.h"
-#include "cap_util.h"
 #include "config.h"
 #include "lock.h"
 
@@ -39,7 +38,7 @@ struct proc {
         /** Capability table.
          * Pointer to the capability table.
          */
-        Cap *cap_table;
+        CapNode *cap_table;
         /** Argument registers.
          * We store the argument registers a0-a7 in the args array,
          * this simplifies inter-process communication.
@@ -49,7 +48,7 @@ struct proc {
 
         /* The pmp configurations are stored in these capabilities */
         /* pmp_table[i].data[1] = pmpicfg | pmpaddri */
-        Cap pmp_table[8];
+        CapNode pmp_table[8];
 
         /** Process state.
          * TODO: Comment
@@ -83,23 +82,23 @@ void ProcInitProcesses(void);
 void ProcHalt(Proc *proc);
 void ProcReset(int pid);
 
-static inline bool ProcLoadPmp(Proc *proc, CapPmpEntry pe, Cap *cap,
+static inline bool ProcLoadPmp(Proc *proc, Cap cap, CapNode *cn,
                                uint64_t index) {
-        if (index > 8)
-                return -1;
-        Cap *child = &proc->pmp_table[index];
-        CapLoadedPmp lp_child = cap_mk_loaded_pmp(pe.addr, pe.rwx);
-        if (!cap_set(child, cap_serialize_loaded_pmp(lp_child)))
-                return 0;
-        if (!CapAppend(child, cap)) {
-                child->data[1] = 0;
-                return 0;
-        }
-        return 1;
+        ASSERT(cap_get_type(cap) == CAP_TYPE_PMP_ENTRY);
+        ASSERT(index < 8);
+        Cap cap_hidden = cap_pmp_entry_hidden(cap_pmp_entry_addr(cap), cap_pmp_entry_rwx(cap));
+        return CapInsert(cap_hidden, &proc->pmp_table[index], cn);
 }
 
 static inline bool ProcUnloadPmp(Proc *proc, uint64_t index) {
-        if (index > 8)
-                return -1;
+        ASSERT(index < 8);
         return CapDelete(&proc->pmp_table[index]);
+}
+
+static inline CapNode *proc_get_cn(Proc *p, uint64_t idx) {
+        return &p->cap_table[idx % N_CAPS];
+}
+
+static inline CapNode *curr_get_cn(uint64_t idx) {
+        return proc_get_cn(current, idx);
 }

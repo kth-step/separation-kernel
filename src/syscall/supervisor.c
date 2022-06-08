@@ -1,4 +1,5 @@
 // See LICENSE file for copyright and license details.
+#include "syscall.h"
 static uint64_t sup_halt(Proc *supervisee) {
         /* Check if supervisee has halted or is to halt */
         if (supervisee->state == PROC_HALTED || supervisee->halt)
@@ -19,45 +20,51 @@ static uint64_t sup_resume(Proc *supervisee) {
         return false;
 }
 
-static uint64_t sup_reset(Proc *supervisee, Cap *pmp_cap) {
-        CapData cd = cap_get(pmp_cap);
-        if (cap_get_type(cd) != CAP_PMP_ENTRY)
+static uint64_t sup_reset(Proc *supervisee, CapNode *cn) {
+        Cap cap = cn_get(cn);
+        if (cap_get_type(cap) != CAP_TYPE_PMP_ENTRY)
                 return -1;
-        CapPmpEntry pe = cap_deserialize_pmp_entry(cd);
         if (supervisee->state != PROC_HALTED)
                 return -1;
         /* Reset the process */
         ProcReset(supervisee->pid);
-        return CapMove(&supervisee->cap_table[0], pmp_cap) &&
-               ProcLoadPmp(supervisee, pe, pmp_cap, 0);
+        return CapMove(proc_get_cn(supervisee, 0), cn) &&
+               ProcLoadPmp(supervisee, cap, cn, 0);
 }
 
 static uint64_t sup_read(Proc *supervisee, uint64_t cid) {
-        return cap_get_arr(proc_get_cap(supervisee, cid), &current->args[1]);
+        Cap cap = cn_get(proc_get_cn(supervisee, cid));
+        current->args[1] = cap.word1;
+        return cap.word0;
 }
 
-static uint64_t sup_give(Proc *supervisee, uint64_t cid_dest, uint64_t cid_src) {
+static uint64_t sup_give(Proc *supervisee, uint64_t cid_dest,
+                         uint64_t cid_src) {
         return 0;
 }
 
-static uint64_t sup_take(Proc *supervisee, uint64_t cid_dest, uint64_t cid_src) {
+static uint64_t sup_take(Proc *supervisee, uint64_t cid_dest,
+                         uint64_t cid_src) {
         return 0;
 }
 
-uint64_t SyscallSupervisor(const CapSupervisor sup, Cap *cap, uint64_t a1,
-                           uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
-                           uint64_t a6, uint64_t a7) {
-        Proc *supervisee = &processes[sup.pid];
+uint64_t SyscallSupervisor(const Cap cap, CapNode *cn, uint64_t a1, uint64_t a2,
+                           uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6,
+                           uint64_t a7) {
+        ASSERT(cap_get_type(cap) == CAP_TYPE_SUPERVISOR);
+        Proc *supervisee = &processes[cap_supervisor_pid(cap)];
         switch (a7) {
                 case SYSNR_READ_CAP:
                         /* Read cap */
-                        return cap_get_arr(cap, &current->args[1]);
+                        current->args[1] = cap.word0;
+                        current->args[2] = cap.word1;
+                        return 1;
                 case SYSNR_MOVE_CAP:
                         /* Move cap */
-                        return CapMove(curr_get_cap(a1), cap);
+                        return CapMove(curr_get_cn(a1), cn);
                 case SYSNR_DELETE_CAP:
                         /* Delete time slice */
-                        return CapDelete(cap);
+                        return CapDelete(cn);
                 case SYSNR_SP_IS_HALTED:
                         return sup_is_halted(supervisee);
                 case SYSNR_SP_HALT:
@@ -68,7 +75,7 @@ uint64_t SyscallSupervisor(const CapSupervisor sup, Cap *cap, uint64_t a1,
                         return sup_resume(supervisee);
                 case SYSNR_SP_RESET:
                         /* Reset process */
-                        return sup_reset(supervisee, curr_get_cap(a1));
+                        return sup_reset(supervisee, curr_get_cn(a1));
                 case SYSNR_SP_READ:
                         /* Read cap */
                         return sup_read(supervisee, a1);

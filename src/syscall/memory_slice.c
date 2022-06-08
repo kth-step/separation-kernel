@@ -1,79 +1,84 @@
 // See LICENSE file for copyright and license details.
-static uint64_t ms_slice(const CapMemorySlice ms, Cap *parent, Cap *child,
-                  uint64_t begin, uint64_t end, uint64_t rwx) {
+#include "syscall.h"
+static uint64_t ms_slice(const Cap cap, CapNode *cn, CapNode *child,
+                         uint64_t begin, uint64_t end, uint64_t rwx) {
+        ASSERT(cap_get_type(cap) == CAP_TYPE_MEMORY_SLICE);
+        /* Check if has child */
+        if (cap_is_child_ms(cap, cn_get(cn->next)))
+                return -1;
         /* Check memory slice validity */
         if (!(begin < end))
                 return -1;
         /* Check bounds */
-        if (!(ms.begin <= begin && end <= ms.end && (rwx & ms.rwx) == rwx))
-                return -1;
-        /* Check if has child */
-        if (cap_is_child_ms(ms, cap_get(parent->next)))
+        Cap cap_child = cap_memory_slice(begin, end, rwx);
+        if (!cap_is_child_ms_ms(cap, cap_child))
                 return -1;
 
-        CapMemorySlice ms_child = cap_mk_memory_slice(begin, end, ms.rwx);
-        return cap_set(child, cap_serialize_memory_slice(ms_child)) &&
-               CapAppend(child, parent);
+        return CapInsert(cap_child, child, cn);
 }
 
-static uint64_t ms_split(const CapMemorySlice ms, Cap *parent, Cap *child0,
-                  Cap *child1, uint64_t mid) {
+static uint64_t ms_split(const Cap cap, CapNode *cn, CapNode *child0,
+                         CapNode *child1, uint64_t mid) {
+        ASSERT(cap_get_type(cap) == CAP_TYPE_MEMORY_SLICE);
         if (child0 == child1)
                 return -1;
         /* Check if has child */
-        if (cap_is_child_ms(ms, cap_get(parent->next)))
+        if (cap_is_child_ms(cap, cn_get(cn->next)))
                 return -1;
         /* Check bounds */
-        if (!(ms.begin < mid && mid < ms.end))
+        uint64_t begin = cap_memory_slice_begin(cap);
+        uint64_t end = cap_memory_slice_end(cap);
+        uint64_t rwx = cap_memory_slice_rwx(cap);
+        if (!(begin < mid && mid < end))
                 return -1;
-
-        CapMemorySlice ms_child0 = cap_mk_memory_slice(ms.begin, mid, ms.rwx);
-        CapMemorySlice ms_child1 = cap_mk_memory_slice(mid, ms.end, ms.rwx);
-        return cap_set(child0, cap_serialize_memory_slice(ms_child0)) &&
-               cap_set(child1, cap_serialize_memory_slice(ms_child1)) &&
-               CapAppend(child0, parent) && CapAppend(child1, parent);
+        Cap cap_child0 = cap_memory_slice(begin, mid, rwx);
+        Cap cap_child1 = cap_memory_slice(mid, end, rwx);
+        ASSERT(cap_is_child_ms_ms(cap, cap_child0));
+        ASSERT(cap_is_child_ms_ms(cap, cap_child1));
+        return CapInsert(cap_child0, child0, cn) &&
+               CapInsert(cap_child1, child1, cn);
 }
 
-static uint64_t ms_instanciate(const CapMemorySlice ms, Cap *parent, Cap *child,
-                        uint64_t addr, uint64_t rwx) {
+static uint64_t ms_instanciate(const Cap cap, CapNode *cn, CapNode *child,
+                               uint64_t pmpaddr, uint64_t pmprwx) {
+        ASSERT(cap_get_type(cap) == CAP_TYPE_MEMORY_SLICE);
         /* Check if it has a memory slice as child */
-        CapData next = cap_get(parent->next);
-        if (cap_is_child_ms(ms, next) && cap_get_type(next) == CAP_MEMORY_SLICE)
+
+        Cap next = cn_get(cn->next);
+        if (cap_is_child_ms(cap, next) &&
+            cap_get_type(next) == CAP_TYPE_MEMORY_SLICE)
                 return -1;
 
-        /* Check bounds */
-        uint64_t begin, end;
-        pmp_napot_bounds(addr, &begin, &end);
-        if (!(ms.begin <= begin && end <= ms.end && begin < end &&
-              (rwx & ms.rwx) == rwx))
+        Cap pe_child = cap_pmp_entry(pmpaddr, pmprwx);
+        if (!cap_is_child_ms_pe(cap, pe_child))
                 return -1;
 
-        CapPmpEntry pe_child = cap_mk_pmp_entry(addr, rwx);
-        return cap_set(child, cap_serialize_pmp_entry(pe_child)) &&
-               CapAppend(child, parent);
+        return CapInsert(pe_child, child, cn);
 }
 
 /*** MEMORY SLICE HANDLE ***/
-uint64_t SyscallMemorySlice(const CapMemorySlice ms, Cap *cap, uint64_t a1,
+uint64_t SyscallMemorySlice(const Cap cap, CapNode *cn, uint64_t a1,
                             uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
                             uint64_t a6, uint64_t sysnr) {
+        ASSERT(cap_get_type(cap) == CAP_TYPE_MEMORY_SLICE);
         switch (sysnr) {
                 case SYSNR_READ_CAP:
-                        return cap_get_arr(cap, &current->args[1]);
+                        current->args[1] = cap.word0;
+                        current->args[2] = cap.word1;
+                        return 1;
                 case SYSNR_MOVE_CAP:
-                        return CapMove(curr_get_cap(a1), cap);
+                        return CapMove(curr_get_cn(a1), cn);
                 case SYSNR_DELETE_CAP:
-                        return CapDelete(cap);
+                        return CapDelete(cn);
                 case SYSNR_REVOKE_CAP:
-                        return CapRevoke(cap);
+                        return CapRevoke(cn);
                 case SYSNR_MS_SLICE:
-                        return ms_slice(ms, cap, curr_get_cap(a1), a2, a3, a4);
+                        return ms_slice(cap, cn, curr_get_cn(a1), a2, a3, a4);
                 case SYSNR_MS_SPLIT:
-                        return ms_split(ms, cap, curr_get_cap(a1),
-                                        curr_get_cap(a2), a3);
+                        return ms_split(cap, cn, curr_get_cn(a1),
+                                        curr_get_cn(a2), a3);
                 case SYSNR_MS_INSTANCIATE:
-                        return ms_instanciate(ms, cap, curr_get_cap(a1), a2,
-                                              a3);
+                        return ms_instanciate(cap, cn, curr_get_cn(a1), a2, a3);
                 default:
                         return -1;
         }
