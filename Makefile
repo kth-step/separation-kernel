@@ -5,24 +5,27 @@ BUILD_DIR=build
 
 include config.mk
 
-SRCS=$(wildcard src/*.S) $(wildcard src/*.c)
-HDRS=$(wildcard inc/*.h)
-DEPS=$(HDRS) $(SRCS) $(wildcard src/*/*.c) $(LDS)
+OBJS=$(patsubst src/%.c, $(BUILD_DIR)/%.c.o, $(wildcard src/*.c)) \
+     $(patsubst src/%.S, $(BUILD_DIR)/%.S.o, $(wildcard src/*.S))
+DEPS=$(patsubst %.o, %.d, $(OBJS))
+DA=$(patsubst %.o, %.da, $(OBJS))
+
 
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
-DA=$(BUILD_DIR)/$(PROGRAM).da
+DA+=$(BUILD_DIR)/$(PROGRAM).da
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
-CFLAGS+=-O2 -gdwarf-2
+CFLAGS+=-O2
+CFLAGS+=-gdwarf-2
 CFLAGS+= -T$(LDS) -nostartfiles
-CFLAGS+= -DDEBUG
 CFLAGS+=-Wall -fanalyzer
 CFLAGS+=-Iinc
 CFLAGS+=-MMD
+#CFLAGS+= -DNDEBUG
 
 # Commands
-.PHONY: all settings format clean size qemu
+.PHONY: all settings format clean size cloc qemu
 
 # Show settings, compile elf and make a disassembly by default.
 all: settings $(ELF) $(DA)
@@ -40,28 +43,35 @@ format:
 
 clean:
 	@echo "Cleaning"
-	@rm -f $(ELF) $(DA)
+	@rm -f $(ELF) $(DA) $(DEPS) $(OBJS)
 
 size: $(ELF)
 	@echo "Size of binary:"
-	@$(SIZE) $(ELF)
+	@$(SIZE) $(OBJS) $(ELF)
+
+cloc:
+	@cloc $(wildcard src/*.c src/*/*.c inc/*.h src/*.S)
 
 qemu: $(ELF)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
 
 # Make target directory
-$(BUILD_DIR):
+$(BUILD_DIR) obj:
 	@mkdir -p $@
 
-# If makefile or config changes, rebuild elf.
-$(ELF): Makefile config.mk | $(BUILD_DIR)
+$(BUILD_DIR)/%.c.o: src/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-# Compile elf file
-$(ELF): $(DEPS)
-	@echo "Compiling ELF file: $(SRCS) ==> $@"
-	@$(CC) $(CFLAGS) -o $@ $(SRCS)
+$(BUILD_DIR)/%.S.o: src/%.S | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-# Disassmble elf file
-$(DA): $(ELF)
-	@echo "Producing DA file: $^ ==> $@"
-	@$(OBJDUMP) -d $< > $@
+$(ELF): $(OBJS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
+
+$(BUILD_DIR)/%.da: $(BUILD_DIR)/%.o
+	$(OBJDUMP) -d $< > $@
+
+$(BUILD_DIR)/%.da: $(BUILD_DIR)/%.elf
+	$(OBJDUMP) -d $< > $@
+
+-include $(DEPS)
