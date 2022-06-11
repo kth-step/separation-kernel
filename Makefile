@@ -46,6 +46,10 @@ size:
 qemu debug-qemu: $(ELF)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
 
+stop-qemu:
+	@killall qemu-system-riscv64
+	@killall riscv64-unknown-elf-gdb
+
 # Build instructions
 
 $(BUILD_DIR):

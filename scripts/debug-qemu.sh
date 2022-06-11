@@ -1,10 +1,10 @@
 #!/bin/bash -e
 
 # Kill QEMU_SYSTEM 
-function cleanup {
-        kill $(jobs -p)
-}
-trap cleanup SIGINT SIGTERM EXIT
+#function cleanup {
+#        kill $(jobs -p)
+#}
+#trap cleanup SIGINT SIGTERM EXIT
 
 $QEMU_SYSTEM -M virt -smp 2, -m 8G \
              -kernel $ELF \
