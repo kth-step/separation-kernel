@@ -21,7 +21,7 @@ CFLAGS+=-Wall -fanalyzer
 
 # Commands
 
-.PHONY: all settings format clean size debug-qemu qemu
+.PHONY: all settings format clean size debug-qemu qemu noninteractive-qemu stop-qemu stop-debugging
 all: settings $(ELF) $(DA)
 
 settings:
@@ -46,8 +46,13 @@ size:
 qemu debug-qemu: $(ELF)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
 
+noninteractive-qemu: $(ELF)
+	@QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/noninteractive-qemu.sh
+
 stop-qemu:
 	@killall qemu-system-riscv64
+
+stop-debugging: stop-qemu
 	@killall riscv64-unknown-elf-gdb
 
 # Build instructions
