@@ -2,12 +2,13 @@
 PROGRAM=s3k
 LDS=config.lds
 BUILD_DIR=build
+OBJ_DIR=obj
 
 include config.mk
 
-OBJS=$(patsubst src/%.c, $(BUILD_DIR)/%.c.o, $(wildcard src/*.c)) \
-     $(patsubst src/%.S, $(BUILD_DIR)/%.S.o, $(wildcard src/*.S))
-DEPS=$(patsubst %.o, %.d, $(OBJS))
+OBJS=$(patsubst src/%.c, $(OBJ_DIR)/%.c.o, $(wildcard src/*.c)) \
+     $(patsubst src/%.S, $(OBJ_DIR)/%.S.o, $(wildcard src/*.S))
+DEPS=$(patsubst $(OBJ_DIR)/%.o, $(OBJ_DIR)/%.d, $(OBJS))
 DA=$(patsubst %.o, %.da, $(OBJS))
 
 
@@ -56,19 +57,19 @@ qemu: $(ELF)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
 
 # Make target directory
-$(BUILD_DIR) obj:
+$(BUILD_DIR) $(OBJ_DIR):
 	@mkdir -p $@
 
-$(BUILD_DIR)/%.c.o: src/%.c | $(BUILD_DIR)
+$(OBJ_DIR)/%.c.o: src/%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/%.S.o: src/%.S | $(BUILD_DIR)
+$(OBJ_DIR)/%.S.o: src/%.S | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(ELF): $(OBJS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-$(BUILD_DIR)/%.da: $(BUILD_DIR)/%.o
+$(OBJ_DIR)/%.da: $(OBJ_DIR)/%.o
 	$(OBJDUMP) -d $< > $@
 
 $(BUILD_DIR)/%.da: $(BUILD_DIR)/%.elf

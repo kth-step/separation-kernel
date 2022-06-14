@@ -1,4 +1,5 @@
-build
 *.o
-offsets.h
+*.d
+*.da
+*.elf
 
