@@ -19,7 +19,7 @@ CFLAGS+=-std=gnu18
 CFLAGS+=-O2
 CFLAGS+=-gdwarf-2
 CFLAGS+= -T$(LDS) -nostartfiles
-CFLAGS+=-Wall -fanalyzer
+CFLAGS+=-Wall -fanalyzer -Werror
 CFLAGS+=-Iinc
 CFLAGS+=-MMD
 #CFLAGS+= -DNDEBUG

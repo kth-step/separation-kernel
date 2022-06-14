@@ -1,11 +1,10 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-#include <stdint.h>
-
 #include "cap.h"
 #include "config.h"
 #include "lock.h"
+#include "types.h"
 
 /** Proc
  * This is the Process Control Block (PCB). We store pointers
@@ -84,21 +83,13 @@ void ProcReset(int pid);
 
 static inline bool ProcLoadPmp(Proc *proc, Cap cap, CapNode *cn,
                                uint64_t index) {
-        ASSERT(cap_get_type(cap) == CAP_TYPE_PMP_ENTRY);
+        ASSERT(cap_get_type(cap) == CAP_PMP);
         ASSERT(index < 8);
-        Cap cap_hidden = cap_pmp_entry_hidden(cap_pmp_entry_addr(cap), cap_pmp_entry_rwx(cap));
+        Cap cap_hidden = cap_mk_pmp_hidden(cap_pmp_addr(cap), cap_pmp_rwx(cap));
         return CapInsert(cap_hidden, &proc->pmp_table[index], cn);
 }
 
 static inline bool ProcUnloadPmp(Proc *proc, uint64_t index) {
         ASSERT(index < 8);
         return CapDelete(&proc->pmp_table[index]);
-}
-
-static inline CapNode *proc_get_cn(Proc *p, uint64_t idx) {
-        return &p->cap_table[idx % N_CAPS];
-}
-
-static inline CapNode *curr_get_cn(uint64_t idx) {
-        return proc_get_cn(current, idx);
 }

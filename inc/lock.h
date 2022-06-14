@@ -1,10 +1,10 @@
 // See LICENSE file for copyright and license details.
 #pragma once
-#include <stdint.h>
+#include "types.h"
 
 typedef unsigned long Lock;
 
-static inline uintptr_t try_acquire_lock(Lock *l) {
+static inline bool try_acquire_lock(Lock *l) {
         return !__sync_lock_test_and_set(l, 1);
 }
 

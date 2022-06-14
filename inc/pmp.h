@@ -1,6 +1,6 @@
 // See LICENSE file for copyright and license details.
 #pragma once
-#include <stdint.h>
+#include "types.h"
 
 static inline void pmp_napot_bounds(uint64_t addr, uint64_t *begin,
                                     uint64_t *end) {

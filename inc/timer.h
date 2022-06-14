@@ -1,6 +1,6 @@
 // See LICENSE file for copyright and license details.
 #pragma once
-#include <stdint.h>
+#include "types.h"
 
 #include "config.h"
 #include "csr.h"

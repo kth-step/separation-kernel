@@ -1,10 +1,6 @@
 // See LICENSE file for copyright and license details.
 #include "cap.h"
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-
 #include "proc.h"
 #include "sched.h"
 
@@ -45,7 +41,7 @@ static inline bool cap_delete(CapNode *prev, CapNode *curr) {
  * Returns 1 if successful, otherwise 0.
  * Assumption: parent != NULL and is_marked(parent->prev)
  */
-static inline bool cap_append(const Cap cap, CapNode *node, CapNode *prev) {
+static inline bool cap_insert(const Cap cap, CapNode *node, CapNode *prev) {
         CapNode *next = prev->next;
         if (__sync_bool_compare_and_swap(&next->prev, prev, node)) {
                 /* TODO: Figure out the ordering of operations */
@@ -94,7 +90,7 @@ bool CapInsert(const Cap cap, CapNode *node, CapNode *prev) {
                 return false;
         /* While parent is alive, attempt to insert */
         while (!cap_is_deleted(prev)) {
-                if (cap_append(cap, node, prev))
+                if (cap_insert(cap, node, prev))
                         return true;
         }
         return false;
@@ -105,9 +101,9 @@ bool CapInsert(const Cap cap, CapNode *node, CapNode *prev) {
  * Uses a CapInsert followed by CapDelete.
  */
 bool CapMove(CapNode *dest, CapNode *src) {
+        const Cap cap = cn_get(src);
         if (cap_is_deleted(src) || !cap_is_deleted(dest))
                 return false;
-        Cap cap = cn_get(src);
         return CapInsert(cap, dest, src) && CapDelete(src);
 }
 

@@ -1,8 +1,8 @@
 #pragma once
 #ifndef NDEBUG
-#include <stdio.h>
 
-void _assert_fail(const char *, const char *, unsigned int, const char *) __attribute__((noreturn));
+void _assert_fail(const char *, const char *, unsigned int, const char *)
+    __attribute__((noreturn));
 
 #define ASSERT(val)                                                           \
         ({                                                                    \

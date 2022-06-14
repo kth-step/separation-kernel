@@ -1,7 +1,7 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-#include <stdint.h>
+#include "types.h"
 
 #include "cap.h"
 #include "proc.h"
