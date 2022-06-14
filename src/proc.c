@@ -45,9 +45,9 @@ void ProcReset(int pid) {
 }
 
 void proc_init_memory(CapNode *pmp, CapNode *memory) {
-        uint64_t begin = USER_MEMORY_BEGIN;
-        uint64_t end = USER_MEMORY_END;
-        uint64_t pmp_length = BOOT_PMP_LENGTH;
+        uint64_t begin = USER_MEMORY_BEGIN >> 12;
+        uint64_t end = USER_MEMORY_END >> 12;
+        uint64_t pmp_length = BOOT_PMP_LENGTH >> 12;
         uint64_t pmp_addr = begin | ((pmp_length - 1) >> 1);
         Cap cap_pmp = cap_mk_pmp(pmp_addr, 5);
         Cap cap_memory = cap_mk_memory(begin, end, begin, 7);
@@ -86,8 +86,8 @@ static void proc_init_boot_proc(Proc *boot) {
         CapNode *cap_table = boot->cap_table;
         proc_init_memory(&cap_table[0], &cap_table[1]);
         proc_init_channels(&cap_table[2]);
-        proc_init_time(&cap_table[3]);
-        proc_init_supervisor(&cap_table[3 + N_CORES]);
+        proc_init_supervisor(&cap_table[3]);
+        proc_init_time(&cap_table[4]);
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
         boot->pc = (uintptr_t)user_code;  // Temporary code.

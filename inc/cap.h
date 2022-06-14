@@ -83,7 +83,7 @@ static inline Cap cap_mk_memory(uint64_t begin, uint64_t end, uint64_t free,
                                    uint64_t rwx) {
         ASSERT((begin & 0xFFFFFFFFull) == begin);
         ASSERT((end & 0xFFFFFFFFull) == end);
-        ASSERT((end & 0xFFFFFFFFull) == free);
+        ASSERT((free & 0xFFFFFFFFull) == free);
         ASSERT(begin <= end);
         ASSERT(begin <= free);
         ASSERT(free <= end);
@@ -119,10 +119,12 @@ static inline Cap cap_mk_pmp(uint64_t addr, uint64_t rwx) {
 }
 
 static inline uint64_t cap_pmp_addr(const Cap cap) {
+        ASSERT(cap_get_type(cap) == CAP_PMP);
         return cap.word1 & 0xFFFFFFFF;
 }
 
 static inline uint64_t cap_pmp_rwx(const Cap cap) {
+        ASSERT(cap_get_type(cap) == CAP_PMP);
         return (cap.word1 >> 32) & 0x7;
 }
 
@@ -134,10 +136,12 @@ static inline Cap cap_mk_pmp_hidden(uint64_t addr, uint64_t rwx) {
 }
 
 static inline uint64_t cap_pmp_hidden_addr(const Cap cap) {
+        ASSERT(cap_get_type(cap) == CAP_PMP_HIDDEN);
         return cap.word1 >> 8;
 }
 
 static inline uint64_t cap_pmp_hidden_cfg(const Cap cap) {
+        ASSERT(cap_get_type(cap) == CAP_PMP_HIDDEN);
         return cap.word1 & 0xFF;
 }
 
@@ -146,7 +150,7 @@ static inline Cap cap_mk_time(uint64_t core, uint64_t begin, uint64_t end,
         ASSERT((core & 0xFF) == core);
         ASSERT((begin & 0xFFFF) == begin);
         ASSERT((end & 0xFFFF) == end);
-        ASSERT((free & 0xFFFF) == end);
+        ASSERT((free & 0xFFFF) == free);
         ASSERT((id & 0xFF) == id);
         ASSERT((fuel & 0xFF) == fuel);
         ASSERT(begin <= end);
@@ -192,7 +196,7 @@ static inline uint64_t cap_time_fuel(const Cap cap) {
 static inline Cap cap_mk_channels(uint64_t begin, uint64_t end, uint64_t free) {
         ASSERT((begin & 0xFFFF) == begin);
         ASSERT((end & 0xFFFF) == end);
-        ASSERT((free & 0xFFFF) == end);
+        ASSERT((free & 0xFFFF) == free);
         ASSERT(begin <= end);
         ASSERT(begin <= free);
         ASSERT(free <= end);
