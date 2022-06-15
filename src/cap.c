@@ -100,6 +100,8 @@ bool CapUpdate(const Cap cap, CapNode *node) {
                 if (!__sync_bool_compare_and_swap(&node->prev, prev, NULL))
                         continue;
                 node->cap = cap;
+                __sync_synchronize();
+                node->prev = prev;
                 return true;
         }
         return false;
