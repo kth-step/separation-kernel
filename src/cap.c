@@ -31,8 +31,7 @@ static inline bool cap_delete(CapNode *prev, CapNode *curr) {
         /* TODO: Figure out the ordering of operations */
         curr->next = NULL;
         prev->next = next;
-        curr->word0 = 0;
-        curr->word1 = 0;
+        curr->cap = NULL_CAP;
         return true;
 }
 
@@ -46,8 +45,7 @@ static inline bool cap_insert(const Cap cap, CapNode *node, CapNode *prev) {
         if (__sync_bool_compare_and_swap(&next->prev, prev, node)) {
                 /* TODO: Figure out the ordering of operations */
                 prev->next = node;
-                node->word0 = cap.word0;
-                node->word1 = cap.word1;
+                node->cap = cap;
                 node->next = next;
                 node->prev = prev;
                 return true;
@@ -96,6 +94,17 @@ bool CapInsert(const Cap cap, CapNode *node, CapNode *prev) {
         return false;
 }
 
+bool CapUpdate(const Cap cap, CapNode *node) {
+        CapNode *prev;
+        while ((prev = node->prev)) {
+                if (!__sync_bool_compare_and_swap(&node->prev, prev, NULL))
+                        continue;
+                node->cap = cap;
+                return true;
+        }
+        return false;
+}
+
 /**
  * Moves the capability in src to dest.
  * Uses a CapInsert followed by CapDelete.
@@ -107,10 +116,6 @@ bool CapMove(CapNode *dest, CapNode *src) {
         return CapInsert(cap, dest, src) && CapDelete(src);
 }
 
-bool CapInterprocessMove(CapNode *dest, CapNode *src, int pid_dest, int pid_src) {
-        return false;
-}
-
 CapNode *CapInitSentinel(void) {
         static int i = 0;
         if (i >= N_SENTINELS)
@@ -118,8 +123,7 @@ CapNode *CapInitSentinel(void) {
         CapNode *sentinel = &sentinels[i++];
         sentinel->next = sentinel;
         sentinel->prev = sentinel;
-        sentinel->word0 = 0;
-        sentinel->word1 = 0;
+        sentinel->cap = NULL_CAP;
         /* Return the head of the sentinel node */
         /* We append capbilities to this head */
         return sentinel;

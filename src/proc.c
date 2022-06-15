@@ -50,7 +50,7 @@ void proc_init_memory(CapNode *pmp, CapNode *memory) {
         uint64_t pmp_length = BOOT_PMP_LENGTH >> 12;
         uint64_t pmp_addr = begin | ((pmp_length - 1) >> 1);
         Cap cap_pmp = cap_mk_pmp(pmp_addr, 5);
-        Cap cap_memory = cap_mk_memory(begin, end, begin, 7);
+        Cap cap_memory = cap_mk_memory(begin, end, begin, 7, 0);
         CapNode *sentinel = CapInitSentinel();
         ASSERT(CapInsert(cap_memory, memory, sentinel));
         ASSERT(CapInsert(cap_pmp, pmp, sentinel));
@@ -59,7 +59,7 @@ void proc_init_memory(CapNode *pmp, CapNode *memory) {
 void proc_init_channels(CapNode *channel) {
         uint16_t begin = 0;
         uint16_t end = N_CHANNELS - 1;
-        Cap cap = cap_mk_channels(begin, end, begin);
+        Cap cap = cap_mk_channels(begin, end, begin, 0);
         CapNode *sentinel = CapInitSentinel();
         ASSERT(CapInsert(cap, channel, sentinel));
 }
@@ -69,9 +69,11 @@ void proc_init_time(CapNode time[N_CORES]) {
                 CapNode *sentinel = CapInitSentinel();
                 uint64_t begin = 0;
                 uint64_t end = N_QUANTUM - 1;
+                uint64_t free = 0;
                 uint64_t id = 0;
-                uint64_t fuel = 255;
-                Cap cap = cap_mk_time(hartid, begin, end, begin, id, fuel);
+                uint64_t id_free = 1;
+                uint64_t id_end = 255;
+                Cap cap = cap_mk_time(hartid, begin, end, free, id, id_end, id_free);
                 ASSERT(CapInsert(cap, &time[hartid], sentinel));
         }
 }

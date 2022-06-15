@@ -1,14 +1,17 @@
 // See LICENSE file for copyright and license details.
 
 #include "syscall.h"
+
 #include "syscall_nr.h"
+
+#define BITWISE_SUBSET(p, q) (((p) & (q)) == (p))
 
 static uint64_t SyscallCap(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
                            uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7);
 static uint64_t SyscallNoCap(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4,
                              uint64_t a5, uint64_t a6, uint64_t a7);
 
-uint64_t syscall_read(uint64_t cid) {
+static uint64_t syscall_read(uint64_t cid) {
         if (cid >= 256)
                 return -1;
         const Cap cap = cn_get(&current->cap_table[cid]);
@@ -17,7 +20,7 @@ uint64_t syscall_read(uint64_t cid) {
         return cap.word0 != 0;
 }
 
-uint64_t syscall_delete(uint64_t cid) {
+static uint64_t syscall_delete(uint64_t cid) {
         if (cid >= 256)
                 return -1;
         CapNode *cn = &current->cap_table[cid];
@@ -35,7 +38,7 @@ uint64_t syscall_delete(uint64_t cid) {
         return CapDelete(cn);
 }
 
-uint64_t syscall_revoke(uint64_t cid) {
+static uint64_t syscall_revoke(uint64_t cid) {
         if (cid >= 256)
                 return -1;
         CapNode *cn = &current->cap_table[cid];
@@ -50,7 +53,7 @@ uint64_t syscall_revoke(uint64_t cid) {
         return CapRevoke(cn);
 }
 
-uint64_t syscall_move(uint64_t cid, uint64_t dest) {
+static uint64_t syscall_move(uint64_t cid, uint64_t dest) {
         if (cid >= 256 || dest >= 256 || cid == dest)
                 return -1;
         CapNode *cn = &current->cap_table[cid];
@@ -58,13 +61,93 @@ uint64_t syscall_move(uint64_t cid, uint64_t dest) {
         return CapMove(cn, cn_dest);
 }
 
-uint64_t syscall_derive(uint64_t cid, uint64_t dest, uint64_t word0, uint64_t word1) {
+static uint64_t syscall_derive_ms(CapNode *cn, CapNode *cn_dest, Cap cap,
+                           Cap cap_new) {
+        ASSERT(cap_get_type(cap) == CAP_MEMORY);
+        if (cap_get_type(cap_new) == CAP_MEMORY &&
+            cap_can_derive_ms_ms(cap, cap_new)) {
+                uint64_t end = cap_memory_begin(cap_new);
+                cap_memory_set_free(&cap, end);
+                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
+        }
+        if (cap_get_type(cap_new) == CAP_PMP &&
+            cap_can_derive_ms_pe(cap, cap_new)) {
+                cap_memory_set_pmp(&cap, 1);
+                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
+        }
+        return -1;
+}
+
+static uint64_t syscall_derive_ts(CapNode *cn, CapNode *cn_dest, Cap cap,
+                           Cap cap_new) {
+        ASSERT(cap_get_type(cap) == CAP_TIME);
+        if (cap_get_type(cap_new) == CAP_TIME &&
+            cap_can_derive_ts_ts(cap, cap_new)) {
+                uint64_t end = cap_time_end(cap_new);
+                uint64_t id_end = cap_time_id_end(cap_new);
+                cap_time_set_free(&cap, end);
+                cap_time_set_id_free(&cap, id_end);
+                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
+        }
+        return -1;
+}
+
+static uint64_t syscall_derive_ch(CapNode *cn, CapNode *cn_dest, Cap cap,
+                           Cap cap_new) {
+        ASSERT(cap_get_type(cap) == CAP_CHANNELS);
+        if (cap_get_type(cap_new) == CAP_CHANNELS &&
+            cap_can_derive_ch_ch(cap, cap_new)) {
+                uint64_t end = cap_channels_end(cap_new);
+                cap_channels_set_free(&cap, end);
+                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
+        }
+        if (cap_get_type(cap_new) == CAP_ENDPOINT &&
+            cap_can_derive_ch_ep(cap, cap_new)) {
+                cap_channels_set_ep(&cap, 1);
+                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
+        }
+        return -1;
+}
+
+static uint64_t syscall_derive_su(CapNode *cn, CapNode *cn_dest, Cap cap,
+                           Cap cap_new) {
+        ASSERT(cap_get_type(cap) == CAP_SUPERVISOR);
+        if (cap_get_type(cap_new) == CAP_SUPERVISOR &&
+            cap_can_derive_su_su(cap, cap_new)) {
+                uint64_t end = cap_supervisor_end(cap_new);
+                cap_supervisor_set_free(&cap, end);
+                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
+        }
+        return -1;
+}
+
+static uint64_t syscall_derive(uint64_t cid, uint64_t dest, uint64_t word0,
+                        uint64_t word1) {
         if (cid >= 256 || dest >= 256 || cid == dest)
                 return -1;
+        CapNode *cn = &current->cap_table[cid];
+        CapNode *cn_dest = &current->cap_table[dest];
+        const Cap cap = cn_get(cn);
+        const Cap cap_dest = (Cap){word0, word1};
+        switch (cap_get_type(cap)) {
+                case CAP_MEMORY:
+                        return syscall_derive_ms(cn, cn_dest, cap, cap_dest);
+                case CAP_TIME:
+                        return syscall_derive_ts(cn, cn_dest, cap, cap_dest);
+                case CAP_CHANNELS:
+                        return syscall_derive_ch(cn, cn_dest, cap, cap_dest);
+                case CAP_SUPERVISOR:
+                        return syscall_derive_su(cn, cn_dest, cap, cap_dest);
+                default:
+                        return -1;
+        }
+}
+static uint64_t syscall_invoke(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
+                        uint64_t a4, uint64_t a5, uint64_t a6) {
         return 0;
 }
 
-uint64_t SyscallCap(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
+static uint64_t SyscallCap(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
                     uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7) {
         switch (a7) {
                 case SYSNR_READ_CAP:
@@ -78,7 +161,7 @@ uint64_t SyscallCap(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
                 case SYSNR_DERIVE_CAP:
                         return syscall_derive(a0, a1, a2, a3);
                 case SYSNR_INVOKE_CAP:
-                        return 0;
+                        return syscall_invoke(a0, a1, a2, a3, a4, a5, a6);
                 default:
                         return -1;
         }
