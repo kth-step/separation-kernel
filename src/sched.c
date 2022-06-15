@@ -6,6 +6,7 @@
 #include "csr.h"
 #include "lock.h"
 #include "stack.h"
+#include "cap.h"
 
 /** The schedule.
  * Each 64-bit word describes the state of four cores:
@@ -18,19 +19,29 @@
  */
 uint64_t schedule[N_QUANTUM];
 
-static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
-        return ((s >> (hartid * 16)) & 0xFF);
+static inline uint64_t sched_tid(uint64_t entry, uint64_t core) {
+        ASSERT(core < N_CORES);
+        entry >>= core * 16;
+        return (entry >> 8) & 0xFF;
 }
 
-static inline int sched_is_invalid_pid(int8_t pid) {
-        return pid < 0;
+static inline uint64_t sched_pid(uint64_t entry, uint64_t core) {
+        ASSERT(core < N_CORES);
+        entry >>= core * 16;
+        return entry & 0x7F;
+}
+
+static inline uint64_t sched_valid(uint64_t entry, uint64_t core) {
+        ASSERT(core < N_CORES);
+        entry >>= core * 16;
+        return entry & 0x80;
 }
 
 static inline int sched_has_priority(uint64_t s, uint64_t pid,
                                      uintptr_t hartid) {
         for (size_t i = 0; i < hartid; i++) {
                 /* If the pid is same, there is hart with higher priortiy */
-                uint64_t other_pid = sched_get_pid(s, i); /* Process ID. */
+                uint64_t other_pid = sched_pid(s, i); /* Process ID. */
                 if (pid == other_pid)
                         return 0;
         }
@@ -53,23 +64,24 @@ static inline uint64_t sched_get_length(uint64_t s, uint64_t q,
         return length;
 }
 
-static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
+static int sched_get_proc(uintptr_t core, uint64_t time, Proc **proc) {
         /* Calculate the current quantum */
         uint64_t q = time % N_QUANTUM;
         /* Get the current quantum schedule */
         __sync_synchronize();
         uint64_t s = schedule[q];
-        uint64_t pid = sched_get_pid(s, hartid); /* Process ID. */
         /* If msb is 1, return 0 */
-        if (pid & 0x80)
+        if (!sched_valid(s, core))
                 return 0;
+
+        uint64_t pid = sched_pid(s, core); /* Process ID. */
         /* Check that no other hart with higher priority schedules this pid */
-        if (!sched_has_priority(s, pid, hartid))
+        if (!sched_has_priority(s, pid, core))
                 return 0;
         /* Set process */
         *proc = &processes[pid];
         /* Return the scheduling length */
-        return sched_get_length(s, q, hartid);
+        return sched_get_length(s, q, core);
 }
 
 static void release_current(void) {
@@ -133,36 +145,67 @@ void Sched(void) {
         }
 }
 
-static inline void sched_update_rev(uint8_t begin, uint8_t end, uint8_t hartid,
-                                    uint16_t expected, uint16_t desired) {
-        uint64_t mask = 0xFFFF << (hartid * 16);
-        uint64_t expected64 = expected << (hartid * 16);
-        uint64_t desired64 = desired << (hartid * 16);
-        for (int i = begin; i >= end; i--) {
-                uint64_t s = schedule[i];
-                if ((s & mask) != expected64)
-                        break;
-                uint64_t s_new = (s & ~mask) | desired64;
-                __sync_val_compare_and_swap(&schedule[i], s, s_new);
-        }
-}
-static inline void sched_update(uint8_t begin, uint8_t end, uint8_t hartid,
-                                uint16_t expected, uint16_t desired) {
-        uint64_t mask = 0xFFFF << (hartid * 16);
-        uint64_t expected64 = expected << (hartid * 16);
-        uint64_t desired64 = desired << (hartid * 16);
+static inline void sched_update(uint64_t begin, uint64_t end, uint64_t mask,
+                                uint64_t expected, uint64_t desired, CapNode *cn) {
         for (int i = begin; i <= end; i++) {
-                uint64_t s = schedule[i];
-                if ((s & mask) != expected64)
+                if (cn->prev == NULL)
                         break;
-                uint64_t s_new = (s & ~mask) | desired64;
+                uint64_t s = schedule[i];
+                if ((s & mask) != expected)
+                        break;
+                uint64_t s_new = (s & ~mask) | desired;
                 __sync_val_compare_and_swap(&schedule[i], s, s_new);
         }
 }
-void SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
-                 uint16_t desired) {
-        if (begin > end)
-                sched_update_rev(begin, end, hartid, expected, desired);
-        else
-                sched_update(begin, end, hartid, expected, desired);
+
+void SchedRevoke(const Cap cap, CapNode *cn) {
+        uint64_t core = cap_time_core(cap);
+        uint64_t begin = cap_time_begin(cap);
+        uint64_t end = cap_time_end(cap);
+
+        uint64_t tid = cap_time_id(cap);
+        uint64_t pid = cap_time_pid(cap);
+
+        uint64_t mask = 0xFFFF << (core * 16);
+        uint64_t desired = (tid << 8 | pid) << (core * 16);
+        for (int i = begin; i <= end; i++) {
+                if (cn->prev == NULL)
+                        break;
+                uint64_t s_expected = schedule[i];
+                if (sched_tid(s_expected, core) <= tid)
+                        continue;
+                uint64_t s_desired = (s_expected & ~mask) | desired;
+                __sync_val_compare_and_swap(&schedule[i], s_expected, s_desired);
+        }
+}
+
+void SchedUpdate(const Cap cap, const Cap new_cap, CapNode *cn) {
+        ASSERT(cap_get_type(cap) == CAP_TIME);
+        uint64_t core = cap_time_core(new_cap);
+        uint64_t begin = cap_time_begin(new_cap);
+        uint64_t end = cap_time_end(new_cap);
+
+        uint64_t old_tid = cap_time_id(cap);
+        uint64_t old_pid = cap_time_pid(cap);
+
+        uint64_t new_tid = cap_time_id(cap);
+        uint64_t new_pid = cap_time_pid(cap);
+
+        uint64_t expected = (old_tid << 8 | old_pid) << (core * 16);
+        uint64_t desired = (new_tid << 8 | new_pid) << (core * 16);
+        uint64_t mask = 0xFFFF << (core * 16);
+        sched_update(begin, end, mask, expected, desired, cn);
+}
+
+void SchedDelete(const Cap cap, CapNode *cn) {
+        ASSERT(cap_get_type(cap) == CAP_TIME);
+        uint64_t tid = cap_time_id(cap);
+        uint64_t pid = cap_time_pid(cap);
+        uint64_t begin = cap_time_begin(cap);
+        uint64_t end = cap_time_end(cap);
+        uint64_t core = cap_time_core(cap);
+        uint64_t expected = (tid << 8 | pid) << (core * 16);
+        uint64_t desired = 0;
+        uint64_t mask = 0xFFFF << (core * 16);
+        sched_update(begin, end, mask, expected, desired, cn);
 }

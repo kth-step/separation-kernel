@@ -144,10 +144,11 @@ static inline uint64_t cap_pmp_hidden_cfg(const Cap cap) {
         return cap.word1 & 0xFF;
 }
 
-static inline Cap cap_mk_time(uint64_t core, uint64_t begin, uint64_t end,
+static inline Cap cap_mk_time(uint64_t core, uint64_t pid, uint64_t begin, uint64_t end,
                               uint64_t free, uint64_t id, uint64_t id_end,
                               uint64_t id_free) {
-        ASSERT((core & 0xFF) == core);
+        ASSERT(core < N_CORES);
+        ASSERT(pid < N_PROC);
         ASSERT((begin & 0xFFFF) == begin);
         ASSERT((end & 0xFFFF) == end);
         ASSERT((free & 0xFFFF) == free);
@@ -160,7 +161,7 @@ static inline Cap cap_mk_time(uint64_t core, uint64_t begin, uint64_t end,
         ASSERT(id_free <= id_end);
 
         return __mk_cap(CAP_TIME, core << 8 | begin << 32 | end << 16 | free,
-                        id | id_end << 8 | id_free << 16);
+                        id | id_end << 8 | id_free << 16 | pid << 24);
 }
 
 static inline uint64_t cap_time_core(const Cap cap) {
@@ -196,6 +197,11 @@ static inline uint64_t cap_time_id_free(const Cap cap) {
 static inline uint64_t cap_time_id_end(const Cap cap) {
         ASSERT(cap_get_type(cap) == CAP_TIME);
         return (cap.word1 >> 8) & 0xFF;
+}
+
+static inline uint64_t cap_time_pid(const Cap cap) {
+        ASSERT(cap_get_type(cap) == CAP_TIME);
+        return (cap.word1 >> 24) & 0xFF;
 }
 
 static inline Cap cap_mk_channels(uint64_t begin, uint64_t end, uint64_t free,

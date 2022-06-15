@@ -73,7 +73,7 @@ void proc_init_time(CapNode time[N_CORES]) {
                 uint64_t id = 0;
                 uint64_t id_free = 1;
                 uint64_t id_end = 255;
-                Cap cap = cap_mk_time(hartid, begin, end, free, id, id_end, id_free);
+                Cap cap = cap_mk_time(hartid, 0, begin, end, free, id, id_end, id_free);
                 ASSERT(CapInsert(cap, &time[hartid], sentinel));
         }
 }

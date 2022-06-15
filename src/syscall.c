@@ -2,6 +2,7 @@
 
 #include "syscall.h"
 
+#include "sched.h"
 #include "syscall_nr.h"
 
 #define BITWISE_SUBSET(p, q) (((p) & (q)) == (p))
@@ -25,17 +26,18 @@ static uint64_t syscall_delete(uint64_t cid) {
                 return -1;
         CapNode *cn = &current->cap_table[cid];
         const Cap cap = cn_get(cn);
+        //        bool succ;
         switch (cap_get_type(cap)) {
                 case CAP_PMP:
                         CapRevoke(cn);
-                        break;
+                        return CapDelete(cn);
                 case CAP_TIME:
-                        /* Fix time */
-                        break;
+                        /* Unset time here */
+                        SchedDelete(cap, cn);
+                        return CapDelete(cn);
                 default:
-                        break;
+                        return CapDelete(cn);
         }
-        return CapDelete(cn);
 }
 
 static uint64_t syscall_revoke(uint64_t cid) {
@@ -45,7 +47,7 @@ static uint64_t syscall_revoke(uint64_t cid) {
         const Cap cap = cn_get(cn);
         switch (cap_get_type(cap)) {
                 case CAP_TIME:
-                        /* Fix time */
+                        SchedRevoke(cap, cn);
                         break;
                 default:
                         break;
@@ -62,7 +64,7 @@ static uint64_t syscall_move(uint64_t cid, uint64_t dest) {
 }
 
 static uint64_t syscall_derive_ms(CapNode *cn, CapNode *cn_dest, Cap cap,
-                           Cap cap_new) {
+                                  Cap cap_new) {
         ASSERT(cap_get_type(cap) == CAP_MEMORY);
         if (cap_get_type(cap_new) == CAP_MEMORY &&
             cap_can_derive_ms_ms(cap, cap_new)) {
@@ -79,7 +81,7 @@ static uint64_t syscall_derive_ms(CapNode *cn, CapNode *cn_dest, Cap cap,
 }
 
 static uint64_t syscall_derive_ts(CapNode *cn, CapNode *cn_dest, Cap cap,
-                           Cap cap_new) {
+                                  Cap cap_new) {
         ASSERT(cap_get_type(cap) == CAP_TIME);
         if (cap_get_type(cap_new) == CAP_TIME &&
             cap_can_derive_ts_ts(cap, cap_new)) {
@@ -87,13 +89,17 @@ static uint64_t syscall_derive_ts(CapNode *cn, CapNode *cn_dest, Cap cap,
                 uint64_t id_end = cap_time_id_end(cap_new);
                 cap_time_set_free(&cap, end);
                 cap_time_set_id_free(&cap, id_end);
-                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
+                if (CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn)) {
+                        SchedUpdate(cap_new, cap, cn);
+                        return true;
+                }
+                return false;
         }
         return -1;
 }
 
 static uint64_t syscall_derive_ch(CapNode *cn, CapNode *cn_dest, Cap cap,
-                           Cap cap_new) {
+                                  Cap cap_new) {
         ASSERT(cap_get_type(cap) == CAP_CHANNELS);
         if (cap_get_type(cap_new) == CAP_CHANNELS &&
             cap_can_derive_ch_ch(cap, cap_new)) {
@@ -110,7 +116,7 @@ static uint64_t syscall_derive_ch(CapNode *cn, CapNode *cn_dest, Cap cap,
 }
 
 static uint64_t syscall_derive_su(CapNode *cn, CapNode *cn_dest, Cap cap,
-                           Cap cap_new) {
+                                  Cap cap_new) {
         ASSERT(cap_get_type(cap) == CAP_SUPERVISOR);
         if (cap_get_type(cap_new) == CAP_SUPERVISOR &&
             cap_can_derive_su_su(cap, cap_new)) {
@@ -122,7 +128,7 @@ static uint64_t syscall_derive_su(CapNode *cn, CapNode *cn_dest, Cap cap,
 }
 
 static uint64_t syscall_derive(uint64_t cid, uint64_t dest, uint64_t word0,
-                        uint64_t word1) {
+                               uint64_t word1) {
         if (cid >= 256 || dest >= 256 || cid == dest)
                 return -1;
         CapNode *cn = &current->cap_table[cid];
@@ -142,13 +148,14 @@ static uint64_t syscall_derive(uint64_t cid, uint64_t dest, uint64_t word0,
                         return -1;
         }
 }
-static uint64_t syscall_invoke(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
-                        uint64_t a4, uint64_t a5, uint64_t a6) {
+static uint64_t syscall_invoke(uint64_t a0, uint64_t a1, uint64_t a2,
+                               uint64_t a3, uint64_t a4, uint64_t a5,
+                               uint64_t a6) {
         return 0;
 }
 
 static uint64_t SyscallCap(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
-                    uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7) {
+                           uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7) {
         switch (a7) {
                 case SYSNR_READ_CAP:
                         return syscall_read(a0);
