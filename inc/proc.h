@@ -84,7 +84,7 @@ void ProcReset(int pid);
 static inline bool ProcLoadPmp(Proc *proc, Cap cap, CapNode *cn,
                                uint64_t index) {
         ASSERT(cap_get_type(cap) == CAP_PMP);
-        ASSERT(index < 8);
+        ASSERT(index < N_PMP);
         Cap cap_hidden = cap_mk_pmp_hidden(cap_pmp_addr(cap), cap_pmp_rwx(cap));
         return CapInsert(cap_hidden, &proc->pmp_table[index], cn);
 }

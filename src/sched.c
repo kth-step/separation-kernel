@@ -31,7 +31,7 @@ static inline uint64_t sched_pid(uint64_t entry, uint64_t core) {
         return entry & 0x7F;
 }
 
-static inline uint64_t sched_valid(uint64_t entry, uint64_t core) {
+static inline bool sched_valid(uint64_t entry, uint64_t core) {
         ASSERT(core < N_CORES);
         entry >>= core * 16;
         return entry & 0x80;

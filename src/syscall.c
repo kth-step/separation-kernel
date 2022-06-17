@@ -148,10 +148,42 @@ static uint64_t syscall_derive(uint64_t cid, uint64_t dest, uint64_t word0,
                         return -1;
         }
 }
+
+static uint64_t syscall_invoke_pmp(Cap cap, CapNode *cn, uint64_t index) {
+        if (index >= N_PMP)
+                return -1;
+        return ProcLoadPmp(current, cap, cn, index);
+}
+
+static uint64_t syscall_invoke_endpoint(Cap cap, CapNode *cn, uint64_t a1,
+                                        uint64_t a2, uint64_t a3, uint64_t a4,
+                                        uint64_t a5, uint64_t a6) {
+        return -1;
+}
+
+static uint64_t syscall_invoke_supervisor(Cap cap, CapNode *cn, uint64_t a1,
+                                          uint64_t a2) {
+        return -1;
+}
+
 static uint64_t syscall_invoke(uint64_t a0, uint64_t a1, uint64_t a2,
                                uint64_t a3, uint64_t a4, uint64_t a5,
                                uint64_t a6) {
-        return 0;
+        if (a0 >= 256)
+                return -1;
+        CapNode *cn = &current->cap_table[a0];
+        Cap cap = cn_get(cn);
+        switch (cap_get_type(cap)) {
+                case CAP_PMP:
+                        return syscall_invoke_pmp(cap, cn, a1);
+                case CAP_ENDPOINT:
+                        return syscall_invoke_endpoint(cap, cn, a1, a2, a3, a4,
+                                                       a5, a6);
+                case CAP_SUPERVISOR:
+                        return syscall_invoke_supervisor(cap, cn, a1, a2);
+                default:
+                        return -1;
+        }
 }
 
 static uint64_t SyscallCap(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
@@ -174,8 +206,8 @@ static uint64_t SyscallCap(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
         }
 }
 
-uint64_t SyscallNoCap(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4,
-                      uint64_t a5, uint64_t a6, uint64_t a7) {
+static uint64_t SyscallNoCap(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4,
+                             uint64_t a5, uint64_t a6, uint64_t a7) {
         switch (a7) {
                 case 0:
                         return syscall_read(0);

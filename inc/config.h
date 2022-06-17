@@ -7,6 +7,8 @@
 #define N_PROC 4
 /* Number of capabilities per process */
 #define N_CAPS 256
+/* Number of PMP registers in hardware */
+#define N_PMP 8
 
 /* Ticks per second */
 #define TICKS_PER_SECOND 10000000UL
