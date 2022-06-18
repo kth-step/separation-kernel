@@ -5,6 +5,7 @@
 #include "config.h"
 #include "lock.h"
 #include "types.h"
+#include "cap_utils.h"
 
 /** Proc
  * This is the Process Control Block (PCB). We store pointers
@@ -83,13 +84,15 @@ void ProcReset(int pid);
 
 static inline bool ProcLoadPmp(Proc *proc, Cap cap, CapNode *cn,
                                uint64_t index) {
-        ASSERT(cap_get_type(cap) == CAP_PMP);
-        ASSERT(index < N_PMP);
-        Cap cap_hidden = cap_mk_pmp_hidden(cap_pmp_addr(cap), cap_pmp_rwx(cap));
+        kassert(cap_get_type(cap) == CAP_PMP);
+        kassert(index < N_PMP);
+        uint64_t addr = cap_pmp_get_addr(cap);
+        addr = (addr << 10) | 0x3FF;
+        Cap cap_hidden = cap_mk_pmp_hidden(addr, cap_pmp_get_rwx(cap));
         return CapInsert(cap_hidden, &proc->pmp_table[index], cn);
 }
 
 static inline bool ProcUnloadPmp(Proc *proc, uint64_t index) {
-        ASSERT(index < 8);
+        kassert(index < 8);
         return CapDelete(&proc->pmp_table[index]);
 }

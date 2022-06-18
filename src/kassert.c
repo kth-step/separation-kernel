@@ -1,4 +1,4 @@
-#include "assert.h"
+#include "kassert.h"
 
 #ifndef NDEBUG
 #include <stdio.h>

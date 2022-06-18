@@ -33,7 +33,7 @@ void ProcReset(int pid) {
         proc->cap_table = cap_tables[pid];
         for (int i = 0; i < N_CAPS; ++i) {
                 CapNode *cap = &cap_tables[pid][i];
-                if (!cap_is_deleted(cap)) {
+                if (!cn_is_deleted(cap)) {
                         CapRevoke(cap);
                         CapDelete(cap);
                 }
@@ -44,44 +44,43 @@ void ProcReset(int pid) {
         proc->state = PROC_HALTED;
 }
 
-void proc_init_memory(CapNode *pmp, CapNode *memory) {
+static void proc_init_memory(CapNode *pmp, CapNode *memory) {
         uint64_t begin = USER_MEMORY_BEGIN >> 12;
         uint64_t end = USER_MEMORY_END >> 12;
         uint64_t pmp_length = BOOT_PMP_LENGTH >> 12;
         uint64_t pmp_addr = begin | ((pmp_length - 1) >> 1);
         Cap cap_pmp = cap_mk_pmp(pmp_addr, 5);
-        Cap cap_memory = cap_mk_memory(begin, end, begin, 7, 0);
+        Cap cap_memory = cap_mk_memory(begin, end, 7, begin, 0);
         CapNode *sentinel = CapInitSentinel();
-        ASSERT(CapInsert(cap_memory, memory, sentinel));
-        ASSERT(CapInsert(cap_pmp, pmp, sentinel));
+        CapInsert(cap_memory, memory, sentinel);
+        CapInsert(cap_pmp, pmp, sentinel);
 }
 
-void proc_init_channels(CapNode *channel) {
+static void proc_init_channels(CapNode *channel) {
         uint16_t begin = 0;
         uint16_t end = N_CHANNELS - 1;
         Cap cap = cap_mk_channels(begin, end, begin, 0);
         CapNode *sentinel = CapInitSentinel();
-        ASSERT(CapInsert(cap, channel, sentinel));
+        CapInsert(cap, channel, sentinel);
 }
 
-void proc_init_time(CapNode time[N_CORES]) {
-        for (int hartid = 0; hartid < N_CORES; hartid++) {
+static void proc_init_time(CapNode time[N_CORES]) {
+        for (int core = 0; core < N_CORES; core++) {
                 CapNode *sentinel = CapInitSentinel();
+                uint64_t pid = 0;
                 uint64_t begin = 0;
-                uint64_t end = N_QUANTUM - 1;
+                uint64_t end = N_QUANTUM;
                 uint64_t free = 0;
-                uint64_t id = 0;
-                uint64_t id_free = 1;
-                uint64_t id_end = 255;
-                Cap cap = cap_mk_time(hartid, 0, begin, end, free, id, id_end, id_free);
-                ASSERT(CapInsert(cap, &time[hartid], sentinel));
+                uint64_t depth = 0;
+                Cap cap = cap_mk_time(core, pid, begin, end, free, depth);
+                CapInsert(cap, &time[core], sentinel);
         }
 }
 
-void proc_init_supervisor(CapNode *cap_sup) {
+static void proc_init_supervisor(CapNode *cap_sup) {
         CapNode *sentinel = CapInitSentinel();
         Cap cap = cap_mk_supervisor(0, N_PROC, 0);
-        ASSERT(CapInsert(cap, cap_sup, sentinel));
+        CapInsert(cap, cap_sup, sentinel);
 }
 
 static void proc_init_boot_proc(Proc *boot) {
@@ -92,7 +91,7 @@ static void proc_init_boot_proc(Proc *boot) {
         proc_init_time(&cap_table[4]);
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
-        boot->pc = (uintptr_t)user_code;  // Temporary code.
+        boot->pc = (uint64_t)user_code;  // Temporary code.
 
         /* Set boot process to running. */
         boot->state = PROC_SUSPENDED;

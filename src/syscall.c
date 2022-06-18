@@ -63,90 +63,51 @@ static uint64_t syscall_move(uint64_t cid, uint64_t dest) {
         return CapMove(cn, cn_dest);
 }
 
-static uint64_t syscall_derive_ms(CapNode *cn, CapNode *cn_dest, Cap cap,
-                                  Cap cap_new) {
-        ASSERT(cap_get_type(cap) == CAP_MEMORY);
-        if (cap_get_type(cap_new) == CAP_MEMORY &&
-            cap_can_derive_ms_ms(cap, cap_new)) {
-                uint64_t end = cap_memory_begin(cap_new);
-                cap_memory_set_free(&cap, end);
-                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
-        }
-        if (cap_get_type(cap_new) == CAP_PMP &&
-            cap_can_derive_ms_pe(cap, cap_new)) {
-                cap_memory_set_pmp(&cap, 1);
-                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
-        }
-        return -1;
-}
-
-static uint64_t syscall_derive_ts(CapNode *cn, CapNode *cn_dest, Cap cap,
-                                  Cap cap_new) {
-        ASSERT(cap_get_type(cap) == CAP_TIME);
-        if (cap_get_type(cap_new) == CAP_TIME &&
-            cap_can_derive_ts_ts(cap, cap_new)) {
-                uint64_t end = cap_time_end(cap_new);
-                uint64_t id_end = cap_time_id_end(cap_new);
-                cap_time_set_free(&cap, end);
-                cap_time_set_id_free(&cap, id_end);
-                if (CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn)) {
-                        SchedUpdate(cap_new, cap, cn);
-                        return true;
-                }
-                return false;
-        }
-        return -1;
-}
-
-static uint64_t syscall_derive_ch(CapNode *cn, CapNode *cn_dest, Cap cap,
-                                  Cap cap_new) {
-        ASSERT(cap_get_type(cap) == CAP_CHANNELS);
-        if (cap_get_type(cap_new) == CAP_CHANNELS &&
-            cap_can_derive_ch_ch(cap, cap_new)) {
-                uint64_t end = cap_channels_end(cap_new);
-                cap_channels_set_free(&cap, end);
-                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
-        }
-        if (cap_get_type(cap_new) == CAP_ENDPOINT &&
-            cap_can_derive_ch_ep(cap, cap_new)) {
-                cap_channels_set_ep(&cap, 1);
-                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
-        }
-        return -1;
-}
-
-static uint64_t syscall_derive_su(CapNode *cn, CapNode *cn_dest, Cap cap,
-                                  Cap cap_new) {
-        ASSERT(cap_get_type(cap) == CAP_SUPERVISOR);
-        if (cap_get_type(cap_new) == CAP_SUPERVISOR &&
-            cap_can_derive_su_su(cap, cap_new)) {
-                uint64_t end = cap_supervisor_end(cap_new);
-                cap_supervisor_set_free(&cap, end);
-                return CapUpdate(cap, cn) && CapInsert(cap_new, cn_dest, cn);
-        }
-        return -1;
-}
-
 static uint64_t syscall_derive(uint64_t cid, uint64_t dest, uint64_t word0,
                                uint64_t word1) {
         if (cid >= 256 || dest >= 256 || cid == dest)
                 return -1;
-        CapNode *cn = &current->cap_table[cid];
-        CapNode *cn_dest = &current->cap_table[dest];
-        const Cap cap = cn_get(cn);
-        const Cap cap_dest = (Cap){word0, word1};
-        switch (cap_get_type(cap)) {
-                case CAP_MEMORY:
-                        return syscall_derive_ms(cn, cn_dest, cap, cap_dest);
-                case CAP_TIME:
-                        return syscall_derive_ts(cn, cn_dest, cap, cap_dest);
-                case CAP_CHANNELS:
-                        return syscall_derive_ch(cn, cn_dest, cap, cap_dest);
-                case CAP_SUPERVISOR:
-                        return syscall_derive_su(cn, cn_dest, cap, cap_dest);
-                default:
-                        return -1;
+        CapNode *cn_parent = &current->cap_table[cid];
+        CapNode *cn_child = &current->cap_table[dest];
+        const Cap parent = cn_get(cn_parent);
+        const Cap child = (Cap){word0, word1};
+        CapType parent_type = cap_get_type(parent);
+        CapType child_type = cap_get_type(child);
+        if (!cap_can_derive(parent, child))
+                return -1;
+        if (parent_type == CAP_MEMORY && child_type == CAP_MEMORY) {
+                uint64_t end = cap_memory_get_begin(child);
+                Cap c = cap_memory_set_free(parent, end);
+                return CapUpdate(c, cn_parent) &&
+                       CapInsert(child, cn_child, cn_parent);
         }
+        if (parent_type == CAP_MEMORY && child_type == CAP_PMP) {
+                Cap c = cap_memory_set_pmp(parent, 1);
+                return CapUpdate(c, cn_parent) &&
+                       CapInsert(child, cn_child, cn_parent);
+        }
+        if (parent_type == CAP_TIME && child_type == CAP_TIME) {
+                uint64_t end = cap_time_get_end(child);
+                Cap c = cap_time_set_free(parent, end);
+                return CapUpdate(c, cn_parent) &&
+                       CapInsert(child, cn_child, cn_parent) &&
+                       SchedUpdate(child, parent, cn_parent);
+        }
+        if (parent_type == CAP_CHANNELS && child_type == CAP_CHANNELS) {
+                uint64_t end = cap_channels_get_end(child);
+                Cap c = cap_channels_set_free(parent, end);
+                return CapUpdate(c, cn_parent) && CapInsert(child, cn_child, cn_parent);
+        }
+        if (parent_type == CAP_CHANNELS && child_type == CAP_ENDPOINT) {
+                Cap c = cap_channels_set_ep(parent, 1);
+                return CapUpdate(c, cn_parent) && CapInsert(child, cn_child, cn_parent);
+        }
+        if (parent_type == CAP_SUPERVISOR && child_type == CAP_SUPERVISOR) {
+                uint64_t end = cap_supervisor_get_end(child);
+                Cap c = cap_supervisor_set_free(parent, end);
+                return CapUpdate(c, cn_parent) && CapInsert(child, cn_child, cn_parent);
+        }
+        kassert(false);
 }
 
 static uint64_t syscall_invoke_pmp(Cap cap, CapNode *cn, uint64_t index) {
@@ -161,9 +122,67 @@ static uint64_t syscall_invoke_endpoint(Cap cap, CapNode *cn, uint64_t a1,
         return -1;
 }
 
-static uint64_t syscall_invoke_supervisor(Cap cap, CapNode *cn, uint64_t a1,
-                                          uint64_t a2) {
+static uint64_t syscall_invoke_supervisor_halt(Proc *supervisee) {
         return -1;
+}
+
+static uint64_t syscall_invoke_supervisor_resume(Proc *supervisee) {
+        return -1;
+}
+
+static uint64_t syscall_invoke_supervisor_reset(Proc *supervisee,
+                                                uint64_t cid0) {
+        return -1;
+}
+
+static uint64_t syscall_invoke_supervisor_give(Proc *supervisee, uint64_t cid0,
+                                               uint64_t cid1) {
+        return -1;
+}
+
+static uint64_t syscall_invoke_supervisor_take(Proc *supervisee, uint64_t cid0,
+                                               uint64_t cid1) {
+        return -1;
+}
+
+static uint64_t syscall_invoke_supervisor(Cap cap, CapNode *cn, uint64_t op,
+                                          uint64_t pid, uint64_t cid0,
+                                          uint64_t cid1) {
+        /* TODO:
+         * - HALT
+         * - RESUME
+         * - RESET
+         * - READ_CAP
+         * - GIVE_CAP
+         * - TAKE_CAP
+         */
+
+        /* Check free <= pid < end */
+        uint64_t pid_free = cap_supervisor_get_free(cap);
+        uint64_t pid_end = cap_supervisor_get_end(cap);
+        if (pid < pid_free || pid >= pid_end)
+                return -1;
+
+        Proc *supervisee = &processes[pid];
+        switch (op) {
+                case 0:
+                        return syscall_invoke_supervisor_halt(supervisee);
+                case 1:
+                        return syscall_invoke_supervisor_resume(supervisee);
+                case 2:
+                        return syscall_invoke_supervisor_resume(supervisee);
+                case 3:
+                        return syscall_invoke_supervisor_reset(supervisee,
+                                                               cid0);
+                case 4:
+                        return syscall_invoke_supervisor_give(supervisee, cid0,
+                                                              cid1);
+                case 5:
+                        return syscall_invoke_supervisor_take(supervisee, cid0,
+                                                              cid1);
+                default:
+                        return -1;
+        }
 }
 
 static uint64_t syscall_invoke(uint64_t a0, uint64_t a1, uint64_t a2,
@@ -180,7 +199,8 @@ static uint64_t syscall_invoke(uint64_t a0, uint64_t a1, uint64_t a2,
                         return syscall_invoke_endpoint(cap, cn, a1, a2, a3, a4,
                                                        a5, a6);
                 case CAP_SUPERVISOR:
-                        return syscall_invoke_supervisor(cap, cn, a1, a2);
+                        return syscall_invoke_supervisor(cap, cn, a1, a2, a3,
+                                                         a4);
                 default:
                         return -1;
         }

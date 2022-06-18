@@ -20,19 +20,19 @@
 uint64_t schedule[N_QUANTUM];
 
 static inline uint64_t sched_tid(uint64_t entry, uint64_t core) {
-        ASSERT(core < N_CORES);
+        kassert(core < N_CORES);
         entry >>= core * 16;
         return (entry >> 8) & 0xFF;
 }
 
 static inline uint64_t sched_pid(uint64_t entry, uint64_t core) {
-        ASSERT(core < N_CORES);
+        kassert(core < N_CORES);
         entry >>= core * 16;
         return entry & 0x7F;
 }
 
-static inline bool sched_valid(uint64_t entry, uint64_t core) {
-        ASSERT(core < N_CORES);
+static inline bool sched_invalid(uint64_t entry, uint64_t core) {
+        kassert(core < N_CORES);
         entry >>= core * 16;
         return entry & 0x80;
 }
@@ -71,7 +71,7 @@ static int sched_get_proc(uintptr_t core, uint64_t time, Proc **proc) {
         __sync_synchronize();
         uint64_t s = schedule[q];
         /* If msb is 1, return 0 */
-        if (!sched_valid(s, core))
+        if (sched_invalid(s, core))
                 return 0;
 
         uint64_t pid = sched_pid(s, core); /* Process ID. */
@@ -145,67 +145,69 @@ void Sched(void) {
         }
 }
 
-static inline void sched_update(uint64_t begin, uint64_t end, uint64_t mask,
+static inline bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
                                 uint64_t expected, uint64_t desired, CapNode *cn) {
-        for (int i = begin; i <= end; i++) {
+        for (int i = begin; i < end; i++) {
                 if (cn->prev == NULL)
-                        break;
+                        return false;
                 uint64_t s = schedule[i];
                 if ((s & mask) != expected)
                         break;
                 uint64_t s_new = (s & ~mask) | desired;
                 __sync_val_compare_and_swap(&schedule[i], s, s_new);
         }
+        return true;
 }
 
-void SchedRevoke(const Cap cap, CapNode *cn) {
-        uint64_t core = cap_time_core(cap);
-        uint64_t begin = cap_time_begin(cap);
-        uint64_t end = cap_time_end(cap);
+bool SchedRevoke(const Cap cap, CapNode *cn) {
+        uint64_t core = cap_time_get_core(cap);
+        uint64_t begin = cap_time_get_begin(cap);
+        uint64_t end = cap_time_get_end(cap);
 
-        uint64_t tid = cap_time_id(cap);
-        uint64_t pid = cap_time_pid(cap);
+        uint64_t depth = cap_time_get_depth(cap);
+        uint64_t pid = cap_time_get_pid(cap);
 
         uint64_t mask = 0xFFFF << (core * 16);
-        uint64_t desired = (tid << 8 | pid) << (core * 16);
-        for (int i = begin; i <= end; i++) {
+        uint64_t desired = (depth << 8 | pid) << (core * 16);
+        for (int i = begin; i < end; i++) {
                 if (cn->prev == NULL)
-                        break;
+                        return false;
                 uint64_t s_expected = schedule[i];
-                if (sched_tid(s_expected, core) <= tid)
+                if (sched_tid(s_expected, core) <= depth)
                         continue;
                 uint64_t s_desired = (s_expected & ~mask) | desired;
                 __sync_val_compare_and_swap(&schedule[i], s_expected, s_desired);
         }
+        return true;
 }
 
-void SchedUpdate(const Cap cap, const Cap new_cap, CapNode *cn) {
-        ASSERT(cap_get_type(cap) == CAP_TIME);
-        uint64_t core = cap_time_core(new_cap);
-        uint64_t begin = cap_time_begin(new_cap);
-        uint64_t end = cap_time_end(new_cap);
+bool SchedUpdate(const Cap cap, const Cap new_cap, CapNode *cn) {
+        kassert(cap_get_type(cap) == CAP_TIME);
+        uint64_t core = cap_time_get_core(new_cap);
+        uint64_t begin = cap_time_get_begin(new_cap);
+        uint64_t end = cap_time_get_end(new_cap);
 
-        uint64_t old_tid = cap_time_id(cap);
-        uint64_t old_pid = cap_time_pid(cap);
+        uint64_t old_depth = cap_time_get_depth(cap);
+        uint64_t old_pid = cap_time_get_pid(cap);
 
-        uint64_t new_tid = cap_time_id(cap);
-        uint64_t new_pid = cap_time_pid(cap);
+        uint64_t new_depth = cap_time_get_depth(cap);
+        uint64_t new_pid = cap_time_get_pid(cap);
 
-        uint64_t expected = (old_tid << 8 | old_pid) << (core * 16);
-        uint64_t desired = (new_tid << 8 | new_pid) << (core * 16);
+        uint64_t expected = (old_depth << 8 | old_pid) << (core * 16);
+        uint64_t desired = (new_depth << 8 | new_pid) << (core * 16);
         uint64_t mask = 0xFFFF << (core * 16);
-        sched_update(begin, end, mask, expected, desired, cn);
+        return sched_update(begin, end, mask, expected, desired, cn);
 }
 
-void SchedDelete(const Cap cap, CapNode *cn) {
-        ASSERT(cap_get_type(cap) == CAP_TIME);
-        uint64_t tid = cap_time_id(cap);
-        uint64_t pid = cap_time_pid(cap);
-        uint64_t begin = cap_time_begin(cap);
-        uint64_t end = cap_time_end(cap);
-        uint64_t core = cap_time_core(cap);
+bool SchedDelete(const Cap cap, CapNode *cn) {
+        kassert(cap_get_type(cap) == CAP_TIME);
+        uint64_t tid = cap_time_get_depth(cap);
+        uint64_t pid = cap_time_get_pid(cap);
+        uint64_t begin = cap_time_get_begin(cap);
+        uint64_t end = cap_time_get_end(cap);
+        uint64_t core = cap_time_get_core(cap);
         uint64_t expected = (tid << 8 | pid) << (core * 16);
-        uint64_t desired = 0;
+        uint64_t desired = 0x80ull << (core * 16);
         uint64_t mask = 0xFFFF << (core * 16);
-        sched_update(begin, end, mask, expected, desired, cn);
+        return sched_update(begin, end, mask, expected, desired, cn);
 }

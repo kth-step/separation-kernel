@@ -2,10 +2,12 @@
 #pragma once
 #include "types.h"
 
-static inline void pmp_napot_bounds(uint64_t addr, uint64_t *begin,
-                                    uint64_t *end) {
-        *begin = addr & (addr + 1);
-        *end = addr | (addr + 1);
+const static inline uint64_t pmp_napot_begin(uint64_t addr) {
+        return addr & (addr + 1);
+}
+
+const static inline uint64_t pmp_napot_end(uint64_t addr) {
+        return addr | (addr + 1);
 }
 
 static inline void set_pmp(uint64_t *pmpcfg, uint64_t pmpaddr[8],

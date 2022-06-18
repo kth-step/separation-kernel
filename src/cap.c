@@ -54,7 +54,7 @@ static inline bool cap_insert(const Cap cap, CapNode *node, CapNode *prev) {
 }
 
 bool CapDelete(CapNode *curr) {
-        while (!cap_is_deleted(curr)) {
+        while (!cn_is_deleted(curr)) {
                 CapNode *prev = curr->prev;
                 if (prev == NULL)
                         continue;
@@ -67,7 +67,7 @@ bool CapDelete(CapNode *curr) {
 bool CapRevoke(CapNode *curr) {
         const Cap parent = cn_get(curr);
         int counter = 0;
-        while (!cap_is_deleted(curr)) {
+        while (!cn_is_deleted(curr)) {
                 CapNode *next = curr->next;
                 Cap child = cn_get(next);
                 if (!cap_is_child(parent, child))
@@ -84,10 +84,10 @@ bool CapRevoke(CapNode *curr) {
  */
 bool CapInsert(const Cap cap, CapNode *node, CapNode *prev) {
         /* Child node must be empty */
-        if (!cap_is_deleted(node))
+        if (!cn_is_deleted(node))
                 return false;
         /* While parent is alive, attempt to insert */
-        while (!cap_is_deleted(prev)) {
+        while (!cn_is_deleted(prev)) {
                 if (cap_insert(cap, node, prev))
                         return true;
         }
@@ -113,7 +113,7 @@ bool CapUpdate(const Cap cap, CapNode *node) {
  */
 bool CapMove(CapNode *dest, CapNode *src) {
         const Cap cap = cn_get(src);
-        if (cap_is_deleted(src) || !cap_is_deleted(dest))
+        if (cn_is_deleted(src) || !cn_is_deleted(dest))
                 return false;
         return CapInsert(cap, dest, src) && CapDelete(src);
 }
