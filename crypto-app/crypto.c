@@ -56,20 +56,24 @@ static int __decrypt(const byte cypher[], byte plaintext[], int num_blocks) {
     cypher is the array where the encrypted text will be placed. The size must be at least the smallest multiple of 16 greater than or equal to the message_len argument.
     message_len is the number of bytes to encrypt from the message argument. If it is not a multiple of 16 the message will be padded with null bytes up to the nearest multiple.
     Returns 1 on success, 0 on failed encryption, and -1 on failed initialization of encryption struct. */
-int encrypt_message(const byte message[], byte cypher[], int message_len) {
+int encrypt_message(const char message[], char cypher[], uint64_t message_len) {
     int aligned_len = message_len;
     if (message_len % AES_BLOCK_SIZE != 0) {
         aligned_len = ((message_len / AES_BLOCK_SIZE) + 1) * AES_BLOCK_SIZE;
     }
     byte m[aligned_len];
+    byte c[aligned_len];
     for (int i = 0; i < message_len; i++) {
-        m[i] = message[i];
+        m[i] = (byte)message[i];
     }
     for (int i = message_len; i < aligned_len; i++) {
         m[i] = (byte)'\0';
     }
-
-    return __encrypt(m, cypher, aligned_len / AES_BLOCK_SIZE);
+    int ret = __encrypt(m, c, aligned_len / AES_BLOCK_SIZE);
+    for (int i = 0; i < aligned_len; i++) {
+        cypher[i] = (char)c[i];
+    }
+    return ret;
     
 }
 
@@ -78,15 +82,19 @@ int encrypt_message(const byte message[], byte cypher[], int message_len) {
     message_len is the number of bytes to return from the decrypted text. This can be equal to the size of the cypher, or less if one expects the cypher to have encrypted a number of padding bytes. 
     Note that the nearest multiple of 16 bytes equal to or greater than message_len will be taken as the size of the cypher.
     Returns 1 on success, 0 on failed decryption, -1 on failed initialization of decryption struct. */
-int decrypt_message(const byte cypher[], byte plaintext[], int message_len) {
+int decrypt_message(const char cypher[], char plaintext[], uint64_t message_len) {
     int aligned_len = message_len;
     if (message_len % AES_BLOCK_SIZE != 0) {
         aligned_len = ((message_len / AES_BLOCK_SIZE) + 1) * AES_BLOCK_SIZE;
     }
+    byte c[aligned_len];
     byte p[aligned_len];
-    int ret = __decrypt(cypher, p, aligned_len / AES_BLOCK_SIZE);
+    for (int i = 0; i < aligned_len; i++) {
+        c[i] = (byte)cypher[i];
+    }
+    int ret = __decrypt(c, p, aligned_len / AES_BLOCK_SIZE);
     for (int i = 0; i < message_len; i++) {
-        plaintext[i] = p[i];
+        plaintext[i] = (char)p[i];
     }
     return ret; 
 }
