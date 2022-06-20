@@ -17,6 +17,16 @@
  */
 uint64_t schedule[N_QUANTUM];
 
+void InitSched() {
+        for (int i = 0; i < N_QUANTUM; i++) {
+                if (i % 2 == 0) {
+                        schedule[i] = 0x0000000200010000;
+                } else {
+                        schedule[i] = 0x0000000100020000;
+                }
+        }
+}
+
 static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
         return ((s >> (hartid * 16)) & 0xFF);
 }

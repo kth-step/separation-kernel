@@ -24,3 +24,5 @@ void SchedUpdatePidTsid(uint8_t begin, uint8_t end, uint8_t hartid,
         uint16_t desired = (tsid_desired << 8) | pid_desired;
         SchedUpdate(begin, end, hartid, expected, desired);
 }
+
+void InitSched();

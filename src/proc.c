@@ -6,6 +6,7 @@
 #include "cap.h"
 #include "cap_util.h"
 #include "config.h"
+#include "sched.h"
 #include "stack.h"
 
 /** Initial stack offset.
@@ -117,6 +118,8 @@ void ProcInitProcesses(void) {
                 ProcReset(i);
         /*** Boot process ***/
         proc_init_boot_proc(&processes[0]);
+
+        InitSched();
 }
 
 void ProcHalt(Proc *proc) {
