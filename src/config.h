@@ -19,9 +19,9 @@
 #define SLACK_TICKS (TICKS/10)
 
 /* Stack size. */
-#define STACK_SIZE 1024
+#define STACK_SIZE (1024*2)
 /* log_2 of stack size. */
-#define LOG_STACK_SIZE 10
+#define LOG_STACK_SIZE 11
 
 /* Beginning and end of the user processes' memory region.
  * Used for setting up initial memory of the boot process. */
