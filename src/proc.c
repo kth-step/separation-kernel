@@ -20,8 +20,25 @@
 /* Temporary. */
 extern void user_code();
 
+/* Benchmarking */
+extern void crypto_decrypt_code();
+extern void cypher_provider_code();
+extern void plaintext_consumer_code();
+
 /* Defined in proc.h */
 Proc processes[N_PROC];
+
+static void proc_init_boot_proc(Proc *boot);
+
+void ProcCryptoAppInit() {
+        if (N_PROC < 3) {
+                return;
+        }
+        // TODO: give processes 1 and 2 memory capabilities; right now it only works since they aren't enforced.
+        processes[0].pc = (uintptr_t)crypto_decrypt_code;
+        processes[1].pc = (uintptr_t)cypher_provider_code;
+        processes[2].pc = (uintptr_t)plaintext_consumer_code;
+}
 
 /* Initializes one process. */
 void ProcReset(int pid) {
@@ -45,7 +62,10 @@ void ProcReset(int pid) {
         proc->pc = 0;
         proc->listen_channel = -1;
         /* Set process to HALTED. */
-        proc->state = PROC_HALTED;
+        //proc->state = PROC_HALTED;
+
+        // TODO: resume relevant processes through function calls instead of setting all processes to be ready. 
+        proc->state = PROC_SUSPENDED;
 }
 
 void proc_init_memory(Cap *pmp, Cap *memory) {
@@ -119,6 +139,7 @@ void ProcInitProcesses(void) {
         /*** Boot process ***/
         proc_init_boot_proc(&processes[0]);
 
+        ProcCryptoAppInit();
         InitSched();
 }
 
