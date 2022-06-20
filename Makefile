@@ -9,6 +9,13 @@ S_SRCS=$(wildcard src/*.S)
 C_SRCS=$(wildcard src/*.c)
 C_HDRS=$(wildcard src/*.h)
 
+S_SRCS+=$(wildcard crypto-app/*.S)
+C_SRCS+=$(wildcard crypto-app/*.c)
+C_HDRS+=$(wildcard crypto-app/*.h)
+
+C_SRCS+= crypto-app/wolfssl/aes.c
+C_SRCS:=$(filter-out crypto-app/test.c, $(C_SRCS))
+
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
 DA=$(BUILD_DIR)/$(PROGRAM).da
 
@@ -63,7 +70,7 @@ $(BUILD_DIR):
 $(ELF): Makefile config.mk | $(BUILD_DIR)
 
 $(BUILD_DIR)/%.elf: $(C_HDRS) $(C_SRCS) $(S_SRCS) config.lds
-	@echo "Compiling ELF file:\t$(S_SRCS)$(C_SRCS) ==> $@"
+	@echo "Compiling ELF file:\t$(S_SRCS) $(C_SRCS) ==> $@ \n"
 	@$(CC) $(CFLAGS) -o $@ $(S_SRCS) $(C_SRCS)
 
 $(BUILD_DIR)/%.da: $(ELF)

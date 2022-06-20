@@ -1,4 +1,4 @@
-# A simple crypt o app
+# A simple crypto app
 This is a simple crypto app that receives messages and either encrypts them or decrypts them with its own private key. The encryption used is AES in CBC mode, with a 128 bit key. 
 
 NOTE: the purpose of this app is only to simulate message passing utilizing AES encryption and decryption. It gives no guarantess that it follows best practices regarding security and it should not be used for any real encryption/decryption purposes.

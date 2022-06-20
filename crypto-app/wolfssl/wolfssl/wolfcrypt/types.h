@@ -32,7 +32,7 @@ decouple library dependencies with standard string, memory and so on.
 #define WOLF_CRYPT_TYPES_H
 
     #include "settings.h"
-    #include "wc_port.h"
+    //#include "wc_port.h"
 
     #ifdef __cplusplus
         extern "C" {
