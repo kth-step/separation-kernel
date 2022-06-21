@@ -2,7 +2,6 @@
 #include <stdio.h>
 
 #include "config.h"
-#include "lock.h"
 #include "s3k.h"
 #include "timer.h"
 
