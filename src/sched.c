@@ -1,9 +1,17 @@
 #include "sched.h"
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 
+#include "benchmark_util.h"
+#include "config.h"
 #include "csr.h"
 #include "stack.h"
+
+static uint64_t round_number = 0;
+/* Used to make sure our structures don't get removed by optimization. */
+static volatile int dummy_counter = 0; 
 
 /** The schedule.
  * Each 64-bit word describes the state of four cores:
@@ -34,29 +42,37 @@ static inline int sched_is_invalid_pid(int8_t pid) {
         return pid < 0;
 }
 
+/* The loop in this function affects the running time of the scheduling, 
+so we force its worst time execution when establishing time needed for scheduling. */
 static inline int sched_has_priority(uint64_t s, uint64_t pid,
                                      uintptr_t hartid) {
-        for (size_t i = 0; i < hartid; i++) {
+        for (size_t i = 0; i < N_CORES - 1; i++) {
                 /* If the pid is same, there is hart with higher priortiy */
                 uint64_t other_pid = sched_get_pid(s, i); /* Process ID. */
                 if (pid == other_pid)
-                        return 0;
+                        /* We keep the if-statement to keep the comparison operation, but we don't care about the outcome. */
+                        dummy_counter = 1;
         }
-        return 1;
+        // While this adds one operation (giving us a slightly worse time) it does allow us to keep the determinism during testing.
+        return (hartid == 0);
 }
 
+/* The loop in this function affects the running time of the scheduling, 
+so we force its worst time execution when establishing time needed for scheduling. */
 static inline uint64_t sched_get_length(uint64_t s, uint64_t q,
                                         uintptr_t hartid) {
         uint64_t length = 1;
         uint64_t mask = 0xFFFFUL << (hartid * 8);
-        for (uint64_t qi = q + 1; qi < N_QUANTUM; qi++) {
+        for (uint64_t qi = 0 + 1; qi < N_QUANTUM; qi++) {
                 /* If next timeslice has the same pid and tsid, then add to
                  * lenght */
                 __sync_synchronize();
                 uint64_t si = schedule[qi];
                 if ((s ^ si) & mask)
-                        break;
-                length++;
+                        /* We keep the if-statement to keep the comparison operation, but we don't care about the outcome. */
+                        dummy_counter = 1;
+                // length++; We want to rerun scheduling as often as possible for more data points, so we don't want to increase length.
+                dummy_counter++;
         }
         return length;
 }
@@ -110,8 +126,12 @@ void set_timeout(uint64_t quantum) {
 }
 
 void wait(uint64_t time) {
-        while (read_time() < time * TICKS) {
+        /* Simulate at least one check in the wait loop */
+        if (read_time() < time * TICKS) {
+                dummy_counter = 1;
         }
+        //while (read_time() < time * TICKS) {
+        //}
 }
 
 void Sched(void) {
@@ -135,6 +155,24 @@ void Sched(void) {
                         set_timeout(time + length);
                         /* Wait until it is time to run */
                         wait(time);
+
+
+                        uint64_t time_after = read_time();
+                        uint64_t remaining_time = (time * TICKS)- time_after;
+                        printf("\nValue= %lu\n", remaining_time);
+                        round_number++;
+                        if (round_number >= SLACK_TEST_ROUNDS) {
+                                print_relevant_config();
+                                printf("\nDONE\n");
+                                exit(0);
+                        }
+                        #if INSTRUMENTATION_TEST == 1
+                                uint64_t time_after_instrumentation = read_time();
+                                uintptr_t instrumentation_overhead = time_after_instrumentation - time_after;
+                                printf("\nValue:%lu\n", instrumentation_overhead);
+                        #endif
+
+
                         /* Returns to AsmSwitchToProc. */
                         return;
                 }

@@ -14,9 +14,9 @@
 /* Number of time slices in a major frame. */
 #define N_QUANTUM 256
 /* Number of ticks per quantum. */
-#define TICKS (TICKS_PER_SECOND/N_QUANTUM)
+#define TICKS 10000UL
 /* Number of slack ticks (buffer) for scheduler. */
-#define SLACK_TICKS (TICKS/10)
+#define SLACK_TICKS 5000UL
 
 /* Stack size. */
 #define STACK_SIZE (1024*2)
@@ -31,3 +31,5 @@
 
 #define N_CHANNELS 256
 
+#define SLACK_TEST_ROUNDS 100
+#define INSTRUMENTATION_TEST 1
