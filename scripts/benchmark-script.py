@@ -34,6 +34,8 @@ output += "Number of entries: ".ljust(30, ' ') + formatting_style.format(len(val
 output += "Average: ".ljust(30, ' ') + formatting_style.format(statistics.mean(values)).rjust(max_number_length, ' ') + "\n"
 output += "Standard deviation: ".ljust(30, ' ') + formatting_style.format(statistics.stdev(values)).rjust(max_number_length, ' ') + "\n" # This calculates the standard deviation of a sample (pstdev for standard deviation of population)
 output += "Variance: ".ljust(30, ' ') + var_str + "\n" # This calculates the variance of a sample (pvariance for variance of population)
+output += "Max: ".ljust(30, ' ') + formatting_style.format(max(values)).rjust(max_number_length, ' ') + "\n"
+output += "Min: ".ljust(30, ' ') + formatting_style.format(min(values)).rjust(max_number_length, ' ') + "\n"
 output += "\n"
 
 output += "Original raw values:\n"
