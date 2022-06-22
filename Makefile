@@ -28,7 +28,7 @@ CFLAGS+=-Wall -fanalyzer
 
 # Commands
 
-.PHONY: all settings format clean size debug-qemu qemu noninteractive-qemu stop-qemu stop-debugging
+.PHONY: all settings format clean size debug-qemu qemu noninteractive-qemu stop-qemu stop-debugging benchmark
 all: settings $(ELF) $(DA)
 
 settings:
@@ -61,6 +61,9 @@ stop-qemu:
 
 stop-debugging: stop-qemu
 	@killall riscv64-unknown-elf-gdb
+
+benchmark: $(ELF)
+	@python3 scripts/benchmark-script.py 
 
 # Build instructions
 
