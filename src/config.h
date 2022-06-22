@@ -31,3 +31,7 @@
 
 #define N_CHANNELS 256
 
+#define SCHEDULE_BENCHMARK 1
+/* Currently 1 round = 1 quantum */
+#define BENCHMARK_DURATION (TICKS_PER_SECOND*10)
+#define BENCHMARK_ROUNDS (BENCHMARK_DURATION / TICKS)

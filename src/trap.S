@@ -1,4 +1,5 @@
 # See LICENSE file for copyright and license details.
+#include "config.h"
 
 .globl AsmTrapEntry
 .globl AsmResumeProc
@@ -221,6 +222,18 @@ __timer_handler_machine:
         ld      tp,(-2*8)(sp)
         ld      gp,(-1*8)(sp)
 
+        #if SCHEDULE_BENCHMARK == 1
+                /* To allow usage of current->args[] vector */
+                sd      a0,(3*8)(tp)
+                sd      a1,(4*8)(tp)
+                sd      a2,(5*8)(tp)
+                sd      a3,(6*8)(tp)
+                sd      a4,(7*8)(tp)
+                sd      a5,(8*8)(tp)
+                sd      a6,(9*8)(tp)
+                sd      a7,(10*8)(tp)
+        #endif
+
         /* Store PC */
         csrr    t1,mepc
         sd      t1,(11*8)(tp)
@@ -292,6 +305,19 @@ AsmResumeProc:
         ld      t2,(-10*8)(sp)
         ld      t1,(-9*8)(sp)
         ld      t0,(-8*8)(sp)
+
+        #if SCHEDULE_BENCHMARK == 1
+                /* To allow usage of current->args[] vector */
+                ld      a7,(10*8)(tp)
+                ld      a6,(9*8)(tp)
+                ld      a5,(8*8)(tp)
+                ld      a4,(7*8)(tp)
+                ld      a3,(6*8)(tp)
+                ld      a2,(5*8)(tp)
+                ld      a1,(4*8)(tp)
+                ld      a0,(3*8)(tp)
+        #endif
+
         ld      tp,(-7*8)(sp)
         ld      gp,(-6*8)(sp)
         ld      ra,(-4*8)(sp)
