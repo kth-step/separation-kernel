@@ -3,10 +3,9 @@
 .globl AsmTrapEntry
 .globl AsmResumeProc
 
-.section .text.entry
-.balign 16
 .option push
 .option norvc   /* Prevent compressed instructions */
+.align 8
 AsmTrapEntry:
         /* Interrupts */
         j       __exception_handler  /*  0: User software interrupt */
@@ -45,7 +44,7 @@ __exception_trampoline:
 __exception_handler:
         /* Load kernel process sp, store user sp. */
         csrrw   sp,mscratch,sp
-#ifdef DEBUG
+#ifndef NDEBUG
         /* If mscratch is 0, we have bug in the kernel */
         beqz    sp,__mhang
 #endif
@@ -65,10 +64,6 @@ __exception_handler:
         sd      t6,(-11*8)(sp)
         sd      ra,(-12*8)(sp)
 
-        /* Write user sp to stack. */
-        csrrw   t3,mscratch,zero
-        sd      t3,(-13*8)(sp)
-
         /* Save user a0-a7. */
         sd      a0,(3*8)(tp)
         sd      a1,(4*8)(tp)
@@ -78,11 +73,17 @@ __exception_handler:
         sd      a5,(8*8)(tp)
         sd      a6,(9*8)(tp)
         sd      a7,(10*8)(tp)
+
+        /* Write user sp to stack. */
+        csrrw   t3,mscratch,zero
+        sd      t3,(-13*8)(sp)
+
         /* Get user pc, saved later as we might modify it. */
         csrr    t3,mepc
 
         /* Check trap type. */
         csrr    t1,mcause
+
 
         /* If mcause == 8, then syscall, else exception. */
 1:      li      t2,8

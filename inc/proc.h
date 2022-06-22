@@ -53,7 +53,7 @@ struct proc {
         /** Process state.
          * TODO: Comment
          */
-        ProcState state;
+        uint64_t state;
         bool halt;
 
         /* If listen_channel != -1, the process is waiting for a message from

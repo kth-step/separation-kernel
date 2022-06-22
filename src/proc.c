@@ -4,6 +4,7 @@
 #include "cap.h"
 #include "config.h"
 #include "stack.h"
+#include <stdio.h>
 
 /** Initial stack offset.
  * The initialization of a process is a bit awkward, we basically
@@ -27,17 +28,8 @@ void ProcReset(int pid) {
         proc->pid = pid;
         /* Set the process's kernel stack. */
         proc->ksp = &proc_stack[pid][STACK_SIZE / 8];
-        for (int i = 0; i < STACK_SIZE / 8; i++)
-                proc_stack[pid][i] = 0;
         /* Zero the capability table. */
         proc->cap_table = cap_tables[pid];
-        for (int i = 0; i < N_CAPS; ++i) {
-                CapNode *cap = &cap_tables[pid][i];
-                if (!cn_is_deleted(cap)) {
-                        CapRevoke(cap);
-                        CapDelete(cap);
-                }
-        }
         proc->pc = 0;
         proc->listen_channel = -1;
         /* Set process to HALTED. */

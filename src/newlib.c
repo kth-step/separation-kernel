@@ -10,10 +10,16 @@
 #include <sys/stat.h>
 
 typedef struct uart {
-        unsigned long long txdata;
+        int txdata;
+        int rxdata;
+        int txctrl;
+        int rxctrl;
+        int ie;
+        int ip;
+        int div;
 } UART;
 
-UART *UART0 = (UART *)(0x10000000);
+extern volatile UART uart0;
 
 int _fstat(int file, struct stat *st) {
         st->st_mode = S_IFCHR;
@@ -33,9 +39,14 @@ int _open(const char *name, int flags, int mode) {
 }
 int _write(int file, char *c, int len) {
         for (int i = 0; i < len; ++i) {
-                while (UART0->txdata < 0)
+                if (c[i] == '\n') {
+                        while (uart0.txdata < 0)
+                                ;
+                        uart0.txdata = '\r';
+                }
+                while (uart0.txdata < 0)
                         ;
-                UART0->txdata = c[i];
+                uart0.txdata = c[i];
         }
         return len;
 }

@@ -13,6 +13,7 @@ DA=$(patsubst %.o, %.da, $(OBJS))
 
 
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
+BIN=$(BUILD_DIR)/$(PROGRAM).bin
 DA+=$(BUILD_DIR)/$(PROGRAM).da
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
@@ -29,7 +30,7 @@ CFLAGS+=-MMD
 .PHONY: all settings format clean size cloc qemu
 
 # Show settings, compile elf and make a disassembly by default.
-all: settings $(ELF) $(DA)
+all: settings $(ELF) $(DA) $(BIN)
 
 settings:
 	@echo "Build options:"
@@ -66,7 +67,7 @@ $(OBJ_DIR)/%.c.o: src/%.c | $(OBJ_DIR)
 $(OBJ_DIR)/%.S.o: src/%.S | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(ELF): $(OBJS) | $(BUILD_DIR)
+$(ELF): $(OBJS) $(LDS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 $(OBJ_DIR)/%.da: $(OBJ_DIR)/%.o
@@ -74,5 +75,8 @@ $(OBJ_DIR)/%.da: $(OBJ_DIR)/%.o
 
 $(BUILD_DIR)/%.da: $(BUILD_DIR)/%.elf
 	$(OBJDUMP) -d $< > $@
+
+$(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf
+	$(OBJCOPY) -S -O binary $^ $@
 
 -include $(DEPS)

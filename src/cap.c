@@ -10,6 +10,8 @@ CapNode cap_tables[N_PROC][N_CAPS];
 /* Make one sentinel node per core, one for memory, one for channels and one for
  * supervisor capabilies */
 #define N_SENTINELS (N_CORES + 4)
+
+int n_sentinels = 0;
 CapNode sentinels[N_SENTINELS];
 
 volatile int ep_receiver[N_CHANNELS];
@@ -119,10 +121,8 @@ bool CapMove(CapNode *dest, CapNode *src) {
 }
 
 CapNode *CapInitSentinel(void) {
-        static int i = 0;
-        if (i >= N_SENTINELS)
-                return NULL;
-        CapNode *sentinel = &sentinels[i++];
+        kassert(n_sentinels < N_SENTINELS);
+        CapNode *sentinel = &sentinels[n_sentinels++];
         sentinel->next = sentinel;
         sentinel->prev = sentinel;
         sentinel->cap = NULL_CAP;

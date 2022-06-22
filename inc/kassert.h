@@ -1,13 +1,17 @@
 #pragma once
 #ifndef NDEBUG
+#include <uart.h>
 
-void _assert_fail(const char *, const char *, unsigned int, const char *)
-    __attribute__((noreturn));
-
-#define kassert(val)                                                          \
-        ({                                                                    \
-                if (!(val))                                                   \
-                        _assert_fail(#val, __FILE__, __LINE__, __FUNCTION__); \
+#define TOSTR(c) #c
+#define ASSERT_FAIL(a, b, c, d)                                          \
+        uart_puts("ASSERT '" #a "' FAILED AT " b ":" TOSTR(c)"\r\n")
+#define kassert(val)                                                        \
+        ({                                                                  \
+                if (!(val)) {                                               \
+                        ASSERT_FAIL(val, __FILE__, __LINE__, __FUNCTION__); \
+                        while (1)                                           \
+                                asm volatile("ebreak");                     \
+                }                                                           \
         })
 #else
 #define kassert(val)                             \

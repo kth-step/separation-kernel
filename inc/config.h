@@ -2,7 +2,7 @@
 #pragma once
 
 /* Number of cores. */
-#define N_CORES 2
+#define N_CORES 4
 /* Number of processes. */
 #define N_PROC 4
 /* Number of capabilities per process */
@@ -28,7 +28,10 @@
 /* Beginning and end of the user processes' memory region.
  * Used for setting up initial memory of the boot process. */
 #define USER_MEMORY_BEGIN 0x80000000UL
-#define USER_MEMORY_END 0x100000000UL
+#define USER_MEMORY_END  0x100000000UL
 #define BOOT_PMP_LENGTH 0x1000UL
 
 #define N_CHANNELS 256
+
+#define MIN_HARTID 1
+#define MAX_HARTID 4
