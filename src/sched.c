@@ -2,8 +2,15 @@
 
 #include <stddef.h>
 
+#include "config.h"
 #include "csr.h"
 #include "stack.h"
+
+#if SCHEDULE_BENCHMARK == 1
+        extern void end_incremental_benchmark();
+        extern void incremental_benchmark_step();
+        static int round_counter = 0;
+#endif
 
 /** The schedule.
  * Each 64-bit word describes the state of four cores:
@@ -77,7 +84,12 @@ static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         /* Set process */
         *proc = &processes[pid];
         /* Return the scheduling length */
-        return sched_get_length(s, q, hartid);
+        #if SCHEDULE_BENCHMARK == 0
+                return sched_get_length(s, q, hartid);
+        #endif
+        #if SCHEDULE_BENCHMARK == 1
+                return (0 != sched_get_length(s, q, hartid));
+        #endif
 }
 
 static void release_current(void) {
@@ -127,7 +139,13 @@ void Sched(void) {
         /* Here the core tries to fetch a process to run */
         while (1) {
                 /* Get the start of next time slice. */
-                uint64_t time = (read_time() / TICKS) + 1;
+                #if SCHEDULE_BENCHMARK == 0
+                        uint64_t time = (read_time() / TICKS) + 1;
+                #endif
+                #if SCHEDULE_BENCHMARK == 1
+                        uint64_t time_ticks = read_time();
+                        uint64_t time = (time_ticks / TICKS) + 1;
+                #endif
                 /* Try getting a process at that time slice. */
                 uint64_t length = sched_get_proc(hartid, time, &proc);
                 if (length > 0 && sched_acquire_proc(proc)) {
@@ -135,6 +153,10 @@ void Sched(void) {
                         set_timeout(time + length);
                         /* Wait until it is time to run */
                         wait(time);
+                        #if SCHEDULE_BENCHMARK == 1
+                                incremental_benchmark_step();
+                                if (++round_counter >= BENCHMARK_ROUNDS) end_incremental_benchmark(time_ticks);
+                        #endif
                         /* Returns to AsmSwitchToProc. */
                         return;
                 }
