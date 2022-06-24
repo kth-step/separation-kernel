@@ -14,9 +14,9 @@
 /* Number of time slices in a major frame. */
 #define N_QUANTUM 256
 /* Number of ticks per quantum. */
-#define TICKS (TICKS_PER_SECOND/N_QUANTUM)
+#define TICKS 20000UL
 /* Number of slack ticks (buffer) for scheduler. */
-#define SLACK_TICKS (TICKS/10)
+#define SLACK_TICKS 10000UL
 
 /* Stack size. */
 #define STACK_SIZE (1024*2)
@@ -32,6 +32,9 @@
 #define N_CHANNELS 256
 
 #define SCHEDULE_BENCHMARK 1
-/* Currently 1 round = 1 quantum */
+/* Currently 1 round = 1 quantum, and the duration consequently assumes a process is only scheduled for one quantum. */
 #define BENCHMARK_DURATION (TICKS_PER_SECOND*10)
 #define BENCHMARK_ROUNDS (BENCHMARK_DURATION / TICKS)
+
+#define PERFORMANCE_SCHEDULING 1
+#define CRYPTO_APP 0

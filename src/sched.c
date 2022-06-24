@@ -41,6 +41,7 @@ static inline int sched_is_invalid_pid(int8_t pid) {
         return pid < 0;
 }
 
+#if PERFORMANCE_SCHEDULING == 0
 static inline int sched_has_priority(uint64_t s, uint64_t pid,
                                      uintptr_t hartid) {
         for (size_t i = 0; i < hartid; i++) {
@@ -51,6 +52,7 @@ static inline int sched_has_priority(uint64_t s, uint64_t pid,
         }
         return 1;
 }
+#endif
 
 static inline uint64_t sched_get_length(uint64_t s, uint64_t q,
                                         uintptr_t hartid) {
@@ -78,9 +80,11 @@ static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         /* If msb is 1, return 0 */
         if (pid & 0x80)
                 return 0;
-        /* Check that no other hart with higher priority schedules this pid */
-        if (!sched_has_priority(s, pid, hartid))
-                return 0;
+        #if PERFORMANCE_SCHEDULING == 0
+                /* Check that no other hart with higher priority schedules this pid */
+                if (!sched_has_priority(s, pid, hartid))
+                        return 0;
+        #endif
         /* Set process */
         *proc = &processes[pid];
         /* Return the scheduling length */
@@ -126,6 +130,11 @@ void wait(uint64_t time) {
         }
 }
 
+void wait_next_scheduling(uint64_t time) {
+        while (read_time() < ((time + 1) * TICKS - SLACK_TICKS)) {
+        }
+}
+
 void Sched(void) {
         /* Release a process if we are holding it */
         release_current();
@@ -151,14 +160,24 @@ void Sched(void) {
                 if (length > 0 && sched_acquire_proc(proc)) {
                         /* Set timeout */
                         set_timeout(time + length);
-                        /* Wait until it is time to run */
-                        wait(time);
+                        #if PERFORMANCE_SCHEDULING == 0
+                                /* Wait until it is time to run */
+                                wait(time);
+                        #endif
                         #if SCHEDULE_BENCHMARK == 1
                                 incremental_benchmark_step();
                                 if (++round_counter >= BENCHMARK_ROUNDS) end_incremental_benchmark(time_ticks);
                         #endif
                         /* Returns to AsmSwitchToProc. */
                         return;
+                } else {
+                        // To prevent constant attempts to acquire the lock when another hart got it.
+                        // While not necessary in the non-performance version, it doesn't hurt either.
+
+                        // TODO: Have not been able to establish that this makes a meaningful difference.
+                        // Tested with 4 cores with 3 not getting scheduled, for over 200 quanta in a row, with 20000 TICKS each quanta.
+                        // User code was only incrementing arg 0 over and over.
+                        wait_next_scheduling(time);
                 }
         }
 }
