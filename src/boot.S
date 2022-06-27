@@ -47,7 +47,7 @@ _start:
         la      sp,core_stack
         csrr    t0,mhartid
         li      t3,MIN_HARTID
-        blt     t0,t3,__hang
+        blt     t0,t3,__park
 
         /* Calculate the core stack pointer */
         csrr    t0,mhartid
