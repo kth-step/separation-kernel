@@ -1,0 +1,146 @@
+caps:
+  - name: invalid
+  - name: memory
+    fields:
+      - begin 4
+      - end 4
+      - rwx 1
+      - free 4
+      - pmp 1
+    asserts:
+      - 'begin <= free'
+      - 'free <= end'
+      - 'pmp < 2'
+      - 'rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7'
+  - name: pmp
+    fields:
+      - addr 4
+      - rwx 1
+    asserts:
+      - 'rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7'
+  - name: pmp_hidden
+    fields:
+      - padd 7
+      - addr 7
+      - rwx 1
+    asserts:
+      - 'rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7'
+  - name: time
+    fields:
+      - core 1
+      - pid 1
+      - begin 2
+      - end 2
+      - free 2
+      - depth 1
+    asserts:
+      - 'begin <= free'
+      - 'free <= end'
+  - name: channels
+    fields:
+      - begin 2
+      - end 2
+      - free 2
+      - ep 1
+    asserts:
+      - 'begin <= free'
+      - 'free <= begin'
+  - name: endpoint
+    fields:
+      - channel 2
+      - mode 1
+      - grant 1
+    asserts:
+      - 'grant < 2'
+  - name: supervisor
+    fields:
+      - begin 1
+      - end 1
+      - free 1
+    asserts:
+      - 'begin <= free'
+      - 'free <= end'
+
+is_child:
+  - parent: memory
+    child: memory  
+    relations:
+      - 'p:begin <= c:begin'
+      - 'c:end <= p:end'
+      - '(c:rwx & p:rwx) == c:rwx'
+  - parent: memory
+    child: pmp
+    relations:
+      - 'p:begin <= pmp_napot_begin(c:addr)'
+      - 'pmp_napot_end(c:addr) <= p:end'
+      - '(c:rwx & p:rwx) == c:rwx'
+  - parent: pmp
+    child: pmp_hidden
+    relations: []
+  - parent: time
+    child: time
+    relations:
+      - 'p:begin <= c:begin'
+      - 'c:end <= p:end'
+      - 'p:core == c:core'
+      - 'p:depth < c:depth'
+  - parent: channels
+    child: channels
+    relations:
+      - 'p:begin <= c:begin'
+      - 'c:end <= p:end'
+  - parent: channels
+    child: endpoint
+    relations:
+      - 'p:begin <= c:channel'
+      - 'c:channel < p:end'
+  - parent: supervisor
+    child: supervisor
+    relations:
+      - 'p:begin <= c:begin'
+      - 'c:end <= p:end'
+      
+
+can_derive:
+  - parent: memory
+    child: memory  
+    relations:
+      - 'p:free <= c:begin'
+      - 'c:end <= p:end'
+      - '(c:rwx & p:rwx) == c:rwx'
+      - 'c:free == c:begin'
+      - 'c:begin < c:end'
+  - parent: memory
+    child: pmp
+    relations:
+      - 'p:free <= pmp_napot_begin(c:addr)'
+      - 'pmp_napot_end(c:addr) <= p:end'
+      - '(c:rwx & p:rwx) == c:rwx'
+  - parent: time
+    child: time
+    relations:
+      - 'p:free <= c:begin'
+      - 'c:end <= p:end'
+      - 'p:core == c:core'
+      - 'p:depth < c:depth'
+      - 'c:free == c:begin'
+      - 'c:begin < c:end'
+  - parent: channels
+    child: channels
+    relations:
+      - 'p:free <= c:begin'
+      - 'c:end <= p:end'
+      - 'c:free == c:begin'
+      - 'c:begin < c:end'
+  - parent: channels
+    child: endpoint
+    relations:
+      - 'p:free <= c:channel'
+      - 'c:channel < p:end'
+  - parent: supervisor
+    child: supervisor
+    relations:
+      - 'p:free <= c:begin'
+      - 'c:end <= p:end'
+      - 'c:free == c:begin'
+      - 'c:begin < c:end'
