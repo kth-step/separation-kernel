@@ -27,6 +27,7 @@ SECTIONS {
 		*(.srodata) 
 		*(.srodata.*) 
         } >RAM
+
 	.bss : ALIGN(8) {
                 PROVIDE(_sbss = .);
 		*(.sbss) 
@@ -34,6 +35,7 @@ SECTIONS {
                 . = ALIGN(8);
                 PROVIDE(_esbss = .);
 	} >RAM
+
 	.data : ALIGN(8) {
 		*(.data) 
 		*(.data.*) 
@@ -51,6 +53,7 @@ SECTIONS {
                 . = ALIGN(8);
                 PROVIDE(_ebss = .);
 	} >RAM
+
         PROVIDE(_heap = ALIGN(4096));
         PROVIDE(_eheap = _heap + 0x8000);
 }

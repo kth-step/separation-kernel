@@ -61,6 +61,9 @@ qemu: $(ELF)
 $(BUILD_DIR) $(OBJ_DIR):
 	@mkdir -p $@
 
+inc/cap_utils.h: scripts/cap_gen.py data/cap.yml
+	./scripts/cap_gen.py data/cap.yml > inc/cap_utils.h
+
 $(OBJ_DIR)/%.c.o: src/%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

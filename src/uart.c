@@ -20,7 +20,7 @@ void uart_put(char c) {
         uart0.txdata = c;
 }
 
-void uart_puts(char *c) {
+void uart_puts(const char *c) {
         while (*c != '\0') {
                 uart_put(*c);
                 c++;

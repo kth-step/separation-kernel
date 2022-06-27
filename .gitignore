@@ -2,4 +2,5 @@
 *.d
 *.da
 *.elf
+inc/cap_utils.h
 

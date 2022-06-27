@@ -1,8 +1,6 @@
 # See LICENSE file for copyright and license details.
 
 #include "config.h"
-#define BOOT_HART 1
-
 
 .section .init
 /*** This is the kernel's entry point ***/
@@ -39,10 +37,6 @@ _start:
         li      x29,0
         li      x30,0
         li      x31,0
-        csrw    mstatus,x0
-        csrw    medeleg,x0
-        csrw    mideleg,x0
-        csrw    satp,x0
         /*** Load the global pointer. ***/
         /* We load gp first so we can used relaxed (gp-relative) addressing. */
         .option push
@@ -50,19 +44,16 @@ _start:
         la      gp,__global_pointer$
         .option pop
 
-        /*** Initialize the core/hart stack pointer. ***/
-        /* Load address to core_stack, defined in stach.h. */
         la      sp,core_stack
-        /* Get hartid+1. */
         csrr    t0,mhartid
         li      t3,MIN_HARTID
         blt     t0,t3,__hang
-        sub     t0,t0,t3
-        addi    t0,t0,1
-        /* Get an offset by multiplying hartid+1 with STACK_SIZE. */
+
+        /* Calculate the core stack pointer */
+        csrr    t0,mhartid
+        addi    t0,t0,MIN_HARTID
         slli    t0,t0,LOG_STACK_SIZE
-        /* Add offset to core_stack, sp should now point at the top of the
-         * core's stack. */
+        addi    t0,t0,(1 << LOG_STACK_SIZE)
         add     sp,sp,t0
 
         /*** Initialize core's control and status registers. ***/
@@ -71,11 +62,13 @@ _start:
         ori     t0,t0,1
         csrw    mtvec,t0
         csrw    mscratch,x0
+        csrw    mstatus,x0
+        csrw    medeleg,x0
+        csrw    mideleg,x0
+        csrw    satp,x0
         /* Enable machine timer interrupt. */
         li      t0,128
         csrw    mie,t0
-        /* Set mstatus to 0, so we go to user-mode when executing mret. */
-        csrw    mstatus,x0
 
         csrw    pmpcfg0,0x0f
         li      t0,0xfffffffffffull
@@ -86,7 +79,7 @@ _start:
         li      t1,MIN_HARTID
         bne     t1,t0,__wait
 
-
+        /* Single process work*/
         la      t0,_bss
         la      t1,_ebss
         j       2f
@@ -131,9 +124,9 @@ __wait:
         call    Sched
         tail    AsmResumeProc
 
-__hang:
+__park:
         wfi
-        j       __hang
+        j       __park
 
 .section .data.init
 /* This lock is used for process initialization */
