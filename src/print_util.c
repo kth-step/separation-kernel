@@ -1,9 +1,9 @@
 // See LICENSE file for copyright and license details.
-#pragma once
+#include "print_util.h"
 
-#include <stdio.h>
+#include "lock.h"
 
-#include "config.h"
+Lock print_lock = 0;
 
 void print_relevant_config() {
     printf( "N_CORES=%d\n"
@@ -23,6 +23,12 @@ void print_relevant_config() {
             , SCHEDULE_BENCHMARK, BENCHMARK_DURATION, BENCHMARK_ROUNDS, PERFORMANCE_SCHEDULING, CRYPTO_APP);
 }
 
+void print_relevant_config_locked() {
+    acquire_lock(&print_lock);
+    print_relevant_config();
+    release_lock(&print_lock);
+}
+
 void print_all_config() {
     print_relevant_config();
     printf( "LOG_STACK_SIZE=%d\n"
@@ -31,4 +37,45 @@ void print_all_config() {
             "BOOT_PMP_LENGTH=0x%lx\n"
             "N_CHANNELS=%d\n"
             , LOG_STACK_SIZE, USER_MEMORY_BEGIN, USER_MEMORY_END, BOOT_PMP_LENGTH, N_CHANNELS);
+}
+
+void print_all_config_locked() {
+    acquire_lock(&print_lock);
+    print_all_config();
+    release_lock(&print_lock);
+}
+
+void p_string(const char * s) {
+    acquire_lock(&print_lock);
+    printf(s);
+    release_lock(&print_lock);
+}
+
+void p_line(const char * s) {
+    acquire_lock(&print_lock);
+    printf(s);
+    printf("\n");
+    release_lock(&print_lock);
+}
+
+void p_line_i(const char * s, volatile int i) {
+    acquire_lock(&print_lock);
+    printf(s);
+    printf("%d\n", i);
+    release_lock(&print_lock);
+}
+
+void p_line_ul(const char * s, volatile uint64_t ul) {
+    acquire_lock(&print_lock);
+    printf(s);
+    printf("%lu\n", ul);
+    release_lock(&print_lock);
+}
+
+void acquire_print_lock() {
+    acquire_lock(&print_lock);
+}
+
+void release_print_lock() {
+    release_lock(&print_lock);
 }

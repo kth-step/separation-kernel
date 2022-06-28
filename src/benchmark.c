@@ -1,8 +1,8 @@
 // See LICENSE file for copyright and license details.
 #include <stdio.h>
 
-#include "benchmark_util.h"
 #include "config.h"
+#include "print_util.h"
 #include "proc.h"
 
 void incremental_benchmark_step() {
