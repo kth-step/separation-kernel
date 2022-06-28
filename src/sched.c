@@ -1,6 +1,7 @@
 #include "sched.h"
 
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "config.h"
 #include "csr.h"
@@ -23,6 +24,10 @@
  */
 uint64_t schedule[N_QUANTUM];
 
+#if TIME_SLOT_LOANING != 0
+        TimeSlotInstanceRoot time_slot_instance_roots[N_QUANTUM][N_CORES];
+#endif
+
 void InitSched() {
         for (int i = 0; i < N_QUANTUM; i++) {
                 if (i % 2 == 0) {
@@ -33,6 +38,73 @@ void InitSched() {
         }
 }
 
+#if TIME_SLOT_LOANING != 0
+        void InitTimeSlotInstanceRoots() {
+                for (int q = 0; q < N_QUANTUM; q++) {
+                        for (int hartid = 0; hartid < N_CORES; hartid++) {
+                                time_slot_instance_roots[q][hartid].pidp = ((uint8_t *)(schedule + q)) + (hartid * 2);
+                                time_slot_instance_roots[q][hartid].head = NULL;
+                        }
+                }
+        }
+
+        TimeSlotInstance * SetLoanedTimeSlot(uint64_t quantum, uint64_t hartid, uint8_t pid) {
+                TimeSlotInstanceRoot * root = &time_slot_instance_roots[quantum][hartid];
+                TimeSlotInstance * prev_head = root->head;
+                TimeSlotInstance * new_instance = (TimeSlotInstance *)malloc(sizeof(TimeSlotInstance));
+                if (new_instance == NULL) return NULL;
+                new_instance->pid = pid;
+                new_instance->loaner = prev_head;
+                root->head = new_instance;
+                return new_instance;
+        }
+
+        int RevokeLoanedTimeSlot(uint64_t quantum, uint64_t hartid, TimeSlotInstance * instance) {
+                TimeSlotInstanceRoot * root = &time_slot_instance_roots[quantum][hartid];
+                TimeSlotInstance * next = root->head;
+                if (next == instance) {
+                        root->head = next->loaner;
+                        free(next);
+                        return 1;
+                } else if (next == NULL) {
+                        return 0;
+                }
+
+                next = next->loaner;
+                while (next != NULL) {
+                        if (next == instance) {
+                                TimeSlotInstance * curr = root->head;
+                                root->head = next->loaner;
+                                while (curr != root->head) {
+                                        next = curr->loaner;
+                                        free(curr);
+                                        curr = next;
+                                }
+                                return 1;
+                        }
+                        next = next->loaner;
+                }
+                return 0;
+        }
+
+        int ReleaseCurrentTimeSlot() {
+                uint64_t q = (read_time() / TICKS) % N_QUANTUM;
+                uint64_t hartid = read_csr(mhartid);
+                TimeSlotInstance * curr = time_slot_instance_roots[q][hartid].head;
+                if (curr == NULL) return 0;
+                time_slot_instance_roots[q][hartid].head = curr->loaner;
+                free(curr);
+                return 1;
+        }
+
+        static uint64_t sched_get_time_slot_pid(uint64_t quantum, uint64_t hartid) {
+                TimeSlotInstanceRoot * root = &time_slot_instance_roots[quantum][hartid];
+                TimeSlotInstance * head = root->head;
+                if (head == NULL) return *(root->pidp);
+                else return head->pid;
+        }
+#endif
+
 static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
         return ((s >> (hartid * 16)) & 0xFF);
 }
@@ -42,11 +114,15 @@ static inline int sched_is_invalid_pid(int8_t pid) {
 }
 
 #if PERFORMANCE_SCHEDULING == 0
-static inline int sched_has_priority(uint64_t s, uint64_t pid,
+static inline int sched_has_priority(uint64_t quantum, uint64_t pid,
                                      uintptr_t hartid) {
         for (size_t i = 0; i < hartid; i++) {
                 /* If the pid is same, there is hart with higher priortiy */
-                uint64_t other_pid = sched_get_pid(s, i); /* Process ID. */
+                #if TIME_SLOT_LOANING == 0
+                        uint64_t other_pid = sched_get_pid(schedule[quantum], i); /* Process ID. */
+                #else
+                        uint64_t other_pid = sched_get_time_slot_pid(quantum, i);
+                #endif
                 if (pid == other_pid)
                         return 0;
         }
@@ -76,13 +152,17 @@ static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         /* Get the current quantum schedule */
         __sync_synchronize();
         uint64_t s = schedule[q];
-        uint64_t pid = sched_get_pid(s, hartid); /* Process ID. */
+        #if TIME_SLOT_LOANING == 0
+                uint64_t pid = sched_get_pid(s, hartid); /* Process ID. */
+        #else 
+                uint64_t pid = sched_get_time_slot_pid(q, hartid); /* Process ID. */
+        #endif
         /* If msb is 1, return 0 */
         if (pid & 0x80)
                 return 0;
         #if PERFORMANCE_SCHEDULING == 0
                 /* Check that no other hart with higher priority schedules this pid */
-                if (!sched_has_priority(s, pid, hartid))
+                if (!sched_has_priority(q, pid, hartid))
                         return 0;
         #endif
         /* Set process */
@@ -150,8 +230,7 @@ void Sched(void) {
                 /* Get the start of next time slice. */
                 #if SCHEDULE_BENCHMARK == 0
                         uint64_t time = (read_time() / TICKS) + 1;
-                #endif
-                #if SCHEDULE_BENCHMARK == 1
+                #else
                         uint64_t time_ticks = read_time();
                         uint64_t time = (time_ticks / TICKS) + 1;
                 #endif
@@ -164,7 +243,7 @@ void Sched(void) {
                                 /* Wait until it is time to run */
                                 wait(time);
                         #endif
-                        #if SCHEDULE_BENCHMARK == 1
+                        #if SCHEDULE_BENCHMARK != 0
                                 incremental_benchmark_step();
                                 if (++round_counter >= BENCHMARK_ROUNDS) end_incremental_benchmark(time_ticks);
                         #endif

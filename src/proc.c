@@ -145,9 +145,12 @@ void ProcInitProcesses(void) {
         proc_init_boot_proc(&processes[0]);
 
         processes[0].pc = (uintptr_t)benchmark_code;
-        #if CRYPTO_APP == 1
+        #if CRYPTO_APP != 0
                 ProcCryptoAppInit();
                 InitSched();
+        #endif
+        #if TIME_SLOT_LOANING != 0
+                InitTimeSlotInstanceRoots();
         #endif
 }
 
