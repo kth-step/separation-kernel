@@ -9,11 +9,27 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "config.h"
+
 typedef struct uart {
-        unsigned long long txdata;
+        #if QEMU_DEBUGGING == 0
+                int txdata;
+                int rxdata;
+                int txctrl;
+                int rxctrl;
+                int ie;
+                int ip;
+                int div;
+        #else
+                unsigned long long txdata;
+        #endif
 } UART;
 
-UART *UART0 = (UART *)(0x10000000);
+#if QEMU_DEBUGGING == 0
+        extern volatile UART uart0;
+#else
+        UART *UART0 = (UART *)(0x10000000);
+#endif
 
 int _fstat(int file, struct stat *st) {
         st->st_mode = S_IFCHR;
@@ -33,9 +49,20 @@ int _open(const char *name, int flags, int mode) {
 }
 int _write(int file, char *c, int len) {
         for (int i = 0; i < len; ++i) {
-                while (UART0->txdata < 0)
-                        ;
-                UART0->txdata = c[i];
+                #if QEMU_DEBUGGING == 0
+                        if (c[i] == '\n') {
+                                while (uart0.txdata < 0)
+                                        ;
+                                uart0.txdata = '\r';
+                        }
+                        while (uart0.txdata < 0)
+                                ;
+                        uart0.txdata = c[i];
+                #else
+                        while (UART0->txdata < 0)
+                                ;
+                        UART0->txdata = c[i];
+                #endif
         }
         return len;
 }

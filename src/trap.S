@@ -4,10 +4,9 @@
 .globl AsmTrapEntry
 .globl AsmResumeProc
 
-.section .text.entry
-.balign 16
 .option push
 .option norvc   /* Prevent compressed instructions */
+.align 8
 AsmTrapEntry:
         /* Interrupts */
         j       __exception_handler  /*  0: User software interrupt */
