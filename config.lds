@@ -3,12 +3,6 @@ OUTPUT_ARCH("riscv")
 
 ENTRY(_start)
 
-clint = 0x2000000;
-mtimecmp = 0x2004000;
-mtime = 0x200bff8;
-uart0 = 0x10010000;
-uart1 = 0x10011000;
-
 MEMORY { 
         RAM (rwx) : ORIGIN = 0x80000000, LENGTH = 0x80000000
 }

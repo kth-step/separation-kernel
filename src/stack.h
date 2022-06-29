@@ -1,8 +1,7 @@
 // See LICENSE file for copyright and license details.
 #pragma once
-#include <stdint.h>
-
 #include "config.h"
+#include "types.h"
 /* The process stack is used by the kernel to service
  * individual processes (e.g., syscalls and exceptions).
  * This stack is necessary for preemption of the syscalls.

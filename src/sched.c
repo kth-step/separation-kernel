@@ -114,8 +114,7 @@ void set_timeout(uint64_t quantum) {
 }
 
 void wait(uint64_t time) {
-        while (read_time() < time * TICKS) {
-        }
+        while (read_time() < time * TICKS);
 }
 
 void Sched(void) {

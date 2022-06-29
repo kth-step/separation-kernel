@@ -5,7 +5,6 @@
 #include "config.h"
 #include "lock.h"
 #include "types.h"
-#include "cap_utils.h"
 
 /** Proc
  * This is the Process Control Block (PCB). We store pointers

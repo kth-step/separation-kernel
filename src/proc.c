@@ -2,9 +2,10 @@
 #include "proc.h"
 
 #include "cap.h"
+#include "cap_utils.h"
 #include "config.h"
 #include "stack.h"
-#include <stdio.h>
+#include "csr.h"
 
 /** Initial stack offset.
  * The initialization of a process is a bit awkward, we basically
@@ -92,9 +93,13 @@ static void proc_init_boot_proc(Proc *boot) {
 /* Defined in proc.h */
 void ProcInitProcesses(void) {
         /* Initialize processes. */
-        for (int i = 0; i < N_PROC; i++)
+        uint64_t hartid = read_csr(mhartid);
+        for (int i = 0; i < N_PROC; i++) {
+                kprintf("Core %d: Init proc %lx\n", hartid, i);
                 ProcReset(i);
+        }
         /*** Boot process ***/
+        kprintf("Core %d: Init boot proc 0\n", hartid);
         proc_init_boot_proc(&processes[0]);
 }
 

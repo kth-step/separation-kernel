@@ -1,17 +1,11 @@
 // See LICENSE file for copyright and license details.
 #pragma once
+#include "platform.h"
 
-/* Number of cores. */
-#define N_CORES 4
 /* Number of processes. */
 #define N_PROC 4
 /* Number of capabilities per process */
 #define N_CAPS 256
-/* Number of PMP registers in hardware */
-#define N_PMP 8
-
-/* Ticks per second */
-#define TICKS_PER_SECOND 10000000UL
 
 /* Number of time slices in a major frame. */
 #define N_QUANTUM 128
@@ -33,5 +27,3 @@
 
 #define N_CHANNELS 256
 
-#define MIN_HARTID 1
-#define MAX_HARTID 4

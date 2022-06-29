@@ -30,3 +30,5 @@ QEMU=qemu-riscv64
 ARCH=rv64imac
 ABI=lp64
 CMODEL=medany
+
+BSP?=virt

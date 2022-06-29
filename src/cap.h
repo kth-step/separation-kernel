@@ -1,9 +1,8 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-#include "assert.h"
+#include "kassert.h"
 #include "config.h"
-#include "pmp.h"
 #include "types.h"
 
 #define NULL_CAP ((Cap){0, 0})
@@ -50,3 +49,5 @@ static inline Cap cn_get(const CapNode *cn) {
         }
         return cap;
 }
+
+#include "cap_utils.h"

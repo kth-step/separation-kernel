@@ -3,7 +3,7 @@
 
 #include "config.h"
 #include "proc.h"
-#include "timer.h"
+#include "platform.h"
 #include "types.h"
 #include "cap.h"
 

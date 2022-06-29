@@ -94,14 +94,13 @@ _start:
         addi    t0,t0,8
 2:      bne     t0,t1,1b
 
-        call    uart_init
         la      a0,msg_init
-        call    uart_puts
+        call    kprintf
 
         /* Initialize the process, only hart 0 does this. */
         call    ProcInitProcesses
         la      a0,msg_done
-        call    uart_puts
+        call    kprintf
 
         /* Unlock the other harts. */
         fence   rw,rw

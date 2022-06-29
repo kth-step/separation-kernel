@@ -172,11 +172,6 @@ __exception_exit:
         /* Go to user mode. */
         mret
 
-__hang: 
-        j       __hang
-__mhang: 
-        j       __mhang
-
 __timer_handler:
         csrrw   sp,mscratch,sp
         bnez    sp,1f
@@ -298,3 +293,9 @@ AsmResumeProc:
         ld      ra,(-4*8)(sp)
         ld      sp,(-5*8)(sp)
         mret
+
+__hang: 
+        j       __hang
+__mhang: 
+        j       __mhang
+

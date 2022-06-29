@@ -1,9 +1,8 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-#include <stdint.h>
-
 #include "syscall_nr.h"
+#include "types.h"
 
 static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0,
                                    uint64_t arg1, uint64_t arg2, uint64_t arg3,

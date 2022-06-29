@@ -1,11 +1,8 @@
 // See LICENSE file for copyright and license details.
 
-#include "syscall.h"
-
 #include "sched.h"
+#include "types.h"
 #include "syscall_nr.h"
-
-#define BITWISE_SUBSET(p, q) (((p) & (q)) == (p))
 
 static uint64_t SyscallCap(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
                            uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7);
