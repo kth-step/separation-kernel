@@ -6,7 +6,7 @@
 typedef enum cap_type CapType;
 
 enum cap_type {
-    CAP_INVALID, CAP_MEMORY, CAP_PMP, CAP_PMP_HIDDEN, CAP_TIME, CAP_CHANNELS, CAP_ENDPOINT, CAP_SUPERVISOR
+    CAP_INVALID, CAP_MEMORY, CAP_PMP, CAP_TIME, CAP_CHANNELS, CAP_ENDPOINT, CAP_SUPERVISOR, CAP_PMP_HIDDEN
 };
 
 static inline CapType cap_get_type(const Cap cap) {
@@ -141,46 +141,6 @@ const static inline Cap cap_pmp_set_rwx(const Cap cap, uint64_t rwx) {
 	Cap c;
 	c.word0 = (cap.word0 & ~0xffull) | rwx;
 	c.word1 = cap.word1;
-	return c;
-}
-
-const static inline Cap cap_mk_pmp_hidden(uint64_t addr, uint64_t rwx) {
-	kassert((addr & 0xffffffffffffffull) == addr);
-	kassert((rwx & 0xffull) == rwx);
-	kassert(rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7);
-	Cap c;
-	c.word0 = (uint64_t)CAP_PMP_HIDDEN << 56;
-	c.word1 = 0;
-	c.word1 |= rwx;
-	c.word1 |= addr << 8;
-	return c;
-}
-
-const static inline uint64_t cap_pmp_hidden_get_addr(const Cap cap) {
-	kassert((cap.word0 >> 56) == CAP_PMP_HIDDEN);
-	return (cap.word1 >> 8) & 0xffffffffffffffull;
-}
-
-const static inline Cap cap_pmp_hidden_set_addr(const Cap cap, uint64_t addr) {
-	kassert((cap.word0 >> 56) == CAP_PMP_HIDDEN);
-	kassert((addr & 0xffffffffffffffull) == addr);
-	Cap c;
-	c.word0 = cap.word0;
-	c.word1 = (cap.word1 & ~0xffffffffffffff00ull) | addr << 8;
-	return c;
-}
-
-const static inline uint64_t cap_pmp_hidden_get_rwx(const Cap cap) {
-	kassert((cap.word0 >> 56) == CAP_PMP_HIDDEN);
-	return cap.word1 & 0xffull;
-}
-
-const static inline Cap cap_pmp_hidden_set_rwx(const Cap cap, uint64_t rwx) {
-	kassert((cap.word0 >> 56) == CAP_PMP_HIDDEN);
-	kassert((rwx & 0xffull) == rwx);
-	Cap c;
-	c.word0 = cap.word0;
-	c.word1 = (cap.word1 & ~0xffull) | rwx;
 	return c;
 }
 
@@ -472,6 +432,46 @@ const static inline Cap cap_supervisor_set_free(const Cap cap, uint64_t free) {
 	Cap c;
 	c.word0 = (cap.word0 & ~0xffull) | free;
 	c.word1 = cap.word1;
+	return c;
+}
+
+const static inline Cap cap_mk_pmp_hidden(uint64_t addr, uint64_t rwx) {
+	kassert((addr & 0xffffffffffffffull) == addr);
+	kassert((rwx & 0xffull) == rwx);
+	kassert(rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7);
+	Cap c;
+	c.word0 = (uint64_t)CAP_PMP_HIDDEN << 56;
+	c.word1 = 0;
+	c.word1 |= rwx;
+	c.word1 |= addr << 8;
+	return c;
+}
+
+const static inline uint64_t cap_pmp_hidden_get_addr(const Cap cap) {
+	kassert((cap.word0 >> 56) == CAP_PMP_HIDDEN);
+	return (cap.word1 >> 8) & 0xffffffffffffffull;
+}
+
+const static inline Cap cap_pmp_hidden_set_addr(const Cap cap, uint64_t addr) {
+	kassert((cap.word0 >> 56) == CAP_PMP_HIDDEN);
+	kassert((addr & 0xffffffffffffffull) == addr);
+	Cap c;
+	c.word0 = cap.word0;
+	c.word1 = (cap.word1 & ~0xffffffffffffff00ull) | addr << 8;
+	return c;
+}
+
+const static inline uint64_t cap_pmp_hidden_get_rwx(const Cap cap) {
+	kassert((cap.word0 >> 56) == CAP_PMP_HIDDEN);
+	return cap.word1 & 0xffull;
+}
+
+const static inline Cap cap_pmp_hidden_set_rwx(const Cap cap, uint64_t rwx) {
+	kassert((cap.word0 >> 56) == CAP_PMP_HIDDEN);
+	kassert((rwx & 0xffull) == rwx);
+	Cap c;
+	c.word0 = cap.word0;
+	c.word1 = (cap.word1 & ~0xffull) | rwx;
 	return c;
 }
 

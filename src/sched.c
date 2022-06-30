@@ -4,7 +4,6 @@
 #include <stddef.h>
 
 #include "csr.h"
-#include "lock.h"
 #include "stack.h"
 #include "cap.h"
 

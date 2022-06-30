@@ -3,7 +3,6 @@
 
 #include "cap.h"
 #include "config.h"
-#include "lock.h"
 #include "types.h"
 
 /** Proc

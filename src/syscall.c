@@ -10,7 +10,7 @@ static uint64_t SyscallNoCap(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4,
                              uint64_t a5, uint64_t a6, uint64_t a7);
 
 static uint64_t syscall_read(uint64_t cid) {
-        if (cid >= 256)
+        if (cid >= N_CAPS)
                 return -1;
         const Cap cap = cn_get(&current->cap_table[cid]);
         current->args[1] = cap.word0;
@@ -19,7 +19,7 @@ static uint64_t syscall_read(uint64_t cid) {
 }
 
 static uint64_t syscall_delete(uint64_t cid) {
-        if (cid >= 256)
+        if (cid >= N_CAPS)
                 return -1;
         CapNode *cn = &current->cap_table[cid];
         const Cap cap = cn_get(cn);
@@ -38,7 +38,7 @@ static uint64_t syscall_delete(uint64_t cid) {
 }
 
 static uint64_t syscall_revoke(uint64_t cid) {
-        if (cid >= 256)
+        if (cid >= N_CAPS)
                 return -1;
         CapNode *cn = &current->cap_table[cid];
         const Cap cap = cn_get(cn);
@@ -53,7 +53,7 @@ static uint64_t syscall_revoke(uint64_t cid) {
 }
 
 static uint64_t syscall_move(uint64_t cid, uint64_t dest) {
-        if (cid >= 256 || dest >= 256 || cid == dest)
+        if (cid >= N_CAPS || dest >= 256 || cid == dest)
                 return -1;
         CapNode *cn = &current->cap_table[cid];
         CapNode *cn_dest = &current->cap_table[dest];
@@ -62,7 +62,7 @@ static uint64_t syscall_move(uint64_t cid, uint64_t dest) {
 
 static uint64_t syscall_derive(uint64_t cid, uint64_t dest, uint64_t word0,
                                uint64_t word1) {
-        if (cid >= 256 || dest >= 256 || cid == dest)
+        if (cid >= N_CAPS || dest >= 256 || cid == dest)
                 return -1;
         CapNode *cn_parent = &current->cap_table[cid];
         CapNode *cn_child = &current->cap_table[dest];
@@ -185,7 +185,7 @@ static uint64_t syscall_invoke_supervisor(Cap cap, CapNode *cn, uint64_t op,
 static uint64_t syscall_invoke(uint64_t a0, uint64_t a1, uint64_t a2,
                                uint64_t a3, uint64_t a4, uint64_t a5,
                                uint64_t a6) {
-        if (a0 >= 256)
+        if (a0 >= N_CAPS)
                 return -1;
         CapNode *cn = &current->cap_table[a0];
         Cap cap = cn_get(cn);

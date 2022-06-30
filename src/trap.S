@@ -174,17 +174,18 @@ __exception_exit:
 
 __timer_handler:
         csrrw   sp,mscratch,sp
-        bnez    sp,1f
+        bnez    sp,__timer_handler_user
 __timer_handler_machine:
         csrr    sp,mscratch
-        /* Store kernel gp, tp */
-        sd      gp,(-1*8)(sp)
-        sd      tp,(-2*8)(sp)
-1:      
-        sd      ra,(-4*8)(sp)
-        //sd      sp,(-5*8)(sp)
+        j       1f
+__timer_handler_user:      
         sd      gp,(-6*8)(sp)
         sd      tp,(-7*8)(sp)
+        /* Load kernel gp, tp */
+        ld      tp,(-2*8)(sp)
+        ld      gp,(-1*8)(sp)
+1:
+        sd      ra,(-4*8)(sp)
         sd      t0,(-8*8)(sp)
         sd      t1,(-9*8)(sp)
         sd      t2,(-10*8)(sp)
@@ -213,10 +214,6 @@ __timer_handler_machine:
         sd      t5,(-33*8)(sp)
         sd      t6,(-34*8)(sp)
 
-        /* Load kernel gp, tp */
-        ld      tp,(-2*8)(sp)
-        ld      gp,(-1*8)(sp)
-
         /* Store PC */
         csrr    t1,mepc
         sd      t1,(11*8)(tp)
@@ -240,26 +237,31 @@ AsmResumeProc:
         /* Swap core and process sp */
         amoswap.d  sp,sp,(tp)
 
-        csrw    mscratch,sp
-
         /* Load mstatus */
         ld      t0,(-3*8)(sp)
         csrw    mstatus,t0
 
-        beqz    t0,1f
-        /* MPP = 1 */
-        sd      sp,(-5*8)(sp)
-        csrw    mscratch,zero
-1:
-        
+        /* Mask MPP */
+        li      t1,0x800
+        and     t0,t0,t1
+
         /* Load PC */
         ld      t1,(11*8)(tp)
         csrw    mepc,t1
 
-        /* Store kernel gp, tp */
+        /* Check if MPP is 3 or 0/2 */
+        beqz    t0,1f
+        /* MPP == 3 (m-mode) */
+        sd      sp,(-5*8)(sp)
+        csrw    mscratch,zero
+        j       2f
+1:      /* MPP == 0 or 2 (u/s-mode) */
+        csrw    mscratch,sp
         sd      gp,(-1*8)(sp)
         sd      tp,(-2*8)(sp)
-
+        ld      tp,(-7*8)(sp)
+        ld      gp,(-6*8)(sp)
+2:
 
         ld      t6,(-34*8)(sp)
         ld      t5,(-33*8)(sp)
@@ -288,8 +290,6 @@ AsmResumeProc:
         ld      t2,(-10*8)(sp)
         ld      t1,(-9*8)(sp)
         ld      t0,(-8*8)(sp)
-        ld      tp,(-7*8)(sp)
-        ld      gp,(-6*8)(sp)
         ld      ra,(-4*8)(sp)
         ld      sp,(-5*8)(sp)
         mret

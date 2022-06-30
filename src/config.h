@@ -5,7 +5,7 @@
 /* Number of processes. */
 #define N_PROC 4
 /* Number of capabilities per process */
-#define N_CAPS 256
+#define N_CAPS 128
 
 /* Number of time slices in a major frame. */
 #define N_QUANTUM 128
@@ -15,9 +15,11 @@
 #define SLACK_TICKS (TICKS / 10)
 
 /* Stack size. */
-#define STACK_SIZE 1024
+#define PROC_STACK_SIZE 512
+#define CORE_STACK_SIZE 128
 /* log_2 of stack size. */
-#define LOG_STACK_SIZE 10
+#define LOG_PROC_STACK_SIZE 9
+#define LOG_CORE_STACK_SIZE 7
 
 /* Beginning and end of the user processes' memory region.
  * Used for setting up initial memory of the boot process. */

@@ -51,9 +51,8 @@ _start:
 
         /* Calculate the core stack pointer */
         csrr    t0,mhartid
-        addi    t0,t0,MIN_HARTID
-        slli    t0,t0,LOG_STACK_SIZE
-        addi    t0,t0,(1 << LOG_STACK_SIZE)
+        addi    t0,t0,(1 - MIN_HARTID)
+        slli    t0,t0,LOG_CORE_STACK_SIZE
         add     sp,sp,t0
 
         /*** Initialize core's control and status registers. ***/

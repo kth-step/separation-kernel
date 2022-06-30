@@ -1,19 +1,16 @@
 # See LICENSE file for copyright and license details.
 PROGRAM=s3k
 LDS=config.lds
-BUILD_DIR=.
+BUILD=build
 
 include config.mk
 
-OBJS=$(patsubst %.c, %.c.o, $(wildcard src/*.c)) \
-     $(patsubst %.S, %.S.o, $(wildcard src/*.S)) \
-     $(patsubst %.c, %.c.o, $(wildcard bsp/$(BSP)/*.c)) \
-     $(patsubst %.S, %.S.o, $(wildcard bsp/$(BSP)/*.S))
-DEPS=$(patsubst %.o, $(OBJ_DIR)/%.d, $(OBJS))
+SRCS=$(wildcard src/*.[cS]) $(wildcard bsp/$(BSP)/*.[cS])
+OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
+DEPS=$(patsubst %.o, %.d, $(OBJS))
 
-
-ELF=$(BUILD_DIR)/$(PROGRAM).elf
-DA=$(BUILD_DIR)/$(PROGRAM).da
+ELF=$(BUILD)/$(PROGRAM).elf
+DA=$(BUILD)/$(PROGRAM).da
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
@@ -60,11 +57,13 @@ src/cap_utils.h: scripts/cap_gen.py cap.yml
 	@echo "Generating $@"
 	@./scripts/cap_gen.py cap.yml > $@
 
-%.c.o: %.c
+$(BUILD)/%.c.o: %.c
+	@mkdir -p $(@D) 
 	@echo "Compiling $@"
 	@$(CC) $(CFLAGS) -c -o $@ $<
 
-%.S.o: %.S
+$(BUILD)/%.S.o: %.S
+	@mkdir -p $(@D) 
 	@echo "Compiling $@"
 	@$(CC) $(CFLAGS) -c -o $@ $<
 

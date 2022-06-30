@@ -18,13 +18,6 @@ caps:
       - rwx 1
     asserts:
       - 'rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7'
-  - name: pmp_hidden
-    fields:
-      - padd 7
-      - addr 7
-      - rwx 1
-    asserts:
-      - 'rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7'
   - name: time
     fields:
       - core 1
@@ -60,6 +53,13 @@ caps:
     asserts:
       - 'begin <= free'
       - 'free <= end'
+  - name: pmp_hidden
+    fields:
+      - padd 7
+      - addr 7
+      - rwx 1
+    asserts:
+      - 'rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7'
 
 is_child:
   - parent: memory

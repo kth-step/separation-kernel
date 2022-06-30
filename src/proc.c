@@ -7,14 +7,6 @@
 #include "stack.h"
 #include "csr.h"
 
-/** Initial stack offset.
- * The initialization of a process is a bit awkward, we basically
- * start in the middle of a function call, for this we have this
- * stack offset which should be safe. It must fit all registers saved
- * to the stack in switch.S and entry.S.
- */
-#define INIT_STACK_OFFSET (STACK_SIZE / 8 - 32)
-
 /* Temporary. */
 extern void user_code();
 
@@ -28,7 +20,7 @@ void ProcReset(int pid) {
         /* Set the process id to */
         proc->pid = pid;
         /* Set the process's kernel stack. */
-        proc->ksp = &proc_stack[pid][STACK_SIZE / 8];
+        proc->ksp = &proc_stack[pid+1][0];
         /* Zero the capability table. */
         proc->cap_table = cap_tables[pid];
         proc->pc = 0;
@@ -95,7 +87,7 @@ void ProcInitProcesses(void) {
         /* Initialize processes. */
         uint64_t hartid = read_csr(mhartid);
         for (int i = 0; i < N_PROC; i++) {
-                kprintf("Core %d: Init proc %lx\n", hartid, i);
+                kprintf("Core %d: Init proc %030lx\n", hartid, i);
                 ProcReset(i);
         }
         /*** Boot process ***/
