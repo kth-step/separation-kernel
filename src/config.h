@@ -1,7 +1,7 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-#define QEMU_DEBUGGING 1
+#define QEMU_DEBUGGING 0
 
 #if QEMU_DEBUGGING == 0
     /* Number of cores. */
@@ -18,6 +18,7 @@
 #define N_PMP 8
 
 /* Ticks per second */
+// TODO: check what this is on the actual board
 #define TICKS_PER_SECOND 10000000UL
 
 /* Number of time slices in a major frame. */

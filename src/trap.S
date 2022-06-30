@@ -261,6 +261,8 @@ AsmResumeProc:
         /* Load mstatus */
         ld      t0,(-3*8)(sp)
         csrw    mstatus,t0
+        li      t1,0x1800
+        and     t0,t0,t1
 
         beqz    t0,1f
         /* MPP = 1 */
