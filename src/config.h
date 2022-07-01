@@ -1,7 +1,9 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-#define QEMU_DEBUGGING 0
+/* 1 if running code through QEMU, 0 if running through HiFive Unleashed board. 
+   If left at 1 here it is automatically set to 0 (and then set back to 1 afterwards) when running the appropriate make command. */
+#define QEMU_DEBUGGING 1
 
 #if QEMU_DEBUGGING == 0
     /* Number of cores. */

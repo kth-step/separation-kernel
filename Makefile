@@ -28,7 +28,7 @@ CFLAGS+=-Wall -fanalyzer
 
 # Commands
 
-.PHONY: all settings format clean size debug-qemu qemu noninteractive-qemu stop-qemu stop-debugging benchmark
+.PHONY: all settings format clean size debug-qemu qemu noninteractive-qemu debug-hifive-unleashed stop-qemu stop-debugging stop-debugging-qemu benchmark
 all: settings $(ELF) $(DA)
 
 settings:
@@ -56,11 +56,20 @@ qemu debug-qemu: $(ELF)
 noninteractive-qemu: $(ELF)
 	@QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/noninteractive-qemu.sh
 
+--debug-hifive-unleashed:
+	@sed -i 's/#define QEMU_DEBUGGING 1/#define QEMU_DEBUGGING 0/' src/config.h
+
+debug-hifive-unleashed: --debug-hifive-unleashed $(ELF)
+	@scripts/hifive-unleashed.sh
+	@sed -i 's/#define QEMU_DEBUGGING 0/#define QEMU_DEBUGGING 1/' src/config.h
+
 stop-qemu:
 	@killall qemu-system-riscv64
 
-stop-debugging: stop-qemu
+stop-debugging:
 	@killall riscv64-unknown-elf-gdb
+
+stop-debugging-qemu: stop-qemu stop-debugging
 
 benchmark: $(ELF)
 	@python3 scripts/benchmark-script.py 
