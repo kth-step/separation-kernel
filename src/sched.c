@@ -139,7 +139,7 @@ void Sched(void) {
         release_current();
 
         /* The hart/core id */
-        uintptr_t hartid = read_csr(mhartid);
+        uintptr_t hartid = get_software_hartid();
 
         /* Process to run and number of time slices to run for */
         Proc *proc;

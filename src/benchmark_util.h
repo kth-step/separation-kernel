@@ -14,7 +14,11 @@ void print_relevant_config() {
             "TICKS=%lu\n"
             "SLACK_TICKS=%lu\n"
             "STACK_SIZE=%d\n"
-            , N_CORES, N_PROC, N_CAPS, TICKS_PER_SECOND, N_QUANTUM, TICKS, SLACK_TICKS, STACK_SIZE);
+            "INSTRUMENTATION_TEST=%d\n"
+            "SLACK_TEST_ROUNDS=%d\n"
+            "QEMU_DEBUGGING=%d\n"
+            , N_CORES, N_PROC, N_CAPS, TICKS_PER_SECOND, N_QUANTUM, TICKS, SLACK_TICKS, STACK_SIZE
+            , INSTRUMENTATION_TEST, SLACK_TEST_ROUNDS, QEMU_DEBUGGING);
 }
 
 void print_all_config() {

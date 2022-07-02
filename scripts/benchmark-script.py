@@ -19,6 +19,7 @@ output = ""
 values = []
 
 # Execute benchmark #
+print("Begin benchmark script")
 for i in range(num_rounds):
     p = subprocess.Popen(["make", "--no-print-directory", "noninteractive-qemu"], stdout=subprocess.PIPE, universal_newlines=True)
 
@@ -28,8 +29,8 @@ for i in range(num_rounds):
             values.append(int(line[6:]))
         elif not is_instrumentation and line[0:6] == "Value=":
             values.append(int(line[6:]))
-        elif i == 0 and line != "\n" and line[0:6] != "Value=" and not "Compiling ELF file:" in line:
-            output += line + "\n"
+        elif i == 0 and line != "\n" and line[0:6] != "Value=":
+            output += line
         line = p.stdout.readline()
     print("Round", str(i+1), "done")
     p.kill()

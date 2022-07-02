@@ -3,10 +3,9 @@
 .globl AsmTrapEntry
 .globl AsmResumeProc
 
-.section .text.entry
-.balign 16
 .option push
 .option norvc   /* Prevent compressed instructions */
+.align 8
 AsmTrapEntry:
         /* Interrupts */
         j       __exception_handler  /*  0: User software interrupt */
@@ -249,6 +248,8 @@ AsmResumeProc:
         /* Load mstatus */
         ld      t0,(-3*8)(sp)
         csrw    mstatus,t0
+        li      t1,0x1800
+        and     t0,t0,t1
 
         beqz    t0,1f
         /* MPP = 1 */
