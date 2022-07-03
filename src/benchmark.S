@@ -9,6 +9,6 @@ benchmark_code:
         la      gp,__global_pointer$
         .option pop
         mv      a0,zero // Zero register
-here:
+
 1:      addi    a0,a0,1
         j       1b
