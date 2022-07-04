@@ -1,27 +1,27 @@
 # See LICENSE file for copyright and license details.
 
-.globl AsmTrapEntry
-.globl AsmResumeProc
+.globl trap_entry
+.globl trap_resume_proc
 
 .option push
 .option norvc   /* Prevent compressed instructions */
 .align 8
-AsmTrapEntry:
+trap_entry:
+        j       __trap_exception_handler  /*  0: User software interrupt */
         /* Interrupts */
-        j       __exception_handler  /*  0: User software interrupt */
         j       __hang  /*  1: Supervisor software interrupt */
         j       __hang  /*  2: Reserved */
         j       __hang  /*  3: Machine software interrupt */
         j       __hang  /*  4: User timer interrupt */
         j       __hang  /*  5: Supervisor timer interrupt */
         j       __hang  /*  6: Reserved */
-        j       __timer_handler /*  7: Machine timer interrupt */
+        j       __trap_timer_handler /*  7: Machine timer interrupt */
         j       __hang  /*  8: User external interrupt */
         j       __hang  /*  9: Supervisor external interrupt */
         j       __hang  /* 10: Reserved */
         j       __hang  /* 11: Machine external interrupt */
 
-__exception_trampoline:
+__trap_exception_trampoline:
         /* Exceptions */
         j       __hang  /* 0: Instruction address misaligned */
         j       __hang  /* 1: Instruction access fault */
@@ -31,7 +31,7 @@ __exception_trampoline:
         j       __hang  /* 5: Load access fault */
         j       __hang  /* 6: Store/AMO address misaligned */
         j       __hang  /* 7: Store/AMO access fault */
-        j       __hang  /* 8: Environment call from U-mode */
+        j       syscall_handler  /* 8: Environment call from U-mode */
         j       __hang  /* 9: Environment call from S-mode */
         j       __hang  /* 10: Reserved */
         j       __hang  /* 11: Environment call from M-mode */
@@ -41,257 +41,236 @@ __exception_trampoline:
         j       __hang  /* 15: Store/AMO page fault */
 .option pop
 
-__exception_handler:
+/****** Exception and system call *******/
+__trap_exception_handler:
         /* Load kernel process sp, store user sp. */
         csrrw   sp,mscratch,sp
 #ifndef NDEBUG
         /* If mscratch is 0, we have bug in the kernel */
         beqz    sp,__mhang
 #endif
-        /* Store user gp, tp registers. */
-        sd      gp,(-3*8)(sp)
-        sd      tp,(-4*8)(sp)
-        /* Load kernel gp and tp. */
-        ld      gp,(-1*8)(sp)   /* points to kernel global data */
-        ld      tp,(-2*8)(sp)   /* points to current pcb */
-        /* Store user t0-t6, ra registers. */
-        sd      t0,(-5*8)(sp)
-        sd      t1,(-6*8)(sp)
-        sd      t2,(-7*8)(sp)
-        sd      t3,(-8*8)(sp)
-        sd      t4,(-9*8)(sp)
-        sd      t5,(-10*8)(sp)
-        sd      t6,(-11*8)(sp)
-        sd      ra,(-12*8)(sp)
+        addi    sp,sp,(-24*8)
+        /* Store ra to stack */
+        sd      ra,(1*8)(sp)
 
-        /* Save user a0-a7. */
-        sd      a0,(3*8)(tp)
-        sd      a1,(4*8)(tp)
-        sd      a2,(5*8)(tp)
-        sd      a3,(6*8)(tp)
-        sd      a4,(7*8)(tp)
-        sd      a5,(8*8)(tp)
-        sd      a6,(9*8)(tp)
-        sd      a7,(10*8)(tp)
+        /* Store pc and sp to trap_frame */
+        csrr    ra,mepc
+        sd      ra,(0*8)(sp)
+        csrrw   ra,mscratch,zero
+        sd      ra,(2*8)(sp)
 
-        /* Write user sp to stack. */
-        csrrw   t3,mscratch,zero
-        sd      t3,(-13*8)(sp)
+        /* Store gp, tp to trap_frame */
+        sd      gp,(3*8)(sp)
+        sd      tp,(4*8)(sp)
 
-        /* Get user pc, saved later as we might modify it. */
-        csrr    t3,mepc
+        /* Store mtval and mcause to trap_frame */
+        csrr    ra,mtval
+        sd      ra,(21*8)(sp)
+        csrr    ra,mcause               /* note, ra=mcause will be used later */
+        sd      ra,(20*8)(sp)
 
-        /* Check trap type. */
-        csrr    t1,mcause
+        /* Load kernel gp and thread pcb */
+        ld      gp,(22*8)(sp)
+        ld      tp,(23*8)(sp)
 
+        /* Enable preemption */
+        /* Before enabling preemption, we must store mcause, mtval, mepc, mscratch,
+         * and load kernel gp and thread pcb (tp).
+         */
+        csrsi   mstatus,8
 
-        /* If mcause == 8, then syscall, else exception. */
-1:      li      t2,8
-        bne     t1,t2,__exception
+        /* Store argument temporary registers to trap_frame */
+        sd      t0,(5*8)(sp)
+        sd      t1,(6*8)(sp)
+        sd      t2,(7*8)(sp)
+        sd      t3,(8*8)(sp)
+        sd      t4,(9*8)(sp)
+        sd      t5,(10*8)(sp)
+        sd      t6,(11*8)(sp)
 
-__syscall:
-        /* Load address to syscall trampoline */
-        la      ra,SyscallHandler
-        /* Adds 4 to pc (jumping over ecall instruction */
-        addi    t3,t3,4
-        /* Store user pc */
-        sd      t3,(-14*8)(sp)
+        sd      a0,(12*8)(sp)
+        sd      a1,(13*8)(sp)
+        sd      a2,(14*8)(sp)
+        sd      a3,(15*8)(sp)
+        sd      a4,(16*8)(sp)
+        sd      a5,(17*8)(sp)
+        sd      a6,(18*8)(sp)
+        sd      a7,(19*8)(sp)
 
-        /* Fix sp and enable preemption */
-        addi    sp,sp,-14*8
-        csrwi   mstatus,8
-
-        call    SyscallHandler
-
-        /* Fix sp and disable preemption */
-        csrwi   mstatus,0
-        addi    sp,sp,14*8
-
-        j       __exception_exit
-
-__exception:
-        j       __hang
-        la      ra,__exception_trampoline
-        /* Set a0 to mcause */
-        mv      a0,t1
-        /* Set a1 to mtval */
-        csrr    a1,mtval
-        /* Set a2 to mepc */
-        mv      a2,t3
-        /* Make offset to trampoline address. */
-        slli    t1,t1,2
-
-        /* Store user pc */
-        sd      t3,(-14*8)(sp)
-
-        addi    sp,sp,-14*8
-        csrwi   mstatus,8
+        /* sp->trap_frame */
+        mv      a0,sp
 
         /* Jump to trampoline */
-        add     ra,ra,t1
+        slli    t0,ra,2         /* ra=mcause */
+        la      ra,__trap_exception_trampoline
+        add     ra,ra,t0
         jalr    ra,0(ra)
 
-        /* Fix sp and disable preemption */
-        csrwi   mstatus,0
-        addi    sp,sp,14*8
+__trap_exception_exit:
 
-__exception_exit:
-        /* Write user pc to mepc. */
-        ld      t3,(-14*8)(sp)
-        beqz    t3,__hang
-        csrw    mepc,t3
-        /* Write user sp to mscratch. */
-        ld      t0,(-13*8)(sp)
-        csrw    mscratch,t0
-        /* Load user a0-a7. */
-        ld      a7,(10*8)(tp)
-        ld      a6,(9*8)(tp)
-        ld      a5,(8*8)(tp)
-        ld      a4,(7*8)(tp)
-        ld      a3,(6*8)(tp)
-        ld      a2,(5*8)(tp)
-        ld      a1,(4*8)(tp)
-        ld      a0,(3*8)(tp)
-        /* Load process ra,t0-t6 register. */
-        ld      ra,(-12*8)(sp)
-        ld      t6,(-11*8)(sp)
-        ld      t5,(-10*8)(sp)
-        ld      t4,(-9*8)(sp)
-        ld      t3,(-8*8)(sp)
-        ld      t2,(-7*8)(sp)
-        ld      t1,(-6*8)(sp)
-        ld      t0,(-5*8)(sp)
-        /* Store kernel gp and tp. */
-        sd      tp,(-2*8)(sp)
-        sd      gp,(-1*8)(sp)
-        /* Load user gp and tp. */
-        ld      tp,(-4*8)(sp)
-        ld      gp,(-3*8)(sp)
-        /* Load process sp, store kernel sp. */
-        csrrw   sp,mscratch,sp
-        /* Go to user mode. */
+        /* Load argument and temporary registers */
+        ld      a7,(19*8)(sp)
+        ld      a6,(18*8)(sp)
+        ld      a5,(17*8)(sp)
+        ld      a4,(16*8)(sp)
+        ld      a3,(15*8)(sp)
+        ld      a2,(14*8)(sp)
+        ld      a1,(13*8)(sp)
+        ld      a0,(12*8)(sp)
+
+        ld      t6,(11*8)(sp)
+        ld      t5,(10*8)(sp)
+        ld      t4,(9*8)(sp)
+        ld      t3,(8*8)(sp)
+        ld      t2,(7*8)(sp)
+        ld      t1,(6*8)(sp)
+        ld      t0,(5*8)(sp)
+
+        /* Enable preemption */
+        csrsi   mstatus,8
+
+        /* Load user gp,tp */
+        ld      tp,(4*8)(sp)
+        ld      gp,(3*8)(sp)
+
+        /* Load user pc and sp */
+        ld      ra,(2*8)(sp)
+        csrw    mscratch,ra
+        ld      ra,(0*8)(sp)
+        csrw    mepc,ra
+
+        /* Load user ra */
+        ld      ra,(1*8)(sp)
+
+        /* Restore kernel sp */
+        addi    sp,sp,(24*8)
+
+        /* Swap user sp and kernel sp */
+        csrrw   sp,mscratch,sp 
         mret
 
-__timer_handler:
+/****** Timer interrupt *******/
+__trap_timer_handler:
         csrrw   sp,mscratch,sp
-        bnez    sp,__timer_handler_user
-__timer_handler_machine:
+        bnez    sp,__trap_timer_handler_user
+__trap_timer_handler_machine:
         csrr    sp,mscratch
-        j       1f
-__timer_handler_user:      
-        sd      gp,(-6*8)(sp)
-        sd      tp,(-7*8)(sp)
-        /* Load kernel gp, tp */
-        ld      tp,(-2*8)(sp)
-        ld      gp,(-1*8)(sp)
-1:
-        sd      ra,(-4*8)(sp)
-        sd      t0,(-8*8)(sp)
-        sd      t1,(-9*8)(sp)
-        sd      t2,(-10*8)(sp)
-        sd      s0,(-11*8)(sp)
-        sd      s1,(-12*8)(sp)
-        sd      a0,(-13*8)(sp)
-        sd      a1,(-14*8)(sp)
-        sd      a2,(-15*8)(sp)
-        sd      a3,(-16*8)(sp)
-        sd      a4,(-17*8)(sp)
+        sd      gp,(-2*8)(sp)
+        sd      tp,(-1*8)(sp)
+__trap_timer_handler_user: 
+        sd      ra,(-34*8)(sp)
+        csrrw   ra,mscratch,zero
+        sd      ra,(-33*8)(sp)
+        sd      gp,(-32*8)(sp)
+        sd      tp,(-31*8)(sp)
+        sd      t0,(-30*8)(sp)
+        sd      t1,(-29*8)(sp)
+        sd      t2,(-28*8)(sp)
+        sd      t3,(-27*8)(sp)
+        sd      t4,(-26*8)(sp)
+        sd      t5,(-25*8)(sp)
+        sd      t6,(-24*8)(sp)
+        sd      a0,(-23*8)(sp)
+        sd      a1,(-22*8)(sp)
+        sd      a2,(-21*8)(sp)
+        sd      a3,(-20*8)(sp)
+        sd      a4,(-19*8)(sp)
         sd      a5,(-18*8)(sp)
-        sd      a6,(-19*8)(sp)
-        sd      a7,(-20*8)(sp)
-        sd      s2,(-21*8)(sp)
-        sd      s3,(-22*8)(sp)
-        sd      s4,(-23*8)(sp)
-        sd      s5,(-24*8)(sp)
-        sd      s6,(-25*8)(sp)
-        sd      s7,(-26*8)(sp)
-        sd      s8,(-27*8)(sp)
-        sd      s9,(-28*8)(sp)
-        sd      s10,(-29*8)(sp)
-        sd      s11,(-30*8)(sp)
-        sd      t3,(-31*8)(sp)
-        sd      t4,(-32*8)(sp)
-        sd      t5,(-33*8)(sp)
-        sd      t6,(-34*8)(sp)
+        sd      a6,(-17*8)(sp)
+        sd      a7,(-16*8)(sp)
+        sd      s0,(-15*8)(sp)
+        sd      s1,(-14*8)(sp)
+        sd      s2,(-13*8)(sp)
+        sd      s3,(-12*8)(sp)
+        sd      s4,(-11*8)(sp)
+        sd      s5,(-10*8)(sp)
+        sd      s6,(-9*8)(sp)
+        sd      s7,(-8*8)(sp)
+        sd      s8,(-7*8)(sp)
+        sd      s9,(-6*8)(sp)
+        sd      s10,(-5*8)(sp)
+        sd      s11,(-4*8)(sp)
 
-        /* Store PC */
-        csrr    t1,mepc
-        sd      t1,(11*8)(tp)
-
-        /* Store SP */
-        csrr    t0,mscratch
-        sd      t0,(-5*8)(sp)
-        
         /* Store mstatus */
         csrr    t0,mstatus
         sd      t0,(-3*8)(sp)
 
+        ld      gp,(-2*8)(sp)
+        ld      tp,(-1*8)(sp)
 
+        /* Store PC */
+        csrr    t1,mepc
+        sd      t1,(2*8)(tp)
+        
+
+
+        addi    sp,sp,(-34*8)
         /* Swap core and process sp */
         amoswap.d  sp,sp,(tp)
 
         /* Call scheduler */
         call    Sched
         
-AsmResumeProc:
+trap_resume_proc:
         /* Swap core and process sp */
         amoswap.d  sp,sp,(tp)
+
+        addi    sp,sp,(34*8)
+
+
+        /* Load PC */
+        ld      t1,(2*8)(tp)
+        csrw    mepc,t1
+
+        /* Store kernel gp and pcb */
+        sd      gp,(-2*8)(sp)
+        sd      tp,(-1*8)(sp)
 
         /* Load mstatus */
         ld      t0,(-3*8)(sp)
         csrw    mstatus,t0
 
-        /* Mask MPP */
+        /* Mask bits so we get mstatus.mpp */
         li      t1,0x800
         and     t0,t0,t1
 
-        /* Load PC */
-        ld      t1,(11*8)(tp)
-        csrw    mepc,t1
+        beqz    t0,1f   /* jump if 1 or 3 (supervisor or user) */
+        /* mstatus.mpp == 0 (m-mode) */
+        sd      sp,(-33*8)(sp) 
 
-        /* Check if MPP is 3 or 0/2 */
-        beqz    t0,1f
-        /* MPP == 3 (m-mode) */
-        sd      sp,(-5*8)(sp)
-        csrw    mscratch,zero
-        j       2f
-1:      /* MPP == 0 or 2 (u/s-mode) */
-        csrw    mscratch,sp
-        sd      gp,(-1*8)(sp)
-        sd      tp,(-2*8)(sp)
-        ld      tp,(-7*8)(sp)
-        ld      gp,(-6*8)(sp)
-2:
-
-        ld      t6,(-34*8)(sp)
-        ld      t5,(-33*8)(sp)
-        ld      t4,(-32*8)(sp)
-        ld      t3,(-31*8)(sp)
-        ld      s11,(-30*8)(sp)
-        ld      s10,(-29*8)(sp)
-        ld      s9,(-28*8)(sp)
-        ld      s8,(-27*8)(sp)
-        ld      s7,(-26*8)(sp)
-        ld      s6,(-25*8)(sp)
-        ld      s5,(-24*8)(sp)
-        ld      s4,(-23*8)(sp)
-        ld      s3,(-22*8)(sp)
-        ld      s2,(-21*8)(sp)
-        ld      a7,(-20*8)(sp)
-        ld      a6,(-19*8)(sp)
+1:      ld      s11,(-4*8)(sp)
+        ld      s10,(-5*8)(sp)
+        ld      s9,(-6*8)(sp)
+        ld      s8,(-7*8)(sp)
+        ld      s7,(-8*8)(sp)
+        ld      s6,(-9*8)(sp)
+        ld      s5,(-10*8)(sp)
+        ld      s4,(-11*8)(sp)
+        ld      s3,(-12*8)(sp)
+        ld      s2,(-13*8)(sp)
+        ld      s1,(-14*8)(sp)
+        ld      s0,(-15*8)(sp)
+        ld      a7,(-16*8)(sp)
+        ld      a6,(-17*8)(sp)
         ld      a5,(-18*8)(sp)
-        ld      a4,(-17*8)(sp)
-        ld      a3,(-16*8)(sp)
-        ld      a2,(-15*8)(sp)
-        ld      a1,(-14*8)(sp)
-        ld      a0,(-13*8)(sp)
-        ld      s1,(-12*8)(sp)
-        ld      s0,(-11*8)(sp)
-        ld      t2,(-10*8)(sp)
-        ld      t1,(-9*8)(sp)
-        ld      t0,(-8*8)(sp)
-        ld      ra,(-4*8)(sp)
-        ld      sp,(-5*8)(sp)
+        ld      a4,(-19*8)(sp)
+        ld      a3,(-20*8)(sp)
+        ld      a2,(-21*8)(sp)
+        ld      a1,(-22*8)(sp)
+        ld      a0,(-23*8)(sp)
+        ld      t6,(-24*8)(sp)
+        ld      t5,(-25*8)(sp)
+        ld      t4,(-26*8)(sp)
+        ld      t3,(-27*8)(sp)
+        ld      t2,(-28*8)(sp)
+        ld      t1,(-29*8)(sp)
+        ld      t0,(-30*8)(sp)
+        ld      tp,(-31*8)(sp)
+        ld      gp,(-32*8)(sp)
+        ld      ra,(-33*8)(sp)
+        csrw    mscratch,ra
+        ld      ra,(-34*8)(sp)
+        csrrw   sp,mscratch,sp
         mret
 
 __hang: 

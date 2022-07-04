@@ -47,7 +47,7 @@ _start:
         la      sp,core_stack
         csrr    t0,mhartid
         li      t3,MIN_HARTID
-        blt     t0,t3,__park
+        blt     t0,t3,__boot_park
 
         /* Calculate the core stack pointer */
         csrr    t0,mhartid
@@ -57,7 +57,7 @@ _start:
 
         /*** Initialize core's control and status registers. ***/
         /* Set the trap entry function. */
-        la      t0,AsmTrapEntry
+        la      t0,trap_entry
         ori     t0,t0,1
         csrw    mtvec,t0
         csrw    mscratch,x0
@@ -76,7 +76,7 @@ _start:
         /* If hartid != 0, then jump to __wait. */
         csrr    t0,mhartid
         li      t1,MIN_HARTID
-        bne     t1,t0,__wait
+        bne     t1,t0,__boot_wait
 
         /* Single process work*/
         la      t0,_bss
@@ -109,10 +109,10 @@ _start:
         j       1f
        
         /* Wait for hart 0 to finish process initialization. */
-__wait: 
+__boot_wait: 
         la      t0,lock
         ld      t1,(t0)
-        bnez    t1,__wait
+        bnez    t1,__boot_wait
 
 
         /*** Here we start executing the kernel. ***/
@@ -120,11 +120,11 @@ __wait:
         li      tp,0
         /* Jump to scheduler. */
         call    Sched
-        tail    AsmResumeProc
+        tail    trap_resume_proc
 
-__park:
+__boot_park:
         wfi
-        j       __park
+        j       __boot_park
 
 .section .data.init
 /* This lock is used for process initialization */

@@ -7,7 +7,7 @@
 static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0,
                                    uint64_t arg1, uint64_t arg2, uint64_t arg3,
                                    uint64_t arg4, uint64_t arg5,
-                                   uint64_t arg6) {
+                                   uint64_t arg6, uint64_t arg7) {
         register uint64_t a0 __asm__("a0") = arg0;
         register uint64_t a1 __asm__("a1") = arg1;
         register uint64_t a2 __asm__("a2") = arg2;
@@ -15,41 +15,48 @@ static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0,
         register uint64_t a4 __asm__("a4") = arg4;
         register uint64_t a5 __asm__("a5") = arg5;
         register uint64_t a6 __asm__("a5") = arg6;
-        register uint64_t a7 __asm__("a7") = sysnr;
+        register uint64_t a7 __asm__("a7") = arg7;
+        register uint64_t t0 __asm__("t0") = sysnr;
         switch (argc) {
                 case 1:
-                        asm volatile("ecall" : "+r"(a0) : "r"(a7));
+                        asm volatile("ecall" : "+r"(a0) : "r"(t0));
                         break;
                 case 2:
-                        asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a7));
+                        asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(t0));
                         break;
                 case 3:
                         asm volatile("ecall"
                                      : "+r"(a0)
-                                     : "r"(a1), "r"(a2), "r"(a7));
+                                     : "r"(a1), "r"(a2), "r"(t0));
                         break;
                 case 4:
                         asm volatile("ecall"
                                      : "+r"(a0)
-                                     : "r"(a1), "r"(a2), "r"(a3), "r"(a7));
+                                     : "r"(a1), "r"(a2), "r"(a3), "r"(t0));
                         break;
                 case 5:
                         asm volatile("ecall"
                                      : "+r"(a0)
                                      : "r"(a1), "r"(a2), "r"(a3), "r"(a4),
-                                       "r"(a7));
+                                       "r"(t0));
                         break;
                 case 6:
                         asm volatile("ecall"
                                      : "+r"(a0)
                                      : "r"(a1), "r"(a2), "r"(a3), "r"(a4),
-                                       "r"(a5), "r"(a7));
+                                       "r"(a5), "r"(t0));
                         break;
                 case 7:
                         asm volatile("ecall"
                                      : "+r"(a0)
                                      : "r"(a1), "r"(a2), "r"(a3), "r"(a4),
-                                       "r"(a5), "r"(a6), "r"(a7));
+                                       "r"(a5), "r"(a6), "r"(t0));
+                        break;
+                case 8:
+                        asm volatile("ecall"
+                                     : "+r"(a0)
+                                     : "r"(a1), "r"(a2), "r"(a3), "r"(a4),
+                                       "r"(a5), "r"(a6), "r"(a7), "r"(t0));
                         break;
                 default:
                         __builtin_unreachable();
@@ -57,31 +64,33 @@ static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0,
         return a0;
 }
 
+#define S3K_SYSCALL8(a0, a1, a2, a3, a4, a5, a6, a7) \
+        S3K_SYSCALL(8, sysnr, a0, a1, a2, a3, a4, a5, a6, a7)
 #define S3K_SYSCALL7(a0, a1, a2, a3, a4, a5, a6) \
-        S3K_SYSCALL(7, sysnr, a0, a1, a2, a3, a4, a5, a6)
+        S3K_SYSCALL(7, sysnr, a0, a1, a2, a3, a4, a5, a6, 0)
 #define S3K_SYSCALL6(sysnr, a0, a1, a2, a3, a4, a5) \
-        S3K_SYSCALL(6, sysnr, a0, a1, a2, a3, a4, a5, 0)
+        S3K_SYSCALL(6, sysnr, a0, a1, a2, a3, a4, a5, 0, 0)
 #define S3K_SYSCALL5(sysnr, a0, a1, a2, a3, a4) \
-        S3K_SYSCALL(5, sysnr, a0, a1, a2, a3, a4, 0, 0)
+        S3K_SYSCALL(5, sysnr, a0, a1, a2, a3, a4, 0, 0, 0)
 #define S3K_SYSCALL4(sysnr, a0, a1, a2, a3) \
-        S3K_SYSCALL(4, sysnr, a0, a1, a2, a3, 0, 0, 0)
+        S3K_SYSCALL(4, sysnr, a0, a1, a2, a3, 0, 0, 0, 0)
 #define S3K_SYSCALL3(sysnr, a0, a1, a2) \
-        S3K_SYSCALL(3, sysnr, a0, a1, a2, 0, 0, 0, 0)
-#define S3K_SYSCALL2(sysnr, a0, a1) S3K_SYSCALL(2, sysnr, a0, a1, 0, 0, 0, 0, 0)
-#define S3K_SYSCALL1(sysnr, a0) S3K_SYSCALL(1, sysnr, a0, 0, 0, 0, 0, 0, 0)
+        S3K_SYSCALL(3, sysnr, a0, a1, a2, 0, 0, 0, 0, 0)
+#define S3K_SYSCALL2(sysnr, a0, a1) S3K_SYSCALL(2, sysnr, a0, a1, 0, 0, 0, 0, 0, 0)
+#define S3K_SYSCALL1(sysnr, a0) S3K_SYSCALL(1, sysnr, a0, 0, 0, 0, 0, 0, 0, 0)
 
 static inline uint64_t S3K_GET_PID(void) {
-        return S3K_SYSCALL1(SYSNR_GET_PID, 0);
+        return S3K_SYSCALL1(SYSNR_NOCAP, SYSNR_GET_PID);
 }
 
 static inline uint64_t S3K_READ_CAP(uint64_t cid, uint64_t data[2]) {
         register int64_t a0 __asm__("a0");
         register uint64_t a1 __asm__("a1");
         register uint64_t a2 __asm__("a2");
-        register uint64_t a7 __asm__("a7");
+        register uint64_t t0 __asm__("t0");
         a0 = cid;
-        a7 = 0;
-        __asm__ volatile("ecall" : "+r"(a0), "=r"(a1), "=r"(a2) : "r"(a7));
+        t0 = SYSNR_READ_CAP;
+        __asm__ volatile("ecall" : "+r"(a0), "=r"(a1), "=r"(a2) : "r"(t0));
         if (a0 > 0) {
                 data[0] = a1;
                 data[1] = a2;
@@ -102,4 +111,8 @@ static inline uint64_t S3K_DELETE_CAP(uint64_t cid) {
 
 static inline uint64_t S3K_REVOKE_CAP(uint64_t cid) {
         return S3K_SYSCALL1(SYSNR_REVOKE_CAP, cid);
+}
+
+static inline uint64_t S3K_DERIVE_CAP(uint64_t src, uint64_t dest, uint64_t word0, uint64_t word1) {
+        return S3K_SYSCALL4(SYSNR_DERIVE_CAP, src, dest, word0, word1);
 }

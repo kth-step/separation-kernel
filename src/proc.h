@@ -33,16 +33,16 @@ struct proc {
          * inter-process communication.
          */
         uintptr_t pid;
-        /** Capability table.
-         * Pointer to the capability table.
-         */
-        CapNode *cap_table;
         /** Argument registers.
          * We store the argument registers a0-a7 in the args array,
          * this simplifies inter-process communication.
          */
-        uintptr_t args[8];
         uintptr_t pc;
+
+        /** Capability table.
+         * Pointer to the capability table.
+         */
+        CapNode *cap_table;
 
         /* The pmp configurations are stored in these capabilities */
         /* pmp_table[i].data[1] = pmpicfg | pmpaddri */
