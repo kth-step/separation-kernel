@@ -73,6 +73,8 @@ static inline void output32(int n, bool sig, int base, char padding, int padd_wi
 }
 
 void kprintf(const char *format, ...) {
+        static volatile int lock = 0;
+        while (!__sync_bool_compare_and_swap(&lock, 0, 1));
         va_list argp;
         va_start(argp, format);
         for (const char *f = format; *f != '\0'; ++f) {
@@ -132,4 +134,5 @@ void kprintf(const char *format, ...) {
                                 break;
                 }
         }
+        lock = 0;
 }

@@ -20,13 +20,15 @@ caps:
       - 'rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7'
   - name: time
     fields:
-      - core 1
+      - hartid 1
       - pid 1
       - begin 2
       - end 2
       - free 2
       - depth 1
     asserts:
+      - 'MIN_HARTID <= hartid'
+      - 'hartid <= MAX_HARTID'
       - 'begin <= free'
       - 'free <= end'
   - name: channels
@@ -81,7 +83,7 @@ is_child:
     relations:
       - 'p:begin <= c:begin'
       - 'c:end <= p:end'
-      - 'p:core == c:core'
+      - 'p:hartid == c:hartid'
       - 'p:depth < c:depth'
   - parent: channels
     child: channels
@@ -122,7 +124,7 @@ can_derive:
     relations:
       - 'p:free <= c:begin'
       - 'c:end <= p:end'
-      - 'p:core == c:core'
+      - 'p:hartid == c:hartid'
       - 'p:depth < c:depth'
       - 'c:free == c:begin'
       - 'c:begin < c:end'

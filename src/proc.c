@@ -50,15 +50,15 @@ static void proc_init_channels(CapNode *channel) {
 }
 
 static void proc_init_time(CapNode time[N_CORES]) {
-        for (int core = 0; core < N_CORES; core++) {
+        for (int hartid = MIN_HARTID; hartid <= MAX_HARTID; hartid++) {
                 CapNode *sentinel = CapInitSentinel();
                 uint64_t pid = 0;
                 uint64_t begin = 0;
                 uint64_t end = N_QUANTUM;
                 uint64_t free = 0;
                 uint64_t depth = 0;
-                Cap cap = cap_mk_time(core, pid, begin, end, free, depth);
-                CapInsert(cap, &time[core], sentinel);
+                Cap cap = cap_mk_time(hartid, pid, begin, end, free, depth);
+                CapInsert(cap, &time[hartid-MIN_HARTID], sentinel);
         }
 }
 

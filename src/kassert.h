@@ -5,12 +5,11 @@
 
 #define kassert(val)                                                          \
         ({                                                                    \
-                if (!(val)) {                                                 \
+                while (!(val)) {                                              \
+                        asm volatile("csrw mie,0");                           \
                         kprintf(                                              \
                             "Assert '%s' failed at %s:%d in function %s\r\n", \
                             #val, __FILE__, __LINE__, __FUNCTION__);          \
-                        while (1)                                             \
-                                ;                                             \
                 }                                                             \
         })
 #else
