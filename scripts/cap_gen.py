@@ -38,7 +38,7 @@ def make_assert(s):
 def make_getter(cap_name, name, size, bins):
     if name == 'padd':
         return
-    print(f"const static inline uint64_t cap_{cap_name}_get_{name}(const Cap cap) {{")
+    print(f"static inline uint64_t cap_{cap_name}_get_{name}(const Cap cap) {{")
     make_assert(f"(cap.word0 >> 56) == CAP_{cap_name.upper()}")
     i, b = get_bin(bins, name)
     offset = get_offset(b, name)
@@ -51,26 +51,21 @@ def make_getter(cap_name, name, size, bins):
 def make_setter(cap_name, name, size, bins):
     if name == 'padd':
         return
-    print(f'const static inline Cap cap_{cap_name}_set_{name}(const Cap cap, uint64_t {name}) {{')
-    make_assert(f"(cap.word0 >> 56) == CAP_{cap_name.upper()}")
+    print(f'static inline void cap_{cap_name}_set_{name}(Cap *cap, uint64_t {name}) {{')
+    make_assert(f"(cap->word0 >> 56) == CAP_{cap_name.upper()}")
     make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")
     i, b = get_bin(bins, name) 
     offset = get_offset(b, name)
     mask = f"0x{'ff'*size + '00'*(offset//8)}ull"
-    print("\tCap c;")
-    if i == 1:
-        print(f"\tc.word0 = cap.word0;")
     if offset:
-        print(f"\tc.word{i} = (cap.word{i} & ~{mask}) | {name} << {offset};")
+        print(f"\tcap->word{i} = (cap->word{i} & ~{mask}) | {name} << {offset};")
     else:
-        print(f"\tc.word{i} = (cap.word{i} & ~{mask}) | {name};")
-    if i == 0:
-        print(f"\tc.word1 = cap.word1;")
-    print("\treturn c;\n}\n")
+        print(f"\tcap->word{i} = (cap->word{i} & ~{mask}) | {name};")
+    print("}\n")
 
 def make_constructor(cap_name, fields, asserts, bins):
     parameters = [f"uint64_t {name}" for (name, size) in fields if name != 'padd']
-    print(f"const static inline Cap cap_mk_{cap_name}({', '.join(parameters)}) {{")
+    print(f"static inline Cap cap_mk_{cap_name}({', '.join(parameters)}) {{")
     for (name, size) in fields:
         if name != 'padd':
             make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")

@@ -3,5 +3,5 @@
 *.da
 *.elf
 *.bin
-inc/cap_utils.h
+src/cap_utils.h
 

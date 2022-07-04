@@ -42,9 +42,8 @@ caps:
     fields:
       - channel 2
       - mode 1
-      - grant 1
     asserts:
-      - 'grant < 2'
+      - 'mode <= 7'
   - name: supervisor
     fields:
       - begin 1
@@ -105,6 +104,8 @@ can_derive:
   - parent: memory
     child: memory  
     relations:
+      - 'p:pmp == 0'
+      - 'c:pmp == 0'
       - 'p:free <= c:begin'
       - 'c:end <= p:end'
       - '(c:rwx & p:rwx) == c:rwx'
@@ -128,6 +129,8 @@ can_derive:
   - parent: channels
     child: channels
     relations:
+      - 'p:ep == 0'
+      - 'c:ep == 0'
       - 'p:free <= c:begin'
       - 'c:end <= p:end'
       - 'c:free == c:begin'
@@ -137,6 +140,7 @@ can_derive:
     relations:
       - 'p:free <= c:channel'
       - 'c:channel < p:end'
+      - 'c:mode <= 7'
   - parent: supervisor
     child: supervisor
     relations:

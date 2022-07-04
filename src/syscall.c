@@ -1,9 +1,8 @@
 // See LICENSE file for copyright and license details.
 
-#include "trap.h"
-
 #include "sched.h"
 #include "syscall_nr.h"
+#include "trap.h"
 #include "types.h"
 #include "utils.h"
 
@@ -23,15 +22,9 @@ static void __syscall_invoke_endpoint(TrapFrame *tf, Cap cap, CapNode *cn);
 static void __syscall_invoke_supervisor(TrapFrame *tf, Cap cap, CapNode *cn);
 
 static void (*const __syscall_handler_array[])(TrapFrame *) = {
-        __syscall_no_cap,
-        __syscall_read_cap,
-        __syscall_move_cap,
-        __syscall_delete_cap,
-        __syscall_revoke_cap,
-        __syscall_derive_cap,
-        __syscall_invoke_cap
-};
-
+    __syscall_no_cap,     __syscall_read_cap,   __syscall_move_cap,
+    __syscall_delete_cap, __syscall_revoke_cap, __syscall_derive_cap,
+    __syscall_invoke_cap};
 
 void syscall_handler(TrapFrame *tf) {
         uint64_t syscall_number = tf->t0;
@@ -40,7 +33,6 @@ void syscall_handler(TrapFrame *tf) {
                 __syscall_handler_array[syscall_number](tf);
         }
 }
-
 
 void __syscall_no_cap(TrapFrame *tf) {
         switch (tf->a0) {
@@ -106,15 +98,27 @@ void __syscall_revoke_cap(TrapFrame *tf) {
                 return;
         }
         CapNode *cn = &current->cap_table[cid];
-        const Cap cap = cn_get(cn);
+        Cap cap = cn_get(cn);
         switch (cap_get_type(cap)) {
                 case CAP_TIME:
                         SchedRevoke(cap, cn);
+                        cap_time_set_free(&cap, cap_time_get_begin(cap));
+                        break;
+                case CAP_MEMORY:
+                        cap_memory_set_free(&cap, cap_memory_get_begin(cap));
+                        cap_memory_set_pmp(&cap, false);
+                        break;
+                case CAP_SUPERVISOR:
+                        cap_supervisor_set_free(&cap, cap_supervisor_get_begin(cap));
+                        break;
+                case CAP_CHANNELS:
+                        cap_channels_set_free(&cap, cap_channels_get_begin(cap));
+                        cap_channels_set_ep(&cap, false);
                         break;
                 default:
                         break;
         }
-        tf->a0 = CapRevoke(cn);
+        tf->a0 = CapRevoke(cn) && CapUpdate(cap, cn);
 }
 
 void __syscall_derive_cap(TrapFrame *tf) {
@@ -130,8 +134,8 @@ void __syscall_derive_cap(TrapFrame *tf) {
         CapNode *cn_parent = &current->cap_table[cid_src];
         CapNode *cn_child = &current->cap_table[cid_dest];
 
-        const Cap parent = cn_get(cn_parent);
-        const Cap child = (Cap){word0, word1};
+        Cap parent = cn_get(cn_parent);
+        Cap child = (Cap){word0, word1};
 
         CapType parent_type = cap_get_type(parent);
         CapType child_type = cap_get_type(child);
@@ -139,38 +143,38 @@ void __syscall_derive_cap(TrapFrame *tf) {
         if (!cap_can_derive(parent, child)) {
                 tf->a0 = 0;
                 return;
-        } 
+        }
 
         if (parent_type == CAP_MEMORY && child_type == CAP_MEMORY) {
                 uint64_t end = cap_memory_get_begin(child);
-                Cap c = cap_memory_set_free(parent, end);
-                tf->a0 = CapUpdate(c, cn_parent) &&
-                                   CapInsert(child, cn_child, cn_parent);
+                cap_memory_set_free(&parent, end);
+                tf->a0 = CapUpdate(parent, cn_parent) &&
+                         CapInsert(child, cn_child, cn_parent);
         } else if (parent_type == CAP_MEMORY && child_type == CAP_PMP) {
-                Cap c = cap_memory_set_pmp(parent, 1);
-                tf->a0 = CapUpdate(c, cn_parent) &&
-                                   CapInsert(child, cn_child, cn_parent);
+                cap_memory_set_pmp(&parent, true);
+                tf->a0 = CapUpdate(parent, cn_parent) &&
+                         CapInsert(child, cn_child, cn_parent);
         } else if (parent_type == CAP_TIME && child_type == CAP_TIME) {
                 uint64_t end = cap_time_get_end(child);
-                Cap c = cap_time_set_free(parent, end);
-                tf->a0 = CapUpdate(c, cn_parent) &&
-                                   CapInsert(child, cn_child, cn_parent) &&
-                                   SchedUpdate(child, parent, cn_parent);
+                cap_time_set_free(&parent, end);
+                tf->a0 = CapUpdate(parent, cn_parent) &&
+                         CapInsert(child, cn_child, cn_parent) &&
+                         SchedUpdate(child, parent, cn_parent);
         } else if (parent_type == CAP_CHANNELS && child_type == CAP_CHANNELS) {
                 uint64_t end = cap_channels_get_end(child);
-                Cap c = cap_channels_set_free(parent, end);
-                tf->a0 = CapUpdate(c, cn_parent) &&
-                                   CapInsert(child, cn_child, cn_parent);
+                cap_channels_set_free(&parent, end);
+                tf->a0 = CapUpdate(parent, cn_parent) &&
+                         CapInsert(child, cn_child, cn_parent);
         } else if (parent_type == CAP_CHANNELS && child_type == CAP_ENDPOINT) {
-                Cap c = cap_channels_set_ep(parent, 1);
-                tf->a0 = CapUpdate(c, cn_parent) &&
-                                   CapInsert(child, cn_child, cn_parent);
+                cap_channels_set_ep(&parent, true);
+                tf->a0 = CapUpdate(parent, cn_parent) &&
+                         CapInsert(child, cn_child, cn_parent);
         } else if (parent_type == CAP_SUPERVISOR &&
                    child_type == CAP_SUPERVISOR) {
                 uint64_t end = cap_supervisor_get_end(child);
-                Cap c = cap_supervisor_set_free(parent, end);
-                tf->a0 = CapUpdate(c, cn_parent) &&
-                                   CapInsert(child, cn_child, cn_parent);
+                cap_supervisor_set_free(&parent, end);
+                tf->a0 = CapUpdate(parent, cn_parent) &&
+                         CapInsert(child, cn_child, cn_parent);
         }
 }
 
@@ -220,6 +224,6 @@ void __syscall_invoke_supervisor(TrapFrame *tf, Cap cap, CapNode *cn) {
                 return;
         }
 
-        //Proc *supervisee = &processes[pid];
+        // Proc *supervisee = &processes[pid];
 }
 
