@@ -5,18 +5,14 @@
 
 #include "cap.h"
 #include "csr.h"
+#include "lock.h"
 #include "stack.h"
 
-/** The schedule.
- * Each 64-bit word, sched_slice, describes the state of four cores:
- *   [(pid,depth), (pid,depth), (pid,depth), (pid,depth)]
- *   (lower bits are pid, upper are depth)
- * The pid describes what process runs on a core, depth (with quantum) uniquely
- * identifies which capability is used to scheduler the process.
- *
- * Note: We should probably replace uint64_t with appropriate structs.
- */
+#define SCHED_SLICE_OFFSET(sched_slice, hartid) \
+        ((sched_slice) << ((hartid)-MIN_HARTID) * 16)
+
 static uint64_t schedule[N_QUANTUM];
+static Lock lock = 0;
 
 /* Returns pid and depth on an sched_slice for a hart */
 static inline uint64_t sched_entry(uint64_t sched_slice, uint64_t hartid);
@@ -44,7 +40,7 @@ static inline bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
 /**************** Definitions ****************/
 uint64_t sched_entry(uint64_t s, uint64_t hartid) {
         kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
-        s >>= (hartid - MIN_HARTID) * 16;
+        s >>= ((hartid)-MIN_HARTID) * 16;
         return s & 0xFFFF;
 }
 
@@ -148,16 +144,32 @@ void Sched(void) {
 
 bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
                   uint64_t expected, uint64_t desired, CapNode *cn) {
+        /* Disable preemption */
+        clear_csr(mstatus, 8);
+        /* Try acquire lock */
+        while (!lock_try_acquire(&lock)) {
+                /* If failed acquire lock, enable preemption temporary */
+                set_csr(mstatus, 8);
+                clear_csr(mstatus, 8);
+        }
+        /* Check that the capability still exists */
+        if (cn->prev == NULL) {
+                /* If capability deleted, release lock, enable preemption and return */
+                lock_release(&lock);
+                set_csr(mstatus, 8);
+                return false;
+        }
+        /* Update the schedule */
         for (int i = begin; i < end; i++) {
-                if (cn->prev == NULL)
-                        return false;
                 uint64_t sched_slice = schedule[i];
                 if ((sched_slice & mask) != expected)
-                        break;
+                        continue;
                 uint64_t new_sched_slice = (sched_slice & ~mask) | desired;
-                __sync_val_compare_and_swap(&schedule[i], sched_slice,
-                                            new_sched_slice);
+                schedule[i] = new_sched_slice;
         }
+        /* Release lock and enable preemption */
+        lock_release(&lock);
+        set_csr(mstatus, 8);
         return true;
 }
 
@@ -169,18 +181,33 @@ bool SchedRevoke(const Cap cap, CapNode *cn) {
         uint64_t depth = cap_time_get_depth(cap);
         uint64_t pid = cap_time_get_pid(cap);
 
-        uint64_t mask = 0xFFFF << ((hartid - MIN_HARTID) * 16);
-        uint64_t desired = (depth << 8 | pid) << ((hartid - MIN_HARTID) * 16);
-        for (int i = begin; i < end; i++) {
-                if (cn->prev == NULL)
-                        return false;
-                uint64_t sched_slice = schedule[i];
-                if (sched_depth(sched_slice, hartid) <= depth)
-                        continue;
-                uint64_t new_sched_slice = (sched_slice & ~mask) | desired;
-                __sync_val_compare_and_swap(&schedule[i], sched_slice,
-                                            new_sched_slice);
+        uint64_t mask = SCHED_SLICE_OFFSET(0xFFFF, hartid);
+        uint64_t desired = SCHED_SLICE_OFFSET(depth << 8 | pid, hartid);
+
+        clear_csr(mstatus, 8);
+
+        while (!lock_try_acquire(&lock)) {
+                set_csr(mstatus, 8);
+                clear_csr(mstatus, 8);
         }
+
+        if (cn->prev == NULL) {
+                lock_release(&lock);
+                set_csr(mstatus, 8);
+                return false;
+        }
+
+        for (int i = begin; i < end; i++) {
+                /* For the revoke to be correct, we assume that
+                 * it is impossible to delete the time slice (cn)
+                 * and create a new time slice with lower depth between the
+                 * first if statement and the compare and swap. */
+                uint64_t sched_slice = schedule[i];
+                uint64_t new_sched_slice = (sched_slice & ~mask) | desired;
+                schedule[i] = new_sched_slice;
+        }
+        lock_release(&lock);
+        set_csr(mstatus, 8);
         return true;
 }
 
@@ -197,28 +224,28 @@ bool SchedUpdate(const Cap cap, const Cap new_cap, CapNode *cn) {
         uint64_t new_pid = cap_time_get_pid(cap);
 
         /* Expected value */
-        uint64_t expected = (old_depth << 8 | old_pid)
-                            << ((hartid - MIN_HARTID) * 16);
+        uint64_t expected =
+            SCHED_SLICE_OFFSET(old_depth << 8 | old_pid, hartid);
         /* Desired value */
-        uint64_t desired = (new_depth << 8 | new_pid)
-                           << ((hartid - MIN_HARTID) * 16);
+        uint64_t desired = SCHED_SLICE_OFFSET(new_depth << 8 | new_pid, hartid);
         /* Mask so we match on desired entry */
-        uint64_t mask = 0xFFFF << ((hartid - MIN_HARTID) * 16);
+        uint64_t mask = SCHED_SLICE_OFFSET(0xFFFF, hartid);
         return sched_update(begin, end, mask, expected, desired, cn);
 }
 
 bool SchedDelete(const Cap cap, CapNode *cn) {
         kassert(cap_get_type(cap) == CAP_TIME);
-        uint64_t tid = cap_time_get_depth(cap);
+        uint64_t depth = cap_time_get_depth(cap);
         uint64_t pid = cap_time_get_pid(cap);
         uint64_t begin = cap_time_get_begin(cap);
         uint64_t end = cap_time_get_end(cap);
         uint64_t hartid = cap_time_get_hartid(cap);
+
         /* Expected value */
-        uint64_t expected = (tid << 8 | pid) << ((hartid - MIN_HARTID) * 16);
+        uint64_t expected = SCHED_SLICE_OFFSET(depth << 8 | pid, hartid);
         /* Desired value, set pid to invalid/inactive */
-        uint64_t desired = 0x80ull << ((hartid - MIN_HARTID) * 16);
+        uint64_t desired = SCHED_SLICE_OFFSET(0x0080, hartid);
         /* Mask so we match on desired entry */
-        uint64_t mask = 0xFFFF << ((hartid - MIN_HARTID) * 16);
+        uint64_t mask = SCHED_SLICE_OFFSET(0xFFFF, hartid);
         return sched_update(begin, end, mask, expected, desired, cn);
 }
