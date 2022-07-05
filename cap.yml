@@ -8,9 +8,9 @@ caps:
       - free 4
       - pmp 1
     asserts:
-      - 'begin <= free'
-      - 'free <= end'
-      - 'pmp < 2'
+      - 'begin == free'
+      - 'begin < end'
+      - 'pmp == 0'
       - 'rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7'
   - name: pmp
     fields:
@@ -29,8 +29,9 @@ caps:
     asserts:
       - 'MIN_HARTID <= hartid'
       - 'hartid <= MAX_HARTID'
-      - 'begin <= free'
-      - 'free <= end'
+      - 'begin == free'
+      - 'begin < end'
+      - 'end <= N_QUANTUM'
   - name: channels
     fields:
       - begin 2
@@ -38,22 +39,26 @@ caps:
       - free 2
       - ep 1
     asserts:
-      - 'begin <= free'
-      - 'free <= begin'
+      - 'begin == free'
+      - 'begin < end'
+      - 'end <= N_CHANNELS'
+      - 'ep == 0'
   - name: endpoint
     fields:
       - channel 2
       - mode 1
     asserts:
       - 'mode <= 7'
+      - 'channel == N_CHANNELS'
   - name: supervisor
     fields:
       - begin 1
       - end 1
       - free 1
     asserts:
-      - 'begin <= free'
-      - 'free <= end'
+      - 'begin == free'
+      - 'begin < end'
+      - 'end <= N_PROC'
   - name: pmp_hidden
     fields:
       - padd 7
