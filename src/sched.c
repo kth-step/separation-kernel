@@ -105,6 +105,10 @@ void InitSched() {
         }
 #endif
 
+static inline uint64_t sched_get_tid(uint64_t s, uintptr_t hartid) {
+        return ((s >> (hartid * 16)) & 0xFF00);
+}
+
 static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
         return ((s >> (hartid * 16)) & 0xFF);
 }
@@ -261,36 +265,42 @@ void Sched(void) {
         }
 }
 
-static inline void sched_update_rev(uint8_t begin, uint8_t end, uint8_t hartid,
-                                    uint16_t expected, uint16_t desired) {
+static inline bool sched_update_rev(uint8_t begin, uint8_t end, uint8_t hartid,
+                                    uint16_t expected, uint16_t desired, Cap * c) {
         uint64_t mask = 0xFFFF << (hartid * 16);
         uint64_t expected64 = expected << (hartid * 16);
         uint64_t desired64 = desired << (hartid * 16);
         for (int i = begin; i >= end; i--) {
+                if (c->prev == NULL)
+                        return false;
                 uint64_t s = schedule[i];
                 if ((s & mask) != expected64)
                         continue;
                 uint64_t s_new = (s & ~mask) | desired64;
                 __sync_val_compare_and_swap(&schedule[i], s, s_new);
         }
+        return true;
 }
-static inline void sched_update(uint8_t begin, uint8_t end, uint8_t hartid,
-                                uint16_t expected, uint16_t desired) {
+static inline bool sched_update(uint8_t begin, uint8_t end, uint8_t hartid,
+                                uint16_t expected, uint16_t desired, Cap * c) {
         uint64_t mask = 0xFFFF << (hartid * 16);
         uint64_t expected64 = expected << (hartid * 16);
         uint64_t desired64 = desired << (hartid * 16);
         for (int i = begin; i <= end; i++) {
+                if (c->prev == NULL)
+                        return false;
                 uint64_t s = schedule[i];
                 if ((s & mask) != expected64)
                         continue;
                 uint64_t s_new = (s & ~mask) | desired64;
                 __sync_val_compare_and_swap(&schedule[i], s, s_new);
         }
+        return true; 
 }
-void SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
-                 uint16_t desired) {
+bool SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
+                 uint16_t desired, Cap * c) {
         if (begin > end)
-                sched_update_rev(begin, end, hartid, expected, desired);
+                return sched_update_rev(begin, end, hartid, expected, desired, c);
         else
-                sched_update(begin, end, hartid, expected, desired);
+                return sched_update(begin, end, hartid, expected, desired, c);
 }

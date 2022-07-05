@@ -43,8 +43,8 @@
 
 void Sched(void);
 
-void SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
-                 uint16_t desired);
+bool SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
+                 uint16_t desired, Cap * c);
 static inline void SchedUpdatePidTsid(uint8_t begin, uint8_t end,
                                       uint8_t hartid, uint8_t pid_expected,
                                       uint8_t tsid_expected,
