@@ -14,7 +14,8 @@
 #endif
 /* Used when testing scheduling; we don't actually run with something else than N_CORES, 
    but we want the scheduler to be able to think that we run with another amount of cores 
-   to affect the time it takes to complete the scheduling. */
+   to affect the time it takes to complete the scheduling. 
+   Since the separation kernel currently only supports up to 4 cores, it is assumed that this value does not surpass 4 either.*/
 #define VIRT_N_CORES 4
 /* Number of processes. */
 #define N_PROC 4
@@ -24,10 +25,11 @@
 #define N_PMP 8
 
 /* Ticks per second */
-#define TICKS_PER_SECOND 10000000UL
+/* "The CPU real time clock (rtcclk) runs at 1 MHz" https://static.dev.sifive.com/FU540-C000-v1.0.pdf */
+#define TICKS_PER_SECOND 1000000UL
 
 /* Number of time slices in a major frame. */
-#define N_QUANTUM 128
+#define N_QUANTUM 256
 /* Number of ticks per quantum. */
 #define TICKS 2000UL
 /* Number of slack ticks (buffer) for scheduler. */
@@ -58,7 +60,7 @@
 /* While some test are quite intrusive in the correctness of the separation kernel the cycle test is parhaps even more so than the other ones. 
 It should definitely be used with care; make sure to check all places with if-guards for this value and make sure it does not 
 break something you depend on. */
-#define SLACK_CYCLE_TEST 1
+#define SLACK_CYCLE_TEST 0
 /* We get one round less than specified for both slack testing and instrumentation testing,
    because we need to discard the boot round for slack, and because we quit before measuring in the last round for instrumentation.
    Therefore we explicitly add + 1 to remind us of this. */
