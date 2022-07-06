@@ -7,7 +7,11 @@
 #include "proc.h"
 #include "timer.h"
 
-void Sched(void);
+#if SLACK_CYCLE_TEST == 1
+        void Sched(uint64_t cycle_before);
+#else
+        void Sched(void);
+#endif
 
 void SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
                  uint16_t desired);

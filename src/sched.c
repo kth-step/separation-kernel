@@ -46,7 +46,7 @@ static inline int sched_is_invalid_pid(int8_t pid) {
 so we force its worst time execution when establishing time needed for scheduling. */
 static inline int sched_has_priority(uint64_t s, uint64_t pid,
                                      uintptr_t hartid) {
-        for (size_t i = 0; i < N_CORES - 1; i++) {
+        for (size_t i = 0; i < VIRT_N_CORES - 1; i++) {
                 /* If the pid is same, there is hart with higher priortiy */
                 uint64_t other_pid = sched_get_pid(s, i); /* Process ID. */
                 if (pid == other_pid)
@@ -134,7 +134,11 @@ void wait(uint64_t time) {
         //}
 }
 
+#if SLACK_CYCLE_TEST == 1
+void Sched(uint64_t cycle_before) {
+#else
 void Sched(void) {
+#endif
         /* Release a process if we are holding it */
         release_current();
 
@@ -155,11 +159,17 @@ void Sched(void) {
                         set_timeout(time + length);
                         /* Wait until it is time to run */
                         wait(time);
-
-
-                        uint64_t time_after = read_time();
-                        uint64_t remaining_time = (time * TICKS)- time_after;
-                        printf("\nValue= %lu\n", remaining_time);
+                        #if SLACK_CYCLE_TEST == 1
+                                #if INSTRUMENTATION_TEST == 1
+                                        uint64_t time_after = read_time();
+                                #endif
+                                uint64_t cycle_after = read_csr(mcycle);
+                                printf("Value= %lu\n", (cycle_after-cycle_before));
+                        #else
+                                uint64_t time_after = read_time();
+                                uint64_t remaining_time = (time * TICKS)- time_after;
+                                printf("\nValue= %lu\n", remaining_time);
+                        #endif
                         round_number++;
                         if (round_number >= SLACK_TEST_ROUNDS) {
                                 print_relevant_config();
@@ -171,7 +181,6 @@ void Sched(void) {
                                 uintptr_t instrumentation_overhead = time_after_instrumentation - time_after;
                                 printf("\nValue:%lu\n", instrumentation_overhead);
                         #endif
-
 
                         /* Returns to AsmSwitchToProc. */
                         return;

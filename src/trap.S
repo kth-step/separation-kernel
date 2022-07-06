@@ -1,5 +1,7 @@
 # See LICENSE file for copyright and license details.
 
+#include "config.h"
+
 .globl AsmTrapEntry
 .globl AsmResumeProc
 
@@ -15,6 +17,9 @@ AsmTrapEntry:
         j       __hang  /*  4: User timer interrupt */
         j       __hang  /*  5: Supervisor timer interrupt */
         j       __hang  /*  6: Reserved */
+        #if SLACK_CYCLE_TEST == 1
+                csrr    t6,mcycle
+        #endif
         j       __timer_handler /*  7: Machine timer interrupt */
         j       __hang  /*  8: User external interrupt */
         j       __hang  /*  9: Supervisor external interrupt */
@@ -215,6 +220,10 @@ __timer_handler_machine:
         sd      t4,(-32*8)(sp)
         sd      t5,(-33*8)(sp)
         sd      t6,(-34*8)(sp)
+
+        #if SLACK_CYCLE_TEST == 1
+                mv      a0,t6
+        #endif
 
         /* Load kernel gp, tp */
         ld      tp,(-2*8)(sp)

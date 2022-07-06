@@ -6,12 +6,16 @@
 #define QEMU_DEBUGGING 1
 
 #if QEMU_DEBUGGING == 0
-    /* Number of cores. */
+    /* Number of cores when running on the board. */
     #define N_CORES 4 
 #else
-    /* Number of cores. */
+    /* Number of cores when running in QEMU. */
     #define N_CORES 2
 #endif
+/* Used when testing scheduling; we don't actually run with something else than N_CORES, 
+   but we want the scheduler to be able to think that we run with another amount of cores 
+   to affect the time it takes to complete the scheduling. */
+#define VIRT_N_CORES 4
 /* Number of processes. */
 #define N_PROC 4
 /* Number of capabilities per process */
@@ -23,11 +27,11 @@
 #define TICKS_PER_SECOND 10000000UL
 
 /* Number of time slices in a major frame. */
-#define N_QUANTUM 256
+#define N_QUANTUM 128
 /* Number of ticks per quantum. */
-#define TICKS 10000UL
+#define TICKS 2000UL
 /* Number of slack ticks (buffer) for scheduler. */
-#define SLACK_TICKS 5000UL
+#define SLACK_TICKS 200UL
 
 /* Stack size. */
 #define STACK_SIZE (1024*2)
@@ -50,8 +54,12 @@
     #define MAX_HARTID (N_PROC - 1)
 #endif
 
-#define INSTRUMENTATION_TEST 1
+#define INSTRUMENTATION_TEST 0
+/* While some test are quite intrusive in the correctness of the separation kernel the cycle test is parhaps even more so than the other ones. 
+It should definitely be used with care; make sure to check all places with if-guards for this value and make sure it does not 
+break something you depend on. */
+#define SLACK_CYCLE_TEST 1
 /* We get one round less than specified for both slack testing and instrumentation testing,
    because we need to discard the boot round for slack, and because we quit before measuring in the last round for instrumentation.
    Therefore we explicitly add + 1 to remind us of this. */
-#define SLACK_TEST_ROUNDS (100000 + 1)
+#define SLACK_TEST_ROUNDS (1000000 + 1)
