@@ -32,12 +32,18 @@ static inline void write_timeout(int hartid, unsigned long long timeout) {
 }
 
 static inline int uart_putchar(char c) {
-        unsigned int *txdata = (unsigned int *)0x10010000;
+        volatile unsigned int *txctrl = (volatile unsigned int *)0x10010008;
+        *txctrl = 0x1;
+        volatile  int *txdata = (volatile int *)0x10010000;
+        while (*txdata < 0);
+        *txdata = c;
+        /*
         asm volatile(
             "1:amoswap.w t0,%0,(%1)\n"
             "  sext.w t0,t0\n"
             "  bltz t0,1b" ::"r"(c), "r"(txdata)
             : "t0");
+            */
         return c;
 }
 #endif

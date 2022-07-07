@@ -18,7 +18,7 @@ CFLAGS+=-O2
 CFLAGS+=-gdwarf-2
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Ibsp/$(BSP)
-CFLAGS+=-Wall -fanalyzer -Werror
+CFLAGS+=-Wall -fanalyzer 
 CFLAGS+=-MMD
 #CFLAGS+= -DNDEBUG
 
@@ -26,7 +26,7 @@ CFLAGS+=-MMD
 .PHONY: all settings format clean size cloc qemu
 
 # Show settings, compile elf and make a disassembly by default.
-all: settings src/cap_utils.h $(ELF) $(DA)
+all: settings $(ELF) $(DA)
 
 settings:
 	@echo "Build options:"
@@ -57,7 +57,7 @@ src/cap_utils.h: scripts/cap_gen.py cap.yml
 	@echo "Generating $@"
 	@./scripts/cap_gen.py cap.yml > $@
 
-$(BUILD)/%.c.o: %.c
+$(BUILD)/%.c.o: %.c src/cap_utils.h
 	@mkdir -p $(@D) 
 	@echo "Compiling $@"
 	@$(CC) $(CFLAGS) -c -o $@ $<

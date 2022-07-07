@@ -31,7 +31,7 @@ user_code:
         // Call main with (pid, user data start, user data end)
         mv      t3,a0
         call    user_main
-        j       user_code
+1:      j       1b
 
 .section .bss.user_data
 // This is data for all processes

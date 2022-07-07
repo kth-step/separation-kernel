@@ -23,15 +23,9 @@ static inline uint64_t sched_pid(uint64_t sched_slice, uint64_t hartid);
 /* Returns pid on an sched_slice for a hart */
 static inline uint64_t sched_depth(uint64_t sched_slice, uint64_t hartid);
 
-/* Gets the processes that should run on _hartid_ at time _time_. Returns true
- * if a process was found. */
-static bool sched_get_proc(uint64_t hartid, uint64_t time, Proc **proc,
+/* Gets the processes that should run on _hartid_ at time _time_. */
+static void sched_get_proc(uint64_t hartid, uint64_t time, Proc **proc,
                            uint64_t *length);
-
-/* Try to acquire a process, settings its state to RUNNING. If successful,
- * returns true and sets current to proc */
-static inline bool sched_acquire_proc(Proc *proc);
-static inline void sched_release_proc(void);
 
 static inline bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
                                 uint64_t expected, uint64_t desired,
@@ -52,12 +46,13 @@ uint64_t sched_depth(uint64_t s, uint64_t hartid) {
         return (sched_entry(s, hartid) >> 8) & 0xFF;
 }
 
-bool sched_get_proc(uint64_t hartid, uint64_t time, Proc **proc,
+void sched_get_proc(uint64_t hartid, uint64_t time, Proc **proc,
                     uint64_t *length) {
         kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
 
         /* Set proc to NULL as default */
         *proc = NULL;
+        *length = 0;
         /* Calculate the current quantum */
         uint64_t quantum = time % N_QUANTUM;
         /* Get the current quantum schedule */
@@ -67,14 +62,14 @@ bool sched_get_proc(uint64_t hartid, uint64_t time, Proc **proc,
 
         /* Check if slot is invalid/inactive */
         if (pid & 0x80)
-                return true;
+                return;
 
         /* Check if some other thread preempts */
         for (size_t i = MIN_HARTID; i < hartid; i++) {
                 /* If the pid is same, there is hart with higher priortiy */
                 uint64_t other_pid = sched_pid(sched_slice, i);
                 if (pid == other_pid)
-                        return false;
+                        return;
         }
 
         /* Calculate the length of the same time slice */
@@ -87,26 +82,7 @@ bool sched_get_proc(uint64_t hartid, uint64_t time, Proc **proc,
         /* Set proc and length */
         *proc = &processes[pid];
         *length = quantum_end - quantum;
-        return true;
-}
-
-void sched_release_proc(void) {
-        /* Release the process */
-        current->state = PROC_SUSPENDED;
-        __sync_synchronize();
-        if (current->halt)
-                __sync_val_compare_and_swap(&current->state, PROC_SUSPENDED,
-                                            PROC_HALTED);
-        current = 0;
-}
-
-bool sched_acquire_proc(Proc *proc) {
-        if (__sync_bool_compare_and_swap(&proc->state, PROC_SUSPENDED,
-                                         PROC_RUNNING)) {
-                current = proc;
-                return true;
-        }
-        return false;
+        return;
 }
 
 void wait_and_set_timeout(uint64_t time, uint64_t length) {
@@ -119,13 +95,19 @@ void wait_and_set_timeout(uint64_t time, uint64_t length) {
         write_timeout(hartid, end_time);
 }
 
-void Sched(void) {
-        /* Release a process we are holding. */
-        if (current)
-                sched_release_proc();
-
+Proc *Sched(void) {
         /* The hart/core id */
         uintptr_t hartid = read_csr(mhartid);
+
+        if (current) {
+                ProcState state, next_state;
+                do {
+                        state = current->state;
+                        next_state = (state == PROC_RUNNING) ? PROC_SUSPENDED
+                                                             : PROC_BLOCKED;
+                } while (!__sync_bool_compare_and_swap(&current->state, state,
+                                                       next_state));
+        }
 
         /* Process to run and number of time slices to run for */
         Proc *proc = NULL;
@@ -136,10 +118,12 @@ void Sched(void) {
                 time = (read_time() / TICKS) + 1;
                 /* Try getting a process at that time slice. */
                 sched_get_proc(hartid, time, &proc, &length);
-        } while (proc == NULL || !sched_acquire_proc(proc));
-
+        } while (!proc || !__sync_bool_compare_and_swap(&proc->state, PROC_SUSPENDED,
+                                               PROC_RUNNING));
+        current = proc;
         /* Wait for time slice to start and set timeout */
         wait_and_set_timeout(time, length);
+        return proc;
 }
 
 bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
@@ -154,7 +138,8 @@ bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
         }
         /* Check that the capability still exists */
         if (cn->prev == NULL) {
-                /* If capability deleted, release lock, enable preemption and return */
+                /* If capability deleted, release lock, enable preemption and
+                 * return */
                 lock_release(&lock);
                 set_csr(mstatus, 8);
                 return false;
@@ -184,16 +169,10 @@ bool SchedRevoke(const Cap cap, CapNode *cn) {
         uint64_t mask = SCHED_SLICE_OFFSET(0xFFFF, hartid);
         uint64_t desired = SCHED_SLICE_OFFSET(depth << 8 | pid, hartid);
 
-        clear_csr(mstatus, 8);
-
-        while (!lock_try_acquire(&lock)) {
-                set_csr(mstatus, 8);
-                clear_csr(mstatus, 8);
-        }
+        lock_acquire(&lock);
 
         if (cn->prev == NULL) {
                 lock_release(&lock);
-                set_csr(mstatus, 8);
                 return false;
         }
 
@@ -207,12 +186,12 @@ bool SchedRevoke(const Cap cap, CapNode *cn) {
                 schedule[i] = new_sched_slice;
         }
         lock_release(&lock);
-        set_csr(mstatus, 8);
         return true;
 }
 
 bool SchedUpdate(const Cap cap, const Cap new_cap, CapNode *cn) {
         kassert(cap_get_type(cap) == CAP_TIME);
+        kassert(cap_get_type(new_cap) == CAP_TIME);
         uint64_t hartid = cap_time_get_hartid(new_cap);
         uint64_t begin = cap_time_get_begin(new_cap);
         uint64_t end = cap_time_get_end(new_cap);
@@ -220,8 +199,8 @@ bool SchedUpdate(const Cap cap, const Cap new_cap, CapNode *cn) {
         uint64_t old_depth = cap_time_get_depth(cap);
         uint64_t old_pid = cap_time_get_pid(cap);
 
-        uint64_t new_depth = cap_time_get_depth(cap);
-        uint64_t new_pid = cap_time_get_pid(cap);
+        uint64_t new_depth = cap_time_get_depth(new_cap);
+        uint64_t new_pid = cap_time_get_pid(new_cap);
 
         /* Expected value */
         uint64_t expected =

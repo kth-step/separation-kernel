@@ -5,6 +5,8 @@
 #include "config.h"
 #include "types.h"
 
+#define PROC_NUM_OF_REGS 37
+
 /** Proc
  * This is the Process Control Block (PCB). We store pointers
  * register and process's state in this struct.
@@ -15,7 +17,28 @@ typedef struct proc Proc;
  */
 typedef enum proc_state ProcState;
 
-enum proc_state { PROC_HALTED, PROC_SUSPENDED, PROC_RUNNING, PROC_BLOCKED };
+typedef struct trap_frame TrapFrame;
+
+enum proc_state { PROC_HALTED, PROC_SUSPENDED, PROC_RUNNING, PROC_HALTING, PROC_BLOCKED };
+
+struct trap_frame {
+        uint64_t pc;
+        uint64_t ra, sp, gp, tp;
+        uint64_t t0, t1, t2;
+        uint64_t s0, s1;
+        uint64_t a0, a1, a2, a3, a4, a5, a6, a7;
+        uint64_t s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;
+        uint64_t t3, t4, t5, t6;
+        /* Exception handling registers */
+        uint64_t cause, tval, epc, esp;
+
+        /* Points to pmp entries */
+        uint64_t pmp0;
+        /* Kernel gp and tp */
+        uint64_t kgp, ktp;
+        /* Keep track of whether process was in exception/syscall handling */
+        uint64_t mstatus;
+};
 
 struct proc {
         /** Kernel stack pointer.
@@ -27,36 +50,27 @@ struct proc {
          * other process is running, then we store the process's stack pointer
          * (pointer to proc_stack) to ksp.
          */
-        uintptr_t *ksp;
+        char *ksp;
+
         /** Process identifier.
          * This is the process's ID used for identification during
          * inter-process communication.
          */
-        uintptr_t pid;
-        /** Argument registers.
-         * We store the argument registers a0-a7 in the args array,
-         * this simplifies inter-process communication.
-         */
-        uintptr_t pc;
+        uint64_t pid;
+
+        TrapFrame *tf;
 
         /** Capability table.
          * Pointer to the capability table.
          */
         CapNode *cap_table;
 
+
         /* The pmp configurations are stored in these capabilities */
         /* pmp_table[i].data[1] = pmpicfg | pmpaddri */
         CapNode pmp_table[8];
 
-        /** Process state.
-         * TODO: Comment
-         */
-        uint64_t state;
-        bool halt;
-
-        /* If listen_channel != -1, the process is waiting for a message from
-         * the channel */
-        int listen_channel;
+        ProcState state;
 };
 
 /** Processes
@@ -79,18 +93,3 @@ void ProcInitProcesses(void);
 
 void ProcHalt(Proc *proc);
 void ProcReset(int pid);
-
-static inline bool ProcLoadPmp(Proc *proc, Cap cap, CapNode *cn,
-                               uint64_t index) {
-        kassert(cap_get_type(cap) == CAP_PMP);
-        kassert(index < N_PMP);
-        uint64_t addr = cap_pmp_get_addr(cap);
-        addr = (addr << 10) | 0x3FF;
-        Cap cap_hidden = cap_mk_pmp_hidden(addr, cap_pmp_get_rwx(cap));
-        return CapInsert(cap_hidden, &proc->pmp_table[index], cn);
-}
-
-static inline bool ProcUnloadPmp(Proc *proc, uint64_t index) {
-        kassert(index < 8);
-        return CapDelete(&proc->pmp_table[index]);
-}

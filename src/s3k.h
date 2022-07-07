@@ -1,23 +1,27 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
+#include "cap_utils.h"
 #include "syscall_nr.h"
 #include "types.h"
 
 static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0,
                                    uint64_t arg1, uint64_t arg2, uint64_t arg3,
-                                   uint64_t arg4, uint64_t arg5,
-                                   uint64_t arg6, uint64_t arg7) {
+                                   uint64_t arg4, uint64_t arg5, uint64_t arg6,
+                                   uint64_t arg7) {
         register uint64_t a0 __asm__("a0") = arg0;
         register uint64_t a1 __asm__("a1") = arg1;
         register uint64_t a2 __asm__("a2") = arg2;
         register uint64_t a3 __asm__("a3") = arg3;
         register uint64_t a4 __asm__("a4") = arg4;
         register uint64_t a5 __asm__("a5") = arg5;
-        register uint64_t a6 __asm__("a5") = arg6;
+        register uint64_t a6 __asm__("a6") = arg6;
         register uint64_t a7 __asm__("a7") = arg7;
         register uint64_t t0 __asm__("t0") = sysnr;
         switch (argc) {
+                case 0:
+                        asm volatile ("ecall" : "=r"(a0) : "r"(t0));
+                        break;
                 case 1:
                         asm volatile("ecall" : "+r"(a0) : "r"(t0));
                         break;
@@ -76,14 +80,15 @@ static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0,
         S3K_SYSCALL(4, sysnr, a0, a1, a2, a3, 0, 0, 0, 0)
 #define S3K_SYSCALL3(sysnr, a0, a1, a2) \
         S3K_SYSCALL(3, sysnr, a0, a1, a2, 0, 0, 0, 0, 0)
-#define S3K_SYSCALL2(sysnr, a0, a1) S3K_SYSCALL(2, sysnr, a0, a1, 0, 0, 0, 0, 0, 0)
+#define S3K_SYSCALL2(sysnr, a0, a1) \
+        S3K_SYSCALL(2, sysnr, a0, a1, 0, 0, 0, 0, 0, 0)
 #define S3K_SYSCALL1(sysnr, a0) S3K_SYSCALL(1, sysnr, a0, 0, 0, 0, 0, 0, 0, 0)
 
-static inline uint64_t S3K_GET_PID(void) {
+static inline uint64_t s3k_get_pid(void) {
         return S3K_SYSCALL1(SYSNR_NOCAP, SYSNR_GET_PID);
 }
 
-static inline uint64_t S3K_READ_CAP(uint64_t cid, uint64_t data[2]) {
+static inline Cap s3k_read_cap(uint64_t cid) {
         register int64_t a0 __asm__("a0");
         register uint64_t a1 __asm__("a1");
         register uint64_t a2 __asm__("a2");
@@ -91,28 +96,46 @@ static inline uint64_t S3K_READ_CAP(uint64_t cid, uint64_t data[2]) {
         a0 = cid;
         t0 = SYSNR_READ_CAP;
         __asm__ volatile("ecall" : "+r"(a0), "=r"(a1), "=r"(a2) : "r"(t0));
-        if (a0 > 0) {
-                data[0] = a1;
-                data[1] = a2;
-        } else {
-                data[0] = 0;
-                data[1] = 0;
-        }
-        return a0 > 0;
+        return (Cap){a1, a2};
 }
 
-static inline uint64_t S3K_MOVE_CAP(uint64_t src, uint64_t dest) {
+static inline uint64_t s3k_move_cap(uint64_t src, uint64_t dest) {
         return S3K_SYSCALL2(SYSNR_MOVE_CAP, src, dest);
 }
 
-static inline uint64_t S3K_DELETE_CAP(uint64_t cid) {
+static inline uint64_t s3k_delete_cap(uint64_t cid) {
         return S3K_SYSCALL1(SYSNR_DELETE_CAP, cid);
 }
 
-static inline uint64_t S3K_REVOKE_CAP(uint64_t cid) {
+static inline uint64_t s3k_revoke_cap(uint64_t cid) {
         return S3K_SYSCALL1(SYSNR_REVOKE_CAP, cid);
 }
 
-static inline uint64_t S3K_DERIVE_CAP(uint64_t src, uint64_t dest, uint64_t word0, uint64_t word1) {
-        return S3K_SYSCALL4(SYSNR_DERIVE_CAP, src, dest, word0, word1);
+static inline uint64_t s3k_derive_cap(uint64_t src, uint64_t dest,
+                                      Cap cap) {
+        return S3K_SYSCALL4(SYSNR_DERIVE_CAP, src, dest, cap.word0, cap.word1);
+}
+
+static inline bool s3k_supervisor_halt(uint64_t sup_cid, uint64_t pid) {
+        return S3K_SYSCALL3(SYSNR_INVOKE_CAP, sup_cid, pid, 0);
+} 
+
+static inline bool s3k_supervisor_resume(uint64_t sup_cid, uint64_t pid) {
+        return S3K_SYSCALL3(SYSNR_INVOKE_CAP, sup_cid, pid, 1);
+} 
+
+static inline bool s3k_supervisor_read_reg(uint64_t sup_cid, uint64_t pid, uint64_t reg_nr) {
+        return S3K_SYSCALL4(SYSNR_INVOKE_CAP, sup_cid, pid, 3, reg_nr);
+} 
+
+static inline bool s3k_supervisor_write_reg(uint64_t sup_cid, uint64_t pid, uint64_t reg_nr, uint64_t val) {
+        return S3K_SYSCALL5(SYSNR_INVOKE_CAP, sup_cid, pid, 4, reg_nr, val);
+} 
+
+static inline uint64_t s3k_supervisor_give_cap(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest, uint64_t n) {
+        return S3K_SYSCALL6(SYSNR_INVOKE_CAP, sup_cid, pid, 5, src, dest, n);
+}
+
+static inline uint64_t s3k_supervisor_take_cap(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest, uint64_t n) {
+        return S3K_SYSCALL6(SYSNR_INVOKE_CAP, sup_cid, pid, 6, src, dest, n);
 }

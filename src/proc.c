@@ -6,6 +6,7 @@
 #include "config.h"
 #include "stack.h"
 #include "csr.h"
+#include "kprint.h"
 
 /* Temporary. */
 extern void user_code();
@@ -21,11 +22,11 @@ void ProcReset(int pid) {
         proc->pid = pid;
         /* Set the process's kernel stack. */
         proc->ksp = &proc_stack[pid+1][0];
+        proc->ksp -= sizeof(TrapFrame);
+        proc->tf = (TrapFrame*)proc->ksp;
         /* Zero the capability table. */
         proc->cap_table = cap_tables[pid];
-        proc->pc = 0;
-        proc->listen_channel = -1;
-        /* Set process to HALTED. */
+
         proc->state = PROC_HALTED;
 }
 
@@ -76,9 +77,7 @@ static void proc_init_boot_proc(Proc *boot) {
         proc_init_time(&cap_table[4]);
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
-        boot->pc = (uint64_t)user_code;  // Temporary code.
-
-        /* Set boot process to running. */
+        boot->tf->pc = (uint64_t)user_code;  // Temporary code.
         boot->state = PROC_SUSPENDED;
 }
 
@@ -96,6 +95,4 @@ void ProcInitProcesses(void) {
 }
 
 void ProcHalt(Proc *proc) {
-        proc->halt = true;
-        __sync_bool_compare_and_swap(&proc->state, PROC_SUSPENDED, PROC_HALTED);
 }
