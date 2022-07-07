@@ -41,7 +41,7 @@ static inline int sched_is_invalid_pid(int8_t pid) {
         return pid < 0;
 }
 
-#if PERFORMANCE_SCHEDULING == 0
+#if (PERFORMANCE_SCHEDULING == 0 && N_CORES != 1)
 static inline int sched_has_priority(uint64_t s, uint64_t pid,
                                      uintptr_t hartid) {
         for (size_t i = 0; i < hartid; i++) {
@@ -80,7 +80,7 @@ static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         /* If msb is 1, return 0 */
         if (pid & 0x80)
                 return 0;
-        #if PERFORMANCE_SCHEDULING == 0
+        #if (PERFORMANCE_SCHEDULING == 0 && N_CORES != 1)
                 /* Check that no other hart with higher priority schedules this pid */
                 if (!sched_has_priority(s, pid, hartid))
                         return 0;
