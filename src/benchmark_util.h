@@ -7,7 +7,6 @@
 
 void print_relevant_config() {
     printf( "N_CORES=%d\n"
-            "VIRT_N_CORES=%d\n"
             "N_PROC=%d\n"
             "N_CAPS=%d\n"
             "TICKS_PER_SECOND=%lu\n"
@@ -19,7 +18,7 @@ void print_relevant_config() {
             "SLACK_TEST_ROUNDS=%d\n"
             "SLACK_CYCLE_TEST=%d\n"
             "QEMU_DEBUGGING=%d\n"
-            , N_CORES, VIRT_N_CORES, N_PROC, N_CAPS, TICKS_PER_SECOND, N_QUANTUM, TICKS, SLACK_TICKS, STACK_SIZE
+            , N_CORES, N_PROC, N_CAPS, TICKS_PER_SECOND, N_QUANTUM, TICKS, SLACK_TICKS, STACK_SIZE
             , INSTRUMENTATION_TEST, SLACK_TEST_ROUNDS, SLACK_CYCLE_TEST, QEMU_DEBUGGING);
 }
 

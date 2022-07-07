@@ -7,16 +7,11 @@
 
 #if QEMU_DEBUGGING == 0
     /* Number of cores when running on the board. */
-    #define N_CORES 4 
+    #define N_CORES 4
 #else
     /* Number of cores when running in QEMU. */
     #define N_CORES 2
 #endif
-/* Used when testing scheduling; we don't actually run with something else than N_CORES, 
-   but we want the scheduler to be able to think that we run with another amount of cores 
-   to affect the time it takes to complete the scheduling. 
-   Since the separation kernel currently only supports up to 4 cores, it is assumed that this value does not surpass 4 either.*/
-#define VIRT_N_CORES 4
 /* Number of processes. */
 #define N_PROC 4
 /* Number of capabilities per process */

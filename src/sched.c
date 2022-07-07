@@ -46,7 +46,7 @@ static inline int sched_is_invalid_pid(int8_t pid) {
 so we force its worst time execution when establishing time needed for scheduling. */
 static inline int sched_has_priority(uint64_t s, uint64_t pid,
                                      uintptr_t hartid) {
-        for (size_t i = 0; i < VIRT_N_CORES - 1; i++) {
+        for (size_t i = 0; i < N_CORES - 1; i++) {
                 /* If the pid is same, there is hart with higher priortiy */
                 uint64_t other_pid = sched_get_pid(s, i); /* Process ID. */
                 if (pid == other_pid)
@@ -88,8 +88,10 @@ static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         if (pid & 0x80)
                 return 0;
         /* Check that no other hart with higher priority schedules this pid */
-        if (!sched_has_priority(s, pid, hartid))
-                return 0;
+        #if N_CORES != 1
+                if (!sched_has_priority(s, pid, hartid))
+                        return 0;
+        #endif
         /* Set process */
         *proc = &processes[pid];
         /* Return the scheduling length */

@@ -7,6 +7,10 @@
 /*** This is the kernel's entry point ***/
 .globl _start
 _start:
+        csrr    t0,mhartid
+        li      t1,N_CORES
+        bgt     t0,t1,__hang
+
         li      x1,0
         li      x2,0
         li      x3,0
