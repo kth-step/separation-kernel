@@ -42,6 +42,7 @@ static inline int sched_is_invalid_pid(int8_t pid) {
         return pid < 0;
 }
 
+#if N_CORES != 1
 /* The loop in this function affects the running time of the scheduling, 
 so we force its worst time execution when establishing time needed for scheduling. */
 static inline int sched_has_priority(uint64_t s, uint64_t pid,
@@ -56,6 +57,7 @@ static inline int sched_has_priority(uint64_t s, uint64_t pid,
         // While this adds one operation (giving us a slightly worse time) it does allow us to keep the determinism during testing.
         return (hartid == 0);
 }
+#endif
 
 /* The loop in this function affects the running time of the scheduling, 
 so we force its worst time execution when establishing time needed for scheduling. */
