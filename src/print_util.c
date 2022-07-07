@@ -15,13 +15,18 @@ void print_relevant_config() {
             "SLACK_TICKS=%lu\n"
             "STACK_SIZE=%d\n"
             "SCHEDULE_BENCHMARK=%d\n"
-            "BENCHMARK_DURATION=%lu\n"
+            #if BENCHMARK_DURATION != 0
+                "BENCHMARK_DURATION=%lu\n"
+            #endif
             "BENCHMARK_ROUNDS=%lu\n"
             "PERFORMANCE_SCHEDULING=%d\n"
             "CRYPTO_APP=%d\n"
             "QEMU_DEBUGGING=%d\n"
-            , N_CORES, N_PROC, N_CAPS, TICKS_PER_SECOND, N_QUANTUM, TICKS, SLACK_TICKS, STACK_SIZE
-            , SCHEDULE_BENCHMARK, BENCHMARK_DURATION, BENCHMARK_ROUNDS, PERFORMANCE_SCHEDULING, CRYPTO_APP, QEMU_DEBUGGING);
+            , N_CORES, N_PROC, N_CAPS, TICKS_PER_SECOND, N_QUANTUM, TICKS, SLACK_TICKS, STACK_SIZE, SCHEDULE_BENCHMARK
+            #if BENCHMARK_DURATION != 0
+                , BENCHMARK_DURATION 
+            #endif
+            , BENCHMARK_ROUNDS, PERFORMANCE_SCHEDULING, CRYPTO_APP, QEMU_DEBUGGING);
 }
 
 void print_relevant_config_locked() {

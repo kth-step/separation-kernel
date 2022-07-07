@@ -6,10 +6,10 @@
 #define QEMU_DEBUGGING 1
 
 #if QEMU_DEBUGGING == 0
-    /* Number of cores. */
+    /* Number of cores when running on the board. */
     #define N_CORES 4 
 #else
-    /* Number of cores. */
+    /* Number of cores when running in QEMU. */
     #define N_CORES 2
 #endif 
 /* Number of processes. */
@@ -20,15 +20,15 @@
 #define N_PMP 8
 
 /* Ticks per second */
-// TODO: check what this is on the actual board
-#define TICKS_PER_SECOND 10000000UL
+/* "The CPU real time clock (rtcclk) runs at 1 MHz" https://static.dev.sifive.com/FU540-C000-v1.0.pdf */
+#define TICKS_PER_SECOND 1000000UL
 
 /* Number of time slices in a major frame. */
-#define N_QUANTUM 256
+#define N_QUANTUM 1
 /* Number of ticks per quantum. */
-#define TICKS 20000UL
+#define TICKS 2000UL
 /* Number of slack ticks (buffer) for scheduler. */
-#define SLACK_TICKS 10000UL
+#define SLACK_TICKS 200UL
 
 /* Stack size. */
 #define STACK_SIZE (1024*2)
@@ -53,8 +53,10 @@
 
 #define SCHEDULE_BENCHMARK 1
 /* Currently 1 round = 1 quantum, and the duration consequently assumes a process is only scheduled for one quantum. */
-#define BENCHMARK_DURATION (TICKS_PER_SECOND*10)
-#define BENCHMARK_ROUNDS (BENCHMARK_DURATION / TICKS)
+#define BENCHMARK_DURATION (TICKS_PER_SECOND*0)
+/* We get two rounds less than specified because we need to discard the boot round and the very first measure is before having run any round at all.
+   Therefore we explicitly add + 2 to remind us of this (if we want a specific number of data points that is). */
+#define BENCHMARK_ROUNDS (1000000 + 2) // (BENCHMARK_DURATION / TICKS)
 
-#define PERFORMANCE_SCHEDULING 1
+#define PERFORMANCE_SCHEDULING 0
 #define CRYPTO_APP 0
