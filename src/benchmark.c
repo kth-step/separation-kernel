@@ -5,9 +5,13 @@
 #include "print_util.h"
 #include "proc.h"
 
-void end_benchmark(uint64_t duration_recorded, uint64_t values[]) {
-        for (int i = 0; i < BENCHMARK_ROUNDS; i++) {
-                printf("Value=%lu\n", values[i]);
+void end_benchmark(uint64_t duration_recorded, uint64_t values[N_CORES][BENCHMARK_ROUNDS]) {
+        for (int hart = 0; hart < N_CORES; hart++) {
+                printf("Values from hart %d:\n", hart);
+                for (int i = 0; i < BENCHMARK_ROUNDS; i++) {
+                        printf("Value=%lu\n", values[hart][i]);
+                }
+                printf("End of values from hart %d\n", hart);
         }
         print_relevant_config();
         #if BENCHMARK_DURATION == 0

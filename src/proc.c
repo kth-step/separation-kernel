@@ -145,10 +145,14 @@ void ProcInitProcesses(void) {
         proc_init_boot_proc(&processes[0]);
 
         processes[0].pc = (uintptr_t)benchmark_code;
+        processes[1].pc = (uintptr_t)benchmark_code;
+        processes[2].pc = (uintptr_t)benchmark_code;
+        processes[3].pc = (uintptr_t)benchmark_code;
+
         #if CRYPTO_APP == 1
                 ProcCryptoAppInit();
-                InitSched();
         #endif
+        InitSched();
 }
 
 void ProcHalt(Proc *proc) {

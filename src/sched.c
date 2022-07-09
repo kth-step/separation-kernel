@@ -8,9 +8,9 @@
 #include "stack.h"
 
 #if SCHEDULE_BENCHMARK == 1
-        extern void end_benchmark(uint64_t duration_recorded, uint64_t values[]);
-        static int round_counter = 0;
-        static uint64_t values[BENCHMARK_ROUNDS];
+        extern void end_benchmark(uint64_t duration_recorded, uint64_t values[N_CORES][BENCHMARK_ROUNDS]);
+        static int round_counter[N_CORES];
+        static uint64_t values[N_CORES][BENCHMARK_ROUNDS];
 #endif
 
 /** The schedule.
@@ -25,13 +25,22 @@
 uint64_t schedule[N_QUANTUM];
 
 void InitSched() {
-        for (int i = 0; i < N_QUANTUM; i++) {
-                if (i % 2 == 0) {
-                        schedule[i] = 0x0000000200010000;
-                } else {
-                        schedule[i] = 0x0000000100020000;
-                }
+        for (int i = 0; i < N_CORES; i++) {
+                round_counter[i] = 0;
         }
+        #if CRYPTO_APP != 0
+                for (int i = 0; i < N_QUANTUM; i++) {
+                        if (i % 2 == 0) {
+                                schedule[i] = 0x0000000200010000;
+                        } else {
+                                schedule[i] = 0x0000000100020000;
+                        }
+                }
+        #elif SCHEDULE_BENCHMARK != 0
+                for (int i = 0; i < N_QUANTUM; i++) {
+                        schedule[i] = 0x0003000200010000;
+                }
+        #endif
 }
 
 static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
@@ -166,9 +175,16 @@ void Sched(void) {
                                 wait(time);
                         #endif
                         #if SCHEDULE_BENCHMARK == 1
-                                values[round_counter] = current->args[0];
+                                values[hartid][round_counter[hartid]] = current->args[0];
                                 current->args[0] = 0;
-                                if (++round_counter >= BENCHMARK_ROUNDS) end_benchmark(time_ticks, values);
+                                if (++(round_counter[hartid]) >= BENCHMARK_ROUNDS) {
+                                        if (hartid == 0)
+                                                end_benchmark(time_ticks, values);
+                                        else {
+                                                while (1)
+                                                        ;
+                                        }
+                                }
                         #endif
                         /* Returns to AsmSwitchToProc. */
                         return;
