@@ -28,7 +28,7 @@ CFLAGS+=-Wall -fanalyzer
 
 # Commands
 
-.PHONY: all settings format clean size debug-qemu qemu noninteractive-qemu debug-hifive-unleashed stop-qemu stop-debugging stop-debugging-qemu benchmark
+.PHONY: all settings format clean size debug-qemu qemu noninteractive-qemu debug-hifive-unleashed stop-qemu stop-debugging stop-debugging-qemu benchmark-qemu benchmark-board
 all: settings $(ELF) $(DA)
 
 settings:
@@ -71,8 +71,13 @@ stop-debugging:
 
 stop-debugging-qemu: stop-qemu stop-debugging
 
-benchmark: $(ELF)
-	@python3 scripts/benchmark-script.py 
+benchmark-qemu: $(ELF)
+	@sed -i 's/is_qemu = False/is_qemu = True/' scripts/benchmark-script.py
+	@python3 scripts/benchmark-script.py
+
+benchmark-board:
+	@sed -i 's/is_qemu = True/is_qemu = False/' scripts/benchmark-script.py
+	@python3 scripts/benchmark-script.py
 
 # Build instructions
 
