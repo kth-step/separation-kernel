@@ -1,24 +1,28 @@
 import statistics
 import subprocess
+import time
 
 # Config #
-num_rounds = 1
+num_rounds = 2
 discard_first_n = 2
 output_file = "./benchmark_results.txt"
 
 # Global variables #
 output = ""
+discard_string = ""
 values = []
 
 # Execute benchmark #
+start_time = time.time()
 print("Begin benchmark script")
 for i in range(num_rounds):
+    round_values = []
     p = subprocess.Popen(["make", "--no-print-directory", "noninteractive-qemu"], stdout=subprocess.PIPE, universal_newlines=True)
 
     line = p.stdout.readline()
     while not "DONE" in line:
         if line[0:6] == "Value=":
-            values.append(int(line[6:]))
+            round_values.append(int(line[6:]))
         elif i == 0 and line != "\n":
             output += line
         line = p.stdout.readline()
@@ -27,14 +31,18 @@ for i in range(num_rounds):
     subprocess.run(["make", "--no-print-directory", "stop-qemu"])
 
 # Generate output #
-output += "\n"
-if discard_first_n > 0:
-    first_values = values[0:discard_first_n]
-    values = values[discard_first_n:]
-    output += "Discarding first " + str(discard_first_n) + " value(s) (might have been bad due to being in boot round or similar). Discarded value(s): " 
-    for i in range(discard_first_n):
-        output += str(first_values[i]) + " "
     output += "\n"
+    if discard_first_n > 0:
+        first_values = round_values[0:discard_first_n]
+        round_values = round_values[discard_first_n:]
+        discard_string += "Discarding first " + str(discard_first_n) + " value(s) (might have been bad due to being in boot round or similar). Discarded value(s): " 
+        for i in range(discard_first_n):
+            discard_string += str(first_values[i]) + " "
+        discard_string += "\n"
+    values.extend(round_values)
+
+ex_time = time.time()
+print("Execution time:", ex_time - start_time)
 
 formatting_style = "{:,.0f}"
 var_str = formatting_style.format(statistics.variance(values))
@@ -49,6 +57,9 @@ output += "Max: ".ljust(30, ' ') + formatting_style.format(max(values)).rjust(ma
 output += "Min: ".ljust(30, ' ') + formatting_style.format(min(values)).rjust(max_number_length, ' ') + "\n"
 output += "\n"
 
+output += discard_string
+output += "\n"
+
 output += "Original raw values:\n"
 for i in range(len(values)):
     output += str(values[i]) + "\n"
@@ -57,3 +68,5 @@ for i in range(len(values)):
 with open(output_file, "w") as f:
     f.write(output)
 print("Benchmark script finished")
+end_time = time.time()
+print("Total time:", end_time - start_time, ", in minutes:", (end_time - start_time)/60)
