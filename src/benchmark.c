@@ -5,12 +5,10 @@
 #include "print_util.h"
 #include "proc.h"
 
-void incremental_benchmark_step() {
-        printf("\nValue=%lu\n", current->args[0]);
-        current->args[0] = 0;
-}
-
-void end_incremental_benchmark(uint64_t duration_recorded) {
+void end_benchmark(uint64_t duration_recorded, uint64_t values[]) {
+        for (int i = 0; i < BENCHMARK_ROUNDS; i++) {
+                printf("Value=%lu\n", values[i]);
+        }
         print_relevant_config();
         #if BENCHMARK_DURATION == 0
                 printf("Duration test ran for: %lu\n", duration_recorded);
@@ -26,16 +24,6 @@ void end_incremental_benchmark(uint64_t duration_recorded) {
                 if (sec > 60.0)
                         printf("In minutes (rounded down): %d\n", (int)(sec / 60));
         #endif
-        printf("DONE\n");
-        while(1)
-                ;
-}
-
-void end_non_incremental_benchmark(uint64_t duration_recorded) {
-        print_relevant_config();
-        printf("\nValue=%lu\n", current->args[0]);
-        printf("Duration test ran for:                       %lu\n", duration_recorded);
-        printf("Amount of time longer than minimum duration: %lu\n", (duration_recorded - BENCHMARK_DURATION));
         printf("DONE\n");
         while(1)
                 ;

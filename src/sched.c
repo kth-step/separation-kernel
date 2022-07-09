@@ -4,12 +4,13 @@
 
 #include "config.h"
 #include "csr.h"
+#include "proc.h"
 #include "stack.h"
 
 #if SCHEDULE_BENCHMARK == 1
-        extern void end_incremental_benchmark();
-        extern void incremental_benchmark_step();
+        extern void end_benchmark(uint64_t duration_recorded, uint64_t values[]);
         static int round_counter = 0;
+        static uint64_t values[BENCHMARK_ROUNDS];
 #endif
 
 /** The schedule.
@@ -165,8 +166,9 @@ void Sched(void) {
                                 wait(time);
                         #endif
                         #if SCHEDULE_BENCHMARK == 1
-                                incremental_benchmark_step();
-                                if (++round_counter >= BENCHMARK_ROUNDS) end_incremental_benchmark(time_ticks);
+                                values[round_counter] = current->args[0];
+                                current->args[0] = 0;
+                                if (++round_counter >= BENCHMARK_ROUNDS) end_benchmark(time_ticks, values);
                         #endif
                         /* Returns to AsmSwitchToProc. */
                         return;
