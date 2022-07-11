@@ -11,7 +11,7 @@
 #define N_CAPS 128
 
 /* Number of time slices in a major frame. */
-#define N_QUANTUM 64
+#define N_QUANTUM 100
 
 /* Number of communications channels */
 #define N_CHANNELS 256
@@ -31,10 +31,4 @@
 
 #define MEMORY_PROTECTION 1
 
-/* Stack size. */
-/* log_2 of stack size. */
-#define LOG_PROC_STACK_SIZE 12
-#define LOG_CORE_STACK_SIZE 12
-#define PROC_STACK_SIZE (1UL << LOG_PROC_STACK_SIZE)
-#define CORE_STACK_SIZE (1UL << LOG_CORE_STACK_SIZE)
 

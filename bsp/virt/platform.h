@@ -11,6 +11,13 @@
 /* Maximum hartid */
 #define MAX_HARTID 4
 
+/* Stack size. */
+/* log_2 of stack size. */
+#define LOG_PROC_STACK_SIZE 12
+#define LOG_CORE_STACK_SIZE 12
+#define PROC_STACK_SIZE (1UL << LOG_PROC_STACK_SIZE)
+#define CORE_STACK_SIZE (1UL << LOG_CORE_STACK_SIZE)
+
 #ifndef __ASSEMBLER__
 #define MTIME ((volatile unsigned long long *)0x200bff8UL)
 #define MTIMECMP(x) ((volatile unsigned long long *)(0x2004000UL + ((x)*8)))
