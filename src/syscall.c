@@ -3,6 +3,7 @@
 #include "csr.h"
 #include "kprint.h"
 #include "sched.h"
+#include "stack.h"
 #include "syscall_nr.h"
 #include "trap.h"
 #include "types.h"
@@ -30,8 +31,10 @@ static void (*const syscall_handler_array[])(TrapFrame *) = {
 void SyscallHandler(TrapFrame *tf, uint64_t mcause, uint64_t mtval) {
         uint64_t syscall_number = tf->t0;
         if (syscall_number < ARRAY_SIZE(syscall_handler_array)) {
-                tf->pc += 4;
+                SchedDisablePreemption();
                 syscall_handler_array[syscall_number](tf);
+                tf->pc += 4;
+                SchedEnablePreemption();
         } else {
                 ExceptionHandler(tf, mcause, mtval);
         }
@@ -69,9 +72,7 @@ void syscall_move_cap(TrapFrame *tf) {
         }
         CapNode *cn_src = &current->cap_table[cid_src];
         CapNode *cn_dest = &current->cap_table[cid_dest];
-        SchedEnablePreemption();
         tf->a0 = CapMove(cn_src, cn_dest);
-        SchedDisablePreemption();
 }
 
 void syscall_delete_cap(TrapFrame *tf) {
@@ -82,7 +83,6 @@ void syscall_delete_cap(TrapFrame *tf) {
         }
         CapNode *cn = &current->cap_table[cid];
         const Cap cap = cn_get(cn);
-        SchedEnablePreemption();
         switch (cap_get_type(cap)) {
                 case CAP_PMP:
                         CapRevoke(cn);
@@ -96,8 +96,6 @@ void syscall_delete_cap(TrapFrame *tf) {
                         tf->a0 = CapDelete(cn);
                         break;
         }
-
-        SchedDisablePreemption();
 }
 
 void syscall_revoke_cap(TrapFrame *tf) {
@@ -108,7 +106,6 @@ void syscall_revoke_cap(TrapFrame *tf) {
         }
         CapNode *cn = &current->cap_table[cid];
         Cap cap = cn_get(cn);
-        SchedDisablePreemption();
         switch (cap_get_type(cap)) {
                 case CAP_PMP:
                         tf->a0 = CapRevoke(cn);
@@ -138,8 +135,6 @@ void syscall_revoke_cap(TrapFrame *tf) {
                         tf->a0 = -1;
                         break;
         }
-
-        SchedDisablePreemption();
 }
 
 void syscall_derive_cap(TrapFrame *tf) {
@@ -166,7 +161,6 @@ void syscall_derive_cap(TrapFrame *tf) {
                 return;
         }
 
-        SchedDisablePreemption();
         if (parent_type == CAP_MEMORY && child_type == CAP_MEMORY) {
                 uint64_t end = cap_memory_get_begin(child);
                 cap_memory_set_free(&parent, end);
@@ -198,8 +192,6 @@ void syscall_derive_cap(TrapFrame *tf) {
                 tf->a0 = CapUpdate(parent, cn_parent) &&
                          CapInsert(child, cn_child, cn_parent);
         }
-
-        SchedEnablePreemption();
 }
 
 void syscall_invoke_cap(TrapFrame *tf) {
@@ -226,22 +218,21 @@ void syscall_invoke_cap(TrapFrame *tf) {
 void syscall_invoke_endpoint(TrapFrame *tf, Cap cap, CapNode *cn) {
 }
 
-void syscall_invoke_supervisor_halt(TrapFrame *tf, Proc *supervisee) {
-        SchedDisablePreemption();
-        tf->a0 = __sync_bool_compare_and_swap(&supervisee->state,
-                                              PROC_SUSPENDED, PROC_HALTED) ||
-                 __sync_bool_compare_and_swap(&supervisee->state, PROC_RUNNING,
-                                              PROC_HALTING);
-
-        SchedEnablePreemption();
+void syscall_invoke_supervisor_suspend(TrapFrame *tf, Proc *supervisee) {
+        ProcState state =
+            __sync_fetch_and_or(&supervisee->state, PROC_SUSPENDED);
+        if (state == PROC_WAITING) {
+                supervisee->ksp =
+                    &proc_stack[supervisee->pid]
+                               [PROC_STACK_SIZE - sizeof(TrapFrame)];
+                __sync_synchronize();
+                supervisee->state = PROC_SUSPENDED;
+        }
 }
 
 void syscall_invoke_supervisor_resume(TrapFrame *tf, Proc *supervisee) {
-        SchedDisablePreemption();
-        tf->a0 = __sync_bool_compare_and_swap(&supervisee->state, PROC_HALTED,
-                                              PROC_SUSPENDED);
-
-        SchedEnablePreemption();
+        tf->a0 = __sync_bool_compare_and_swap(&supervisee->state,
+                                              PROC_SUSPENDED, PROC_READY);
 }
 
 bool syscall_interprocess_move(CapNode *src, CapNode *dest, uint64_t pid) {
@@ -267,40 +258,32 @@ bool syscall_interprocess_move(CapNode *src, CapNode *dest, uint64_t pid) {
 }
 
 void syscall_invoke_supervisor_state(TrapFrame *tf, Proc *supervisee) {
-        ProcState state;
-        do {
-                state = (volatile ProcState)supervisee->state;
-        } while (state == PROC_BLOCKED);
-        tf->a0 = state;
+        tf->a0 = supervisee->state;
 }
 
 void syscall_invoke_supervisor_read_reg(TrapFrame *tf, Proc *supervisee) {
-        SchedDisablePreemption();
         uint64_t reg_nr = tf->a3;
         if (reg_nr < PROC_NUM_OF_REGS &&
-            __sync_bool_compare_and_swap(&supervisee->state, PROC_HALTED,
-                                         PROC_BLOCKED)) {
+            __sync_bool_compare_and_swap(&supervisee->state, PROC_SUSPENDED,
+                                         PROC_SUSPENDED_BUSY)) {
                 tf->a0 = 1;
                 tf->a1 = ((uint64_t *)supervisee->tf)[reg_nr];
                 __sync_synchronize();
-                supervisee->state = PROC_HALTED;
+                supervisee->state = PROC_READY;
         }
-        SchedEnablePreemption();
 }
 
 void syscall_invoke_supervisor_write_reg(TrapFrame *tf, Proc *supervisee) {
-        SchedDisablePreemption();
         uint64_t reg_nr = tf->a3;
         uint64_t reg_value = tf->a4;
         if (reg_nr < PROC_NUM_OF_REGS &&
-            __sync_bool_compare_and_swap(&supervisee->state, PROC_HALTED,
-                                         PROC_BLOCKED)) {
+            __sync_bool_compare_and_swap(&supervisee->state, PROC_SUSPENDED,
+                                         PROC_SUSPENDED_BUSY)) {
                 tf->a0 = 1;
                 ((uint64_t *)supervisee->tf)[reg_nr] = reg_value;
                 __sync_synchronize();
-                supervisee->state = PROC_HALTED;
+                supervisee->state = PROC_SUSPENDED;
         }
-        SchedEnablePreemption();
 }
 
 void syscall_invoke_supervisor_give(TrapFrame *tf, Proc *supervisee) {
@@ -312,17 +295,16 @@ void syscall_invoke_supervisor_give(TrapFrame *tf, Proc *supervisee) {
         while (cid_src < N_CAPS && cid_src < cid_last && cid_dest < N_CAPS) {
                 CapNode *src = &current->cap_table[cid_src];
                 CapNode *dest = &supervisee->cap_table[cid_dest];
-                SchedDisablePreemption();
                 if (__sync_bool_compare_and_swap(&supervisee->state,
-                                                 PROC_HALTED, PROC_BLOCKED)) {
+                                                 PROC_SUSPENDED,
+                                                 PROC_SUSPENDED_BUSY)) {
                         succ = syscall_interprocess_move(src, dest,
                                                          supervisee->pid);
                         __sync_synchronize();
-                        supervisee->state = PROC_HALTED;
+                        supervisee->state = PROC_SUSPENDED;
                 } else {
                         succ = false;
                 }
-                SchedEnablePreemption();
                 if (!succ)
                         break;
                 cid_src++;
@@ -340,15 +322,16 @@ void syscall_invoke_supervisor_take(TrapFrame *tf, Proc *supervisee) {
         while (cid_src < N_CAPS && cid_src < cid_last && cid_dest < N_CAPS) {
                 CapNode *src = &supervisee->cap_table[cid_src];
                 CapNode *dest = &current->cap_table[cid_dest];
-                SchedDisablePreemption();
                 if (__sync_bool_compare_and_swap(&supervisee->state,
-                                                 PROC_HALTED, PROC_BLOCKED)) {
+                                                 PROC_SUSPENDED,
+                                                 PROC_SUSPENDED_BUSY)) {
                         succ =
                             syscall_interprocess_move(src, dest, current->pid);
+                        __sync_synchronize();
+                        supervisee->state = PROC_SUSPENDED;
                 } else {
                         succ = false;
                 }
-                SchedEnablePreemption();
                 if (!succ)
                         break;
                 cid_src++;
@@ -371,7 +354,7 @@ void syscall_invoke_supervisor(TrapFrame *tf, Cap cap, CapNode *cn) {
         Proc *supervisee = &processes[pid];
         switch (op) {
                 case 0:
-                        syscall_invoke_supervisor_halt(tf, supervisee);
+                        syscall_invoke_supervisor_suspend(tf, supervisee);
                         break;
                 case 1:
                         syscall_invoke_supervisor_resume(tf, supervisee);

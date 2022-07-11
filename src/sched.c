@@ -100,13 +100,7 @@ Proc *Sched(void) {
         uintptr_t hartid = read_csr(mhartid);
 
         if (current) {
-                ProcState state, next_state;
-                do {
-                        state = current->state;
-                        next_state = (state == PROC_RUNNING) ? PROC_SUSPENDED
-                                                             : PROC_BLOCKED;
-                } while (!__sync_bool_compare_and_swap(&current->state, state,
-                                                       next_state));
+                __sync_fetch_and_and(&current->state, PROC_SUSPENDED);
         }
 
         /* Process to run and number of time slices to run for */
@@ -118,8 +112,8 @@ Proc *Sched(void) {
                 time = (read_time() / TICKS) + 1;
                 /* Try getting a process at that time slice. */
                 sched_get_proc(hartid, time, &proc, &length);
-        } while (!proc || !__sync_bool_compare_and_swap(&proc->state, PROC_SUSPENDED,
-                                               PROC_RUNNING));
+        } while (!proc || !__sync_bool_compare_and_swap(
+                              &proc->state, PROC_READY, PROC_RUNNING));
         current = proc;
         /* Wait for time slice to start and set timeout */
         wait_and_set_timeout(time, length);

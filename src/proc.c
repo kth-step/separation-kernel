@@ -15,7 +15,7 @@ extern void user_code();
 Proc processes[N_PROC];
 
 /* Initializes one process. */
-void ProcReset(int pid) {
+void proc_init(int pid) {
         /* Get the PCB */
         Proc *proc = &processes[pid];
         /* Set the process id to */
@@ -27,7 +27,7 @@ void ProcReset(int pid) {
         /* Zero the capability table. */
         proc->cap_table = cap_tables[pid];
 
-        proc->state = PROC_HALTED;
+        proc->state = PROC_SUSPENDED;
 }
 
 static void proc_init_memory(CapNode *pmp, CapNode *memory) {
@@ -69,7 +69,7 @@ static void proc_init_supervisor(CapNode *cap_sup) {
         CapInsert(cap, cap_sup, sentinel);
 }
 
-static void proc_init_boot_proc(Proc *boot) {
+static void proc_init_boot(Proc *boot) {
         CapNode *cap_table = boot->cap_table;
         proc_init_memory(&cap_table[0], &cap_table[1]);
         proc_init_channels(&cap_table[2]);
@@ -78,21 +78,12 @@ static void proc_init_boot_proc(Proc *boot) {
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
         boot->tf->pc = (uint64_t)user_code;  // Temporary code.
-        boot->state = PROC_SUSPENDED;
+        boot->state = PROC_READY;
 }
 
 /* Defined in proc.h */
 void ProcInitProcesses(void) {
-        /* Initialize processes. */
-        uint64_t hartid = read_csr(mhartid);
-        for (int i = 0; i < N_PROC; i++) {
-                kprintf("Core %d: Init proc %030lx\n", hartid, i);
-                ProcReset(i);
-        }
-        /*** Boot process ***/
-        kprintf("Core %d: Init boot proc 0\n", hartid);
-        proc_init_boot_proc(&processes[0]);
-}
-
-void ProcHalt(Proc *proc) {
+        for (int i = 0; i < N_PROC; i++)
+                proc_init(i);
+        proc_init_boot(&processes[0]);
 }

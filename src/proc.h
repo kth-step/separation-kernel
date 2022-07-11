@@ -19,7 +19,16 @@ typedef enum proc_state ProcState;
 
 typedef struct trap_frame TrapFrame;
 
-enum proc_state { PROC_HALTED, PROC_SUSPENDED, PROC_RUNNING, PROC_HALTING, PROC_BLOCKED };
+enum proc_state {
+        PROC_READY,
+        PROC_RUNNING,
+        PROC_WAITING,
+        PROC_RECEIVING,
+        PROC_SUSPENDED,
+        PROC_RUNNING_THEN_SUSPEND,
+        PROC_SUSPENDED_BUSY,
+        PROC_RECEIVING_THEN_SUSPEND
+};
 
 struct trap_frame {
         uint64_t pc;
@@ -34,10 +43,6 @@ struct trap_frame {
 
         /* Points to pmp entries */
         uint64_t pmp0;
-        /* Kernel gp and tp */
-        uint64_t kgp, ktp;
-        /* Keep track of whether process was in exception/syscall handling */
-        uint64_t mstatus;
 };
 
 struct proc {
@@ -65,7 +70,6 @@ struct proc {
          */
         CapNode *cap_table;
 
-
         /* The pmp configurations are stored in these capabilities */
         /* pmp_table[i].data[1] = pmpicfg | pmpaddri */
         CapNode pmp_table[8];
@@ -90,6 +94,3 @@ register Proc *current __asm__("tp");
  * entry points.
  */
 void ProcInitProcesses(void);
-
-void ProcHalt(Proc *proc);
-void ProcReset(int pid);

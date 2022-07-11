@@ -1,7 +1,10 @@
 #include "trap.h"
+#include "sched.h"
 
 void ExceptionHandler(TrapFrame *tf, uint64_t mcause, uint64_t mtval) {
+        SchedDisablePreemption();
         tf->cause = mcause;
+        tf->tval = mtval;
         uint64_t sp = tf->sp;
         tf->sp = tf->esp;
         tf->esp = sp;
@@ -9,6 +12,7 @@ void ExceptionHandler(TrapFrame *tf, uint64_t mcause, uint64_t mtval) {
         uint64_t pc = tf->pc;
         tf->pc = tf->epc;
         tf->epc = pc;
+        SchedEnablePreemption();
 }
 
 #define URET 0x0020000073
@@ -17,6 +21,7 @@ void ExceptionHandler(TrapFrame *tf, uint64_t mcause, uint64_t mtval) {
 
 void IllegalInstructionHandler(TrapFrame *tf, uint64_t mcause, uint64_t mtval) {
         if (mtval == URET || mtval == SRET || mtval == MRET) {
+                SchedDisablePreemption();
                 uint64_t sp = tf->sp;
                 tf->sp = tf->esp;
                 tf->esp = sp;
@@ -24,6 +29,7 @@ void IllegalInstructionHandler(TrapFrame *tf, uint64_t mcause, uint64_t mtval) {
                 uint64_t pc = tf->pc;
                 tf->pc = tf->epc;
                 tf->epc = pc;
+                SchedEnablePreemption();
         } else {
                 ExceptionHandler(tf, mcause, mtval);
         }

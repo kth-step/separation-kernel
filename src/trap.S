@@ -89,26 +89,30 @@ __exception_handler:
         sd      t0,(0*8)(sp)
         sd      t1,(2*8)(sp)
 
-        /* Load kernel gp and tp */
-        ld      gp,(37*8)(sp)
-        ld      tp,(38*8)(sp)
 
         mv      a0,sp
         csrr    a1,mcause
         csrr    a2,mtval 
         csrr    s0,mstatus
 
+        /* Load kernel gp and tp */
+        ld      gp,(-1*8)(sp)
+        ld      tp,(-2*8)(sp)
+
         /* CALL EXCEPTION_HANDLER */
         slli    t0,a1,2
         la      ra,__exception_trampoline
         add     ra,ra,t0
         jalr    ra,(ra)
+
+        /* Load kernel gp and tp */
+        sd      gp,(-1*8)(sp)
+        sd      tp,(-2*8)(sp)
         
+        csrw    mscratch,sp
         csrw    mstatus,s0
         /* Load pc and sp */
-        ld      t1,(2*8)(sp)
         ld      t0,(0*8)(sp)
-        csrw    mscratch,t1
         csrw    mepc,t0
 
         ld      t6,(31*8)(sp)
@@ -140,21 +144,18 @@ __exception_handler:
         ld      t0,(5*8)(sp)
         ld      tp,(4*8)(sp)
         ld      gp,(3*8)(sp)
-        /* sd      sp,(2*8)(sp) */
         ld      ra,(1*8)(sp)
-        /* sd      pc,(0*8)(sp) */
-
-        csrrw   sp,mscratch,sp
+        ld      sp,(2*8)(sp)
         mret
 
 __timer_handler:
         csrrw   sp,mscratch,sp
         bnez    sp,1f
         csrr    sp,mscratch
-        addi    sp,sp,-40*8
-        sd      gp,(37*8)(sp) 
-        sd      tp,(38*8)(sp) 
-1:
+        addi    sp,sp,-32*8
+        sd      gp,(-1*8)(sp) 
+        sd      tp,(-2*8)(sp) 
+1:      
         /* sd      pc,(0*8)(sp) */
         sd      ra,(1*8)(sp)
         /* sd      sp,(2*8)(sp) */
@@ -195,10 +196,10 @@ __timer_handler:
         sd      t1,(2*8)(sp)
 
         /* Load kernel gp and tp */
-        ld      gp,(37*8)(sp)
-        ld      tp,(38*8)(sp)
+        ld      gp,(-1*8)(sp)
+        ld      tp,(-2*8)(sp)
         csrr    a0,mstatus
-        sd      a0,(39*8)(sp)
+        sd      a0,(-3*8)(sp)
 
         amoswap.d sp,sp,(tp)
 
@@ -207,19 +208,22 @@ trap_resume_proc:
 
         amoswap.d sp,sp,(tp)
         
-        sd      gp,(37*8)(sp)
-        sd      tp,(38*8)(sp)
-        ld      a0,(39*8)(sp)
-        csrw    mstatus,a0
-        /* Load pc and sp */
-        ld      t0,(0*8)(sp)
-        csrw    mepc,t0
+        /* Load kernel gp and tp */
+        sd      gp,(-1*8)(sp)
+        sd      tp,(-2*8)(sp)
+        ld      t0,(-3*8)(sp)
+        csrw    mstatus,t0
 
+        /* Load pc */
+        ld      t1,(0*8)(sp)
+        csrw    mepc,t1
+
+        /* save kernel sp */
         csrw    mscratch,sp
 
-        li      t0,0x800
-        and     a0,a0,t0
-        beqz    a0,1f
+        li      t1,0x800
+        and     t0,t0,t1
+        beqz    t0,1f
         /* If previous privilege was M-mode */
         csrw    mscratch,zero
 1:
@@ -252,9 +256,7 @@ trap_resume_proc:
         ld      t0,(5*8)(sp)
         ld      tp,(4*8)(sp)
         ld      gp,(3*8)(sp)
-        /* ld      sp,(2*8)(sp) */
         ld      ra,(1*8)(sp)
-        /* ld      pc,(0*8)(sp) */
         ld      sp,(2*8)(sp)
         mret
 
