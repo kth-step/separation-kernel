@@ -70,11 +70,11 @@ void user_main(uintptr_t pid, uint64_t begin, uint64_t end) {
         }
 
         if (pid == 0) {
-                Cap new_time = cap_mk_time(1, 1, 10, 32, 10, 2);
+                Cap new_time = cap_mk_time(2, 1, 10, 32, 10, 2);
                 uint64_t sup_cap = 3;
                 uint64_t supervisee_pid = 1;
                 uint64_t time_cap = 8;
-                kassert(s3k_derive_cap(4, time_cap, new_time));
+                kassert(s3k_derive_cap(5, time_cap, new_time));
                 kassert(s3k_supervisor_give_cap(sup_cap, supervisee_pid, time_cap,
                                              1, 1));
                 kassert(s3k_supervisor_write_reg(sup_cap, supervisee_pid, 0,

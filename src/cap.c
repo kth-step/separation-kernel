@@ -14,7 +14,6 @@ CapNode cap_tables[N_PROC][N_CAPS];
 int n_sentinels = 0;
 CapNode sentinels[N_SENTINELS];
 
-volatile int ep_receiver[N_CHANNELS];
 /*
  * Tries to delete node curr.
  * Assumption: prev = NULL or is_marked(prev->prev)

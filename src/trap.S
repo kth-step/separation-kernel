@@ -148,6 +148,15 @@ __exception_handler:
         ld      sp,(2*8)(sp)
         mret
 
+trap_waiting:
+        /* Loads ptr to trap frame, resetting sp */
+        ld      sp,(4*8)(tp)    
+        /* Swap to core stack */
+        amoswap.d  sp,sp,(tp)
+
+        la      ra,trap_resume_proc
+        j       Sched
+
 __timer_handler:
         csrrw   sp,mscratch,sp
         bnez    sp,1f

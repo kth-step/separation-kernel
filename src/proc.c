@@ -15,19 +15,20 @@ extern void user_code();
 Proc processes[N_PROC];
 
 /* Initializes one process. */
-void proc_init(int pid) {
+static void proc_init(int pid) {
         /* Get the PCB */
         Proc *proc = &processes[pid];
         /* Set the process id to */
         proc->pid = pid;
         /* Set the process's kernel stack. */
-        proc->ksp = &proc_stack[pid+1][0];
-        proc->ksp -= sizeof(TrapFrame);
+        proc->ksp = &proc_stack[pid][PROC_STACK_SIZE - sizeof(TrapFrame)];
         proc->tf = (TrapFrame*)proc->ksp;
         /* Zero the capability table. */
         proc->cap_table = cap_tables[pid];
-
+        /* All processes are by default suspended */
         proc->state = PROC_SUSPENDED;
+        /* channel == -1 means not subscribed to any channel */
+        proc->channel = -1;
 }
 
 static void proc_init_memory(CapNode *pmp, CapNode *memory) {
@@ -44,7 +45,7 @@ static void proc_init_memory(CapNode *pmp, CapNode *memory) {
 
 static void proc_init_channels(CapNode *channel) {
         uint16_t begin = 0;
-        uint16_t end = N_CHANNELS - 1;
+        uint16_t end = N_CHANNELS;
         Cap cap = cap_mk_channels(begin, end, begin, 0);
         CapNode *sentinel = CapInitSentinel();
         CapInsert(cap, channel, sentinel);

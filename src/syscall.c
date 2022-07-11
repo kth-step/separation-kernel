@@ -28,6 +28,8 @@ static void (*const syscall_handler_array[])(TrapFrame *) = {
     syscall_delete_cap, syscall_revoke_cap, syscall_derive_cap,
     syscall_invoke_cap};
 
+volatile int channels[N_CHANNELS];
+
 void SyscallHandler(TrapFrame *tf, uint64_t mcause, uint64_t mtval) {
         uint64_t syscall_number = tf->t0;
         if (syscall_number < ARRAY_SIZE(syscall_handler_array)) {
@@ -84,10 +86,6 @@ void syscall_delete_cap(TrapFrame *tf) {
         CapNode *cn = &current->cap_table[cid];
         const Cap cap = cn_get(cn);
         switch (cap_get_type(cap)) {
-                case CAP_PMP:
-                        CapRevoke(cn);
-                        tf->a0 = CapDelete(cn);
-                        break;
                 case CAP_TIME:
                         /* Unset time here */
                         tf->a0 = CapDelete(cn) && SchedDelete(cap, cn);
@@ -107,9 +105,6 @@ void syscall_revoke_cap(TrapFrame *tf) {
         CapNode *cn = &current->cap_table[cid];
         Cap cap = cn_get(cn);
         switch (cap_get_type(cap)) {
-                case CAP_PMP:
-                        tf->a0 = CapRevoke(cn);
-                        break;
                 case CAP_TIME:
                         cap_time_set_free(&cap, cap_time_get_begin(cap));
                         tf->a0 = CapRevoke(cn) && SchedRevoke(cap, cn) &&
@@ -225,6 +220,10 @@ void syscall_invoke_supervisor_suspend(TrapFrame *tf, Proc *supervisee) {
                 supervisee->ksp =
                     &proc_stack[supervisee->pid]
                                [PROC_STACK_SIZE - sizeof(TrapFrame)];
+                uint64_t channel = supervisee->channel;
+                if (channel != -1) {
+                        __sync_val_compare_and_swap(&channels[channel], supervisee->pid, -1);
+                }
                 __sync_synchronize();
                 supervisee->state = PROC_SUSPENDED;
         }
@@ -239,21 +238,16 @@ bool syscall_interprocess_move(CapNode *src, CapNode *dest, uint64_t pid) {
         Cap cap = cn_get(src);
         CapType type = cap_get_type(cap);
         bool succ;
-        if (type == CAP_INVALID) {
-                return false;
-        }
 
         if (type == CAP_TIME) {
                 Cap new_cap = cap;
                 cap_time_set_pid(&new_cap, pid);
                 succ = CapInsert(new_cap, dest, src) && CapDelete(src) &&
                        SchedUpdate(cap, new_cap, dest);
-        } else if (type == CAP_PMP) {
-                CapRevoke(src);
-                succ = CapMove(src, dest);
         } else {
                 succ = CapMove(src, dest);
         }
+
         return succ;
 }
 

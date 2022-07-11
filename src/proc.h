@@ -5,7 +5,6 @@
 #include "config.h"
 #include "types.h"
 
-#define PROC_NUM_OF_REGS 37
 
 /** Proc
  * This is the Process Control Block (PCB). We store pointers
@@ -38,12 +37,15 @@ struct trap_frame {
         uint64_t a0, a1, a2, a3, a4, a5, a6, a7;
         uint64_t s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;
         uint64_t t3, t4, t5, t6;
-        /* Exception handling registers */
-        uint64_t cause, tval, epc, esp;
-
+        /* Trap pc and trap sp. */
+        uint64_t tpc, tsp;
+        /* Previous pc, sp, a0 and a1 (before exception). */
+        uint64_t  ppc, psp, pa0, pa1;
         /* Points to pmp entries */
         uint64_t pmp0;
 };
+
+#define PROC_NUM_OF_REGS (sizeof(struct trap_frame) / sizeof(uint64_t))
 
 struct proc {
         /** Kernel stack pointer.
@@ -56,31 +58,19 @@ struct proc {
          * (pointer to proc_stack) to ksp.
          */
         char *ksp;
-
-        /** Process identifier.
-         * This is the process's ID used for identification during
-         * inter-process communication.
-         */
+        /* Process identifier */
         uint64_t pid;
-
-        TrapFrame *tf;
-
-        /** Capability table.
-         * Pointer to the capability table.
-         */
-        CapNode *cap_table;
-
-        /* The pmp configurations are stored in these capabilities */
-        /* pmp_table[i].data[1] = pmpicfg | pmpaddri */
-        CapNode pmp_table[8];
-
+        /* Process state */
         ProcState state;
+        /* IPC channel subscription, -1 == not listening */
+        int64_t channel;
+        /* Registers */
+        TrapFrame *tf;
+        /* Capability table */
+        CapNode *cap_table;
 };
 
-/** Processes
- * We have a static number of processes N_PROC. The initial process is always
- * process 0.
- */
+/* Processes, process 0 is boot process. */
 extern Proc processes[N_PROC];
 
 /** Current process
