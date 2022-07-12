@@ -23,19 +23,22 @@ static void syscall_invoke_cap(TrapFrame *tf);
 static void syscall_invoke_endpoint(TrapFrame *tf, Cap cap, CapNode *cn);
 static void syscall_invoke_supervisor(TrapFrame *tf, Cap cap, CapNode *cn);
 
+static bool syscall_interprocess_move(CapNode *src, CapNode *dest,
+                                      uint64_t pid);
+
 static void (*const syscall_handler_array[])(TrapFrame *) = {
     syscall_no_cap,     syscall_read_cap,   syscall_move_cap,
     syscall_delete_cap, syscall_revoke_cap, syscall_derive_cap,
     syscall_invoke_cap};
 
-volatile int channels[N_CHANNELS];
+Proc *volatile channels[N_CHANNELS];
 
 void SyscallHandler(TrapFrame *tf, uint64_t mcause, uint64_t mtval) {
         uint64_t syscall_number = tf->t0;
         if (syscall_number < ARRAY_SIZE(syscall_handler_array)) {
                 SchedDisablePreemption();
-                syscall_handler_array[syscall_number](tf);
                 tf->pc += 4;
+                syscall_handler_array[syscall_number](tf);
                 SchedEnablePreemption();
         } else {
                 ExceptionHandler(tf, mcause, mtval);
@@ -51,6 +54,23 @@ void syscall_no_cap(TrapFrame *tf) {
                 default:
                         tf->a0 = -1;
         }
+}
+
+bool syscall_interprocess_move(CapNode *src, CapNode *dest, uint64_t pid) {
+        Cap cap = cn_get(src);
+        CapType type = cap_get_type(cap);
+        bool succ;
+
+        if (type == CAP_TIME) {
+                Cap new_cap = cap;
+                cap_time_set_pid(&new_cap, pid);
+                succ = CapInsert(new_cap, dest, src) && CapDelete(src) &&
+                       SchedUpdate(cap, new_cap, dest);
+        } else {
+                succ = CapMove(src, dest);
+        }
+
+        return succ;
 }
 
 void syscall_read_cap(TrapFrame *tf) {
@@ -210,7 +230,82 @@ void syscall_invoke_cap(TrapFrame *tf) {
         }
 }
 
+static void syscall_invoke_endpoint_send(TrapFrame *tf, uint64_t channel) {
+        Proc *receiver;
+        /* Acquire the receiver in the channel */
+        do {
+                receiver = channels[channel];
+                if (receiver == NULL) {
+                        /* No receiver */
+                        tf->a0 = false;
+                        return;
+                }
+                /* Receiver is not waiting */
+                if (receiver->state != PROC_WAITING)
+                        continue;
+        } while (
+            __sync_bool_compare_and_swap(&channels[channel], receiver, NULL));
+        /* Acquire the receiver state */
+        if (!__sync_bool_compare_and_swap(&receiver->state, PROC_WAITING,
+                                          PROC_RECEIVING)) {
+                tf->a0 = false;
+                return;
+        }
+
+        TrapFrame *rtf = receiver->tf;
+
+        /* From where to get capabilities */
+        uint64_t cid_src = tf->a1;
+        /* From where to set capabilities */
+        uint64_t cid_dest = rtf->a1;
+        /* Number of capabilities to send */
+        uint64_t n = (tf->a2 > rtf->a2) ? rtf->a2 : tf->a2;
+        /* Position of last capability to send (excl.) */
+        uint64_t cid_last = cid_src + n;
+        /* Number of capabilities sent */
+        tf->a1 = 0;
+        while (cid_src < N_CAPS && cid_src < cid_last && cid_dest < N_CAPS) {
+                CapNode *src = &current->cap_table[cid_src];
+                CapNode *dest = &receiver->cap_table[cid_dest];
+                if(!syscall_interprocess_move(src, dest, receiver->pid)) {
+                        /* If moving a capability failed */
+                        break;
+                }
+                cid_src++;
+                cid_dest++;
+                tf->a1++;
+        }
+        /* Send successful */
+        tf->a0 = true;
+        rtf->a0 = true;
+
+        /* Number of caps sent */
+        rtf->a1 = tf->a1;
+        /* Message passing, 256 bits */
+        rtf->a2 = tf->a3;
+        rtf->a3 = tf->a4;
+        rtf->a4 = tf->a5;
+        rtf->a5 = tf->a6;
+
+        /* Sets the receiver to suspended or ready state */
+        __sync_fetch_and_and(&receiver->state, PROC_SUSPENDED);
+}
+
 void syscall_invoke_endpoint(TrapFrame *tf, Cap cap, CapNode *cn) {
+        uint64_t mode = cap_endpoint_get_mode(cap);
+        uint64_t channel = cap_endpoint_get_channel(cap);
+        if (mode == 0) { /* Receive */
+                tf->a0 = false;
+                current->channel = channel;
+                if (__sync_bool_compare_and_swap(&channels[channel], NULL,
+                                                 current)) {
+                        trap_recv_yield();
+                } else {
+                        current->channel = -1;
+                }
+        } else if (mode == 1) { /* Send */
+                syscall_invoke_endpoint_send(tf, channel);
+        }
 }
 
 void syscall_invoke_supervisor_suspend(TrapFrame *tf, Proc *supervisee) {
@@ -219,7 +314,7 @@ void syscall_invoke_supervisor_suspend(TrapFrame *tf, Proc *supervisee) {
         if (state == PROC_WAITING) {
                 uint64_t channel = supervisee->channel;
                 if (channel != -1) {
-                        __sync_val_compare_and_swap(&channels[channel], supervisee->pid, -1);
+                        channels[channel] = NULL;
                 }
                 __sync_synchronize();
                 supervisee->state = PROC_SUSPENDED;
@@ -228,8 +323,8 @@ void syscall_invoke_supervisor_suspend(TrapFrame *tf, Proc *supervisee) {
 }
 
 void syscall_invoke_supervisor_resume(TrapFrame *tf, Proc *supervisee) {
-        if (__sync_bool_compare_and_swap(&supervisee->state,
-                                              PROC_SUSPENDED, PROC_SUSPENDED_BUSY)) {
+        if (__sync_bool_compare_and_swap(&supervisee->state, PROC_SUSPENDED,
+                                         PROC_SUSPENDED_BUSY)) {
                 /* Resets the kernel stack */
                 supervisee->ksp = supervisee->tf;
                 __sync_synchronize();
@@ -238,23 +333,6 @@ void syscall_invoke_supervisor_resume(TrapFrame *tf, Proc *supervisee) {
         } else {
                 tf->a0 = false;
         }
-}
-
-bool syscall_interprocess_move(CapNode *src, CapNode *dest, uint64_t pid) {
-        Cap cap = cn_get(src);
-        CapType type = cap_get_type(cap);
-        bool succ;
-
-        if (type == CAP_TIME) {
-                Cap new_cap = cap;
-                cap_time_set_pid(&new_cap, pid);
-                succ = CapInsert(new_cap, dest, src) && CapDelete(src) &&
-                       SchedUpdate(cap, new_cap, dest);
-        } else {
-                succ = CapMove(src, dest);
-        }
-
-        return succ;
 }
 
 void syscall_invoke_supervisor_state(TrapFrame *tf, Proc *supervisee) {
@@ -267,7 +345,8 @@ void syscall_invoke_supervisor_read_reg(TrapFrame *tf, Proc *supervisee) {
             __sync_bool_compare_and_swap(&supervisee->state, PROC_SUSPENDED,
                                          PROC_SUSPENDED_BUSY)) {
                 tf->a0 = 1;
-                tf->a1 = ((uint64_t *)supervisee->tf + TF_KERNEL_REGISTERS)[reg_nr];
+                tf->a1 =
+                    ((uint64_t *)supervisee->tf + TF_KERNEL_REGISTERS)[reg_nr];
                 __sync_synchronize();
                 supervisee->state = PROC_READY;
         }
@@ -280,64 +359,55 @@ void syscall_invoke_supervisor_write_reg(TrapFrame *tf, Proc *supervisee) {
             __sync_bool_compare_and_swap(&supervisee->state, PROC_SUSPENDED,
                                          PROC_SUSPENDED_BUSY)) {
                 tf->a0 = 1;
-                ((uint64_t *)supervisee->tf + TF_KERNEL_REGISTERS)[reg_nr] = reg_value;
+                ((uint64_t *)supervisee->tf + TF_KERNEL_REGISTERS)[reg_nr] =
+                    reg_value;
                 __sync_synchronize();
                 supervisee->state = PROC_SUSPENDED;
         }
 }
 
 void syscall_invoke_supervisor_give(TrapFrame *tf, Proc *supervisee) {
+        if (!__sync_bool_compare_and_swap(&supervisee->state, PROC_SUSPENDED,
+                                          PROC_SUSPENDED_BUSY)) {
+                tf->a0 = 0;
+                return;
+        }
         uint64_t cid_src = tf->a3;
         uint64_t cid_dest = tf->a4;
         uint64_t cid_last = cid_src + tf->a5;
         tf->a0 = 0;
-        bool succ;
         while (cid_src < N_CAPS && cid_src < cid_last && cid_dest < N_CAPS) {
                 CapNode *src = &current->cap_table[cid_src];
                 CapNode *dest = &supervisee->cap_table[cid_dest];
-                if (__sync_bool_compare_and_swap(&supervisee->state,
-                                                 PROC_SUSPENDED,
-                                                 PROC_SUSPENDED_BUSY)) {
-                        succ = syscall_interprocess_move(src, dest,
-                                                         supervisee->pid);
-                        __sync_synchronize();
-                        supervisee->state = PROC_SUSPENDED;
-                } else {
-                        succ = false;
-                }
-                if (!succ)
+                if (!syscall_interprocess_move(src, dest, supervisee->pid))
                         break;
                 cid_src++;
                 cid_dest++;
                 tf->a0++;
         }
+        supervisee->state = PROC_SUSPENDED;
 }
 
 void syscall_invoke_supervisor_take(TrapFrame *tf, Proc *supervisee) {
+        if (!__sync_bool_compare_and_swap(&supervisee->state, PROC_SUSPENDED,
+                                          PROC_SUSPENDED_BUSY)) {
+                tf->a0 = 0;
+                return;
+        }
         uint64_t cid_src = tf->a3;
         uint64_t cid_dest = tf->a4;
         uint64_t cid_last = cid_src + tf->a5;
-        bool succ;
         tf->a0 = 0;
         while (cid_src < N_CAPS && cid_src < cid_last && cid_dest < N_CAPS) {
                 CapNode *src = &supervisee->cap_table[cid_src];
                 CapNode *dest = &current->cap_table[cid_dest];
-                if (__sync_bool_compare_and_swap(&supervisee->state,
-                                                 PROC_SUSPENDED,
-                                                 PROC_SUSPENDED_BUSY)) {
-                        succ =
-                            syscall_interprocess_move(src, dest, current->pid);
-                        __sync_synchronize();
-                        supervisee->state = PROC_SUSPENDED;
-                } else {
-                        succ = false;
-                }
-                if (!succ)
+                if (!syscall_interprocess_move(src, dest, supervisee->pid))
                         break;
                 cid_src++;
                 cid_dest++;
                 tf->a0++;
         }
+        supervisee->state = PROC_SUSPENDED;
 }
 
 void syscall_invoke_supervisor(TrapFrame *tf, Cap cap, CapNode *cn) {
