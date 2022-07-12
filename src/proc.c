@@ -23,9 +23,11 @@ static void proc_init(Proc *proc, int pid) {
         /* TrapFrame sits at the top of the stack */
         proc->tf = (TrapFrame *)proc->ksp;
         /* Set the mstatus */
-        *(((uint64_t*)proc->ksp) - 3) = 0;
-        /* Set the mscratch */
-        *(((void **)proc->ksp) - 4) = proc->ksp;
+        proc->tf->mstatus = 0;
+        proc->tf->mscratch = (uint64_t)proc->ksp;
+        register uint64_t gp __asm__("gp");
+        proc->tf->kgp = gp;
+        proc->tf->ktp = (uint64_t)proc;
         /* Capability table. */
         proc->cap_table = cap_tables[pid];
         /* All processes are by default suspended */

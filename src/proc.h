@@ -5,7 +5,6 @@
 #include "config.h"
 #include "types.h"
 
-
 /** Proc
  * This is the Process Control Block (PCB). We store pointers
  * register and process's state in this struct.
@@ -30,6 +29,10 @@ enum proc_state {
 };
 
 struct trap_frame {
+        /* Kernel registers */
+        uint64_t kgp, ktp, mstatus, mscratch;
+
+        /* Process registers */
         uint64_t pc;
         uint64_t ra, sp, gp, tp;
         uint64_t t0, t1, t2;
@@ -40,12 +43,13 @@ struct trap_frame {
         /* Trap pc and trap sp. */
         uint64_t tpc, tsp;
         /* Previous pc, sp, a0 and a1 (before exception). */
-        uint64_t  ppc, psp, pa0, pa1;
+        uint64_t ppc, psp, pa0, pa1;
         /* Points to pmp entries */
         uint64_t pmp0;
 };
 
-#define PROC_NUM_OF_REGS (sizeof(struct trap_frame) / sizeof(uint64_t))
+#define TF_KERNEL_REGISTERS 4
+#define TF_PROCESS_REGISTERS ((sizeof(TrapFrame) / sizeof(uint64_t)) - TF_KERNEL_REGISTERS)
 
 struct proc {
         /** Kernel stack pointer.

@@ -216,7 +216,6 @@ void syscall_invoke_endpoint(TrapFrame *tf, Cap cap, CapNode *cn) {
 void syscall_invoke_supervisor_suspend(TrapFrame *tf, Proc *supervisee) {
         ProcState state =
             __sync_fetch_and_or(&supervisee->state, PROC_SUSPENDED);
-        tf->a0 = true;
         if (state == PROC_WAITING) {
                 uint64_t channel = supervisee->channel;
                 if (channel != -1) {
@@ -224,18 +223,15 @@ void syscall_invoke_supervisor_suspend(TrapFrame *tf, Proc *supervisee) {
                 }
                 __sync_synchronize();
                 supervisee->state = PROC_SUSPENDED;
-        } 
-        if (state == PROC_SUSPENDED || state == PROC_SUSPENDED_BUSY) {
-                tf->a0 = false;
         }
+        tf->a0 = (state & PROC_SUSPENDED) == 0;
 }
 
 void syscall_invoke_supervisor_resume(TrapFrame *tf, Proc *supervisee) {
         if (__sync_bool_compare_and_swap(&supervisee->state,
                                               PROC_SUSPENDED, PROC_SUSPENDED_BUSY)) {
+                /* Resets the kernel stack */
                 supervisee->ksp = supervisee->tf;
-                *((uint64_t*)supervisee->ksp - 3) = 0;
-                *((void**)supervisee->ksp - 4) = supervisee->ksp;
                 __sync_synchronize();
                 supervisee->state = PROC_READY;
                 tf->a0 = true;
@@ -267,11 +263,11 @@ void syscall_invoke_supervisor_state(TrapFrame *tf, Proc *supervisee) {
 
 void syscall_invoke_supervisor_read_reg(TrapFrame *tf, Proc *supervisee) {
         uint64_t reg_nr = tf->a3;
-        if (reg_nr < PROC_NUM_OF_REGS &&
+        if (reg_nr < TF_PROCESS_REGISTERS &&
             __sync_bool_compare_and_swap(&supervisee->state, PROC_SUSPENDED,
                                          PROC_SUSPENDED_BUSY)) {
                 tf->a0 = 1;
-                tf->a1 = ((uint64_t *)supervisee->tf)[reg_nr];
+                tf->a1 = ((uint64_t *)supervisee->tf + TF_KERNEL_REGISTERS)[reg_nr];
                 __sync_synchronize();
                 supervisee->state = PROC_READY;
         }
@@ -280,11 +276,11 @@ void syscall_invoke_supervisor_read_reg(TrapFrame *tf, Proc *supervisee) {
 void syscall_invoke_supervisor_write_reg(TrapFrame *tf, Proc *supervisee) {
         uint64_t reg_nr = tf->a3;
         uint64_t reg_value = tf->a4;
-        if (reg_nr < PROC_NUM_OF_REGS &&
+        if (reg_nr < TF_PROCESS_REGISTERS &&
             __sync_bool_compare_and_swap(&supervisee->state, PROC_SUSPENDED,
                                          PROC_SUSPENDED_BUSY)) {
                 tf->a0 = 1;
-                ((uint64_t *)supervisee->tf)[reg_nr] = reg_value;
+                ((uint64_t *)supervisee->tf + TF_KERNEL_REGISTERS)[reg_nr] = reg_value;
                 __sync_synchronize();
                 supervisee->state = PROC_SUSPENDED;
         }
