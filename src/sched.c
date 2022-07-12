@@ -95,16 +95,12 @@ void wait_and_set_timeout(uint64_t time, uint64_t length) {
         write_timeout(hartid, end_time);
 }
 
-Proc *Sched(void) {
+Proc *Sched(Proc *proc) {
         /* The hart/core id */
         uintptr_t hartid = read_csr(mhartid);
 
-        if (current) {
-                __sync_fetch_and_and(&current->state, PROC_SUSPENDED);
-        }
-
         /* Process to run and number of time slices to run for */
-        Proc *proc = NULL;
+        proc = NULL;
         uint64_t time, length;
 
         do {
@@ -112,9 +108,7 @@ Proc *Sched(void) {
                 time = (read_time() / TICKS) + 1;
                 /* Try getting a process at that time slice. */
                 sched_get_proc(hartid, time, &proc, &length);
-        } while (!proc || !__sync_bool_compare_and_swap(
-                              &proc->state, PROC_READY, PROC_RUNNING));
-        current = proc;
+        } while (!proc);
         /* Wait for time slice to start and set timeout */
         wait_and_set_timeout(time, length);
         return proc;

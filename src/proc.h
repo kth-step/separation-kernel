@@ -57,17 +57,17 @@ struct proc {
          * other process is running, then we store the process's stack pointer
          * (pointer to proc_stack) to ksp.
          */
-        char *ksp;
+        void *ksp;
         /* Process identifier */
         uint64_t pid;
-        /* Process state */
-        ProcState state;
         /* IPC channel subscription, -1 == not listening */
         int64_t channel;
         /* Registers */
         TrapFrame *tf;
         /* Capability table */
         CapNode *cap_table;
+        /* Process state */
+        ProcState state;
 };
 
 /* Processes, process 0 is boot process. */

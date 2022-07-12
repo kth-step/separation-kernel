@@ -7,7 +7,7 @@
 #include "proc.h"
 #include "types.h"
 
-Proc *Sched(void);
+Proc *Sched(Proc *proc);
 
 /* Revoke scheduling according to time capability cap, check capability node cn
  * for invalidations of the capability. If cn->prev == NULL, break function. */

@@ -4,9 +4,9 @@
 #include "cap.h"
 #include "cap_utils.h"
 #include "config.h"
-#include "stack.h"
 #include "csr.h"
 #include "kprint.h"
+#include "stack.h"
 
 /* Temporary. */
 extern void user_code();
@@ -15,15 +15,18 @@ extern void user_code();
 Proc processes[N_PROC];
 
 /* Initializes one process. */
-static void proc_init(int pid) {
-        /* Get the PCB */
-        Proc *proc = &processes[pid];
-        /* Set the process id to */
+static void proc_init(Proc *proc, int pid) {
+        /* Set the process id */
         proc->pid = pid;
         /* Set the process's kernel stack. */
         proc->ksp = &proc_stack[pid][PROC_STACK_SIZE - sizeof(TrapFrame)];
-        proc->tf = (TrapFrame*)proc->ksp;
-        /* Zero the capability table. */
+        /* TrapFrame sits at the top of the stack */
+        proc->tf = (TrapFrame *)proc->ksp;
+        /* Set the mstatus */
+        *(((uint64_t*)proc->ksp) - 3) = 0;
+        /* Set the mscratch */
+        *(((void **)proc->ksp) - 4) = proc->ksp;
+        /* Capability table. */
         proc->cap_table = cap_tables[pid];
         /* All processes are by default suspended */
         proc->state = PROC_SUSPENDED;
@@ -60,7 +63,7 @@ static void proc_init_time(CapNode time[N_CORES]) {
                 uint64_t free = 0;
                 uint64_t depth = 0;
                 Cap cap = cap_mk_time(hartid, pid, begin, end, free, depth);
-                CapInsert(cap, &time[hartid-MIN_HARTID], sentinel);
+                CapInsert(cap, &time[hartid - MIN_HARTID], sentinel);
         }
 }
 
@@ -85,6 +88,6 @@ static void proc_init_boot(Proc *boot) {
 /* Defined in proc.h */
 void ProcInitProcesses(void) {
         for (int i = 0; i < N_PROC; i++)
-                proc_init(i);
+                proc_init(&processes[i], i);
         proc_init_boot(&processes[0]);
 }

@@ -119,8 +119,8 @@ __boot_wait:
 1:      /* Set thread pointer to 0. */
         li      tp,0
         /* Jump to scheduler. */
-        call    Sched
-        tail    trap_resume_proc
+        la      ra,trap_resume_proc
+        tail    Sched
 
 __boot_park:
         wfi
