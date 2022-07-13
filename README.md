@@ -58,12 +58,12 @@ make debug-qemu # Runs the kernel using QEMU
 ## Progress
 
 - [x] Implement the foundation of the scheduler. Done, currently schedules process 0 only, but can be configured statically to behave differently. DONE!
-- [ ] Implement message passing so we can send basic messages with no capabilities.
-- [ ] Implement message passing so we can send time slices, allowing us to dynamically change the scheduling.
+- [x] Implement message passing so we can send basic messages with no capabilities.
+- [x] Implement message passing so we can send time slices, allowing us to dynamically change the scheduling.
 - [ ] Separate kernel and user binaries.  Implement a basic bootloader in process 0 for loading the user binaries.
-- [ ] Implement the supervisor capability allowing process 0 to manage other process's capabilities.
+- [x] Implement the supervisor capability allowing process 0 to manage other process's capabilities.
 - [ ] Implement memory protection (memory slice, memory frame).
-- [ ] Implement exception handling.
+- [x] Implement exception handling.
 - [ ] Design and build applications, benchmarks and tests.
 - [ ] Start on formal verification.
 
