@@ -16,7 +16,8 @@ user_code:
         // Do syscall, get_pid
         li      a1,0
         li      a7,1
-        ecall                           // Fetch process ID to a0                    
+        ecall                           // Fetch process ID to a1                    
+        mv      a0,a1
 
         // Prepare user data
         la      a1,user_data            // a2=user_data

@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "cap.h"
+#include "cap_utils.h"
 #include "csr.h"
 #include "lock.h"
 #include "stack.h"
@@ -117,19 +118,13 @@ void Sched(void) {
 bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
                   uint64_t expected, uint64_t desired, CapNode *cn) {
         /* Disable preemption */
-        clear_csr(mstatus, 8);
         /* Try acquire lock */
-        while (!lock_try_acquire(&lock)) {
-                /* If failed acquire lock, enable preemption temporary */
-                set_csr(mstatus, 8);
-                clear_csr(mstatus, 8);
-        }
+        lock_acquire(&lock);
         /* Check that the capability still exists */
-        if (cn->prev == NULL) {
+        if (cap_node_is_deleted(cn)) {
                 /* If capability deleted, release lock, enable preemption and
                  * return */
                 lock_release(&lock);
-                set_csr(mstatus, 8);
                 return false;
         }
         /* Update the schedule */
@@ -142,7 +137,6 @@ bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
         }
         /* Release lock and enable preemption */
         lock_release(&lock);
-        set_csr(mstatus, 8);
         return true;
 }
 
@@ -159,7 +153,7 @@ bool SchedRevoke(const Cap cap, CapNode *cn) {
 
         lock_acquire(&lock);
 
-        if (cn->prev == NULL) {
+        if (cap_node_is_deleted(cn)) {
                 lock_release(&lock);
                 return false;
         }

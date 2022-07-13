@@ -1,5 +1,6 @@
 // See LICENSE file for copyright and license details.
 #include "cap.h"
+#include "cap_utils.h"
 
 #include "proc.h"
 #include "sched.h"
@@ -55,7 +56,7 @@ static inline bool cap_insert(const Cap cap, CapNode *node, CapNode *prev) {
 }
 
 bool CapDelete(CapNode *curr) {
-        while (!cn_is_deleted(curr)) {
+        while (!cap_node_is_deleted(curr)) {
                 CapNode *prev = curr->prev;
                 if (prev == NULL)
                         continue;
@@ -65,18 +66,15 @@ bool CapDelete(CapNode *curr) {
         return false;
 }
 
-bool CapRevoke(CapNode *curr) {
-        const Cap parent = cn_get(curr);
-        int counter = 0;
-        while (!cn_is_deleted(curr)) {
+void CapRevoke(CapNode *curr) {
+        const Cap parent = cap_node_get_cap(curr);
+        while (!cap_node_is_deleted(curr)) {
                 CapNode *next = curr->next;
-                Cap child = cn_get(next);
+                Cap child = cap_node_get_cap(next);
                 if (!cap_is_child(parent, child))
                         break;
-                if (cap_delete(curr, next))
-                        counter++;
+                cap_delete(curr, next);
         }
-        return counter > 0;
 }
 
 /**
@@ -85,10 +83,10 @@ bool CapRevoke(CapNode *curr) {
  */
 bool CapInsert(const Cap cap, CapNode *node, CapNode *prev) {
         /* Child node must be empty */
-        if (!cn_is_deleted(node))
+        if (!cap_node_is_deleted(node))
                 return false;
         /* While parent is alive, attempt to insert */
-        while (!cn_is_deleted(prev)) {
+        while (!cap_node_is_deleted(prev)) {
                 if (cap_insert(cap, node, prev))
                         return true;
         }
@@ -113,8 +111,8 @@ bool CapUpdate(const Cap cap, CapNode *node) {
  * Uses a CapInsert followed by CapDelete.
  */
 bool CapMove(CapNode *dest, CapNode *src) {
-        const Cap cap = cn_get(src);
-        if (cn_is_deleted(src) || !cn_is_deleted(dest))
+        const Cap cap = cap_node_get_cap(src);
+        if (cap_node_is_deleted(src) || !cap_node_is_deleted(dest))
                 return false;
         return CapInsert(cap, dest, src) && CapDelete(src);
 }

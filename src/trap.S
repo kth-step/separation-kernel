@@ -234,6 +234,8 @@ __restore_registers:
         ld      sp,(6*8)(sp)
         mret
 
+trap_exit:
+
 trap_recv_yield:
         /* CompareAndSwap(state,PROC_RUNNING, PROC_WAITING) */
         addi    t1,tp,(5*8)

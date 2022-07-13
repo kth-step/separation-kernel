@@ -1,10 +1,10 @@
 // See LICENSE file for copyright and license details.
 #include <string.h>
 
+#include <stdint.h>
 #include "config.h"
 #include "kprint.h"
 #include "s3k.h"
-#include "types.h"
 
 void print_cap(Cap cap) {
         switch (cap_get_type(cap)) {
@@ -74,12 +74,9 @@ void user_main(uintptr_t pid, uint64_t begin, uint64_t end) {
                 uint64_t sup_cap = 3;
                 uint64_t supervisee_pid = 1;
                 uint64_t time_cap = 8;
-                kassert(s3k_derive_cap(5, time_cap, new_time));
-                kassert(s3k_supervisor_give_cap(sup_cap, supervisee_pid, time_cap,
-                                             1, 1));
-                kassert(s3k_supervisor_write_reg(sup_cap, supervisee_pid, 0,
-                                         (uint64_t)user_code));
-                kassert(s3k_supervisor_resume(sup_cap, supervisee_pid));
+                kprintf("%d\n", s3k_derive_cap(5, time_cap, new_time));
+                kprintf("%d\n", s3k_supervisor_give_cap(sup_cap, supervisee_pid, time_cap, 1, 1));
+                kprintf("%d\n", s3k_supervisor_write_reg(sup_cap, supervisee_pid, 0, (uint64_t)user_code));
+                kprintf("%d\n", s3k_supervisor_resume(sup_cap, supervisee_pid));
         }
-
 }

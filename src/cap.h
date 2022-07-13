@@ -23,7 +23,7 @@ extern CapNode cap_tables[N_PROC][N_CAPS];
 extern volatile int ep_receiver[N_CHANNELS];
 
 /* Delete all children of node */
-bool CapRevoke(CapNode *node);
+void CapRevoke(CapNode *node);
 /* Delete node */
 bool CapDelete(CapNode *node);
 /* Move node in src to dest */
@@ -35,19 +35,20 @@ bool CapUpdate(const Cap cap, CapNode *node);
 /* Make a sentinel node. */
 CapNode *CapInitSentinel(void);
 
+static inline bool cap_node_is_deleted(const CapNode *cn);
+static inline Cap cap_node_get_cap(const CapNode *cn);
+
 /* Check if a node has been deleted */
-static inline bool cn_is_deleted(const CapNode *cn) {
+bool cap_node_is_deleted(const CapNode *cn) {
         // Check if prev is NULL ?
         return cn->next == NULL;
 }
 
-static inline Cap cn_get(const CapNode *cn) {
+Cap cap_node_get_cap(const CapNode *cn) {
         Cap cap = cn->cap;
         __sync_synchronize();
-        if (cn_is_deleted(cn)) {
+        if (cap_node_is_deleted(cn)) {
                 return NULL_CAP;
         }
         return cap;
 }
-
-#include "cap_utils.h"

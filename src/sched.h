@@ -30,4 +30,3 @@ static inline bool SchedDisablePreemption(void) {
         asm volatile ("csrc mstatus,8");
         return true;
 }
-
