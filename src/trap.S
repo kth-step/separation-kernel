@@ -5,19 +5,8 @@
 .globl trap_recv_yield
 
 #include "config.h"
+#include "macros.S"
 
-/* tmp -> working register
- * addr -> addr to lr/sc
- * expected -> register with expected value
- * desired -> register with desired value
- * failure_label -> where to jump of CAS failure
- */
-.macro casw tmp,addr,expected,desired,failure_label
-42:     lr.w    \tmp,(\addr)
-        bne     \tmp,\expected,\failure_label
-        sc.w    \tmp,\desired,(\addr)
-        bnez    \tmp,42b
-.endm
 
 .option push
 .option norvc   /* Prevent compressed instructions */
@@ -59,195 +48,69 @@ __exception_trampoline:
 
 __exception_handler:
         /* Load kernel process sp, store user sp. */
-        csrrw   sp,mscratch,sp
+        csrrw   tp,mscratch,tp
 #ifndef NDEBUG
         /* If mscratch is 0, we have bug in the kernel */
-        beqz    sp,__mhang
+        beqz    tp,__mhang
 #endif
-        sd      ra,(5*8)(sp)
-        sd      gp,(7*8)(sp)
-        sd      tp,(8*8)(sp)
-        sd      t0,(9*8)(sp)
-        sd      t1,(10*8)(sp)
-        sd      t2,(11*8)(sp)
-        sd      s0,(12*8)(sp)
-        sd      s1,(13*8)(sp)
-        sd      a0,(14*8)(sp)
-        sd      a1,(15*8)(sp)
-        sd      a2,(16*8)(sp)
-        sd      a3,(17*8)(sp)
-        sd      a4,(18*8)(sp)
-        sd      a5,(19*8)(sp)
-        sd      a6,(20*8)(sp)
-        sd      a7,(21*8)(sp)
-        sd      s2,(22*8)(sp)
-        sd      s3,(23*8)(sp)
-        sd      s4,(24*8)(sp)
-        sd      s5,(25*8)(sp)
-        sd      s6,(26*8)(sp)
-        sd      s7,(27*8)(sp)
-        sd      s8,(28*8)(sp)
-        sd      s9,(29*8)(sp)
-        sd      s10,(30*8)(sp)
-        sd      s11,(31*8)(sp)
-        sd      t3,(32*8)(sp)
-        sd      t4,(33*8)(sp)
-        sd      t5,(34*8)(sp)
-        sd      t6,(35*8)(sp)
+        
+        /* Save all registers except tp */
+        save_context
 
-        /* Save pc and sp */
-        csrr    t0,mepc
-        csrrw   t1,mscratch,zero
-        sd      t0,(4*8)(sp)
-        sd      t1,(6*8)(sp)
+        /* Save pc */
+        csrrw   t0,mscratch,zero
+        sd      t0,(4*8)(tp)
 
+        load_gp_sp
 
-        mv      a0,sp
-        csrr    a1,mcause
-        csrr    a2,mtval 
-
-        /* Load kernel gp and tp */
-        ld      gp,(0*8)(sp)
-        ld      tp,(1*8)(sp)
-        /* Save mstatus */
-        csrrs   t0,mstatus,8
-        sd      t0,(2*8)(sp)
+        /* Enable preemption */
+        csrw    mstatus,8
 
         /* CALL EXCEPTION_HANDLER */
+        mv      a0,tp
+        csrr    a1,mcause
+        csrr    a2,mtval
+
         slli    t0,a1,2
         la      t1,__exception_trampoline
         add     t1,t1,t0
-        la      ra,__restore_registers
+        la      ra,trap_resume_proc
         jalr    x0,(t1)
 
-
-
 __timer_handler:
-        csrrw   sp,mscratch,sp
-        bnez    sp,1f
-        csrr    sp,mscratch
-        addi    sp,sp,-36*8
-        sd      gp,(0*8)(sp) 
-        sd      tp,(1*8)(sp) 
-        sd      zero,(3*8)(sp)
+        csrrw   tp,mscratch,tp
+        bnez    tp,1f
+        csrrw   tp,mscratch,zero
+        j       2f
 1:
-        sd      ra,(5*8)(sp)
-        sd      gp,(7*8)(sp)
-        sd      tp,(8*8)(sp)
-        sd      t0,(9*8)(sp)
-        sd      t1,(10*8)(sp)
-        sd      t2,(11*8)(sp)
-        sd      s0,(12*8)(sp)
-        sd      s1,(13*8)(sp)
-        sd      a0,(14*8)(sp)
-        sd      a1,(15*8)(sp)
-        sd      a2,(16*8)(sp)
-        sd      a3,(17*8)(sp)
-        sd      a4,(18*8)(sp)
-        sd      a5,(19*8)(sp)
-        sd      a6,(20*8)(sp)
-        sd      a7,(21*8)(sp)
-        sd      s2,(22*8)(sp)
-        sd      s3,(23*8)(sp)
-        sd      s4,(24*8)(sp)
-        sd      s5,(25*8)(sp)
-        sd      s6,(26*8)(sp)
-        sd      s7,(27*8)(sp)
-        sd      s8,(28*8)(sp)
-        sd      s9,(29*8)(sp)
-        sd      s10,(30*8)(sp)
-        sd      s11,(31*8)(sp)
-        sd      t3,(32*8)(sp)
-        sd      t4,(33*8)(sp)
-        sd      t5,(34*8)(sp)
-        sd      t6,(35*8)(sp)
+        /* Save all registers except pc/tp */
+        save_context
 
-        /* Save pc and sp */
-        csrr    t0,mepc
-        csrrw   t1,mscratch,zero
-        sd      t0,(4*8)(sp)
-        sd      t1,(6*8)(sp)
+        /* Save tp */
+        csrr    t0,mscratch
+        sd      t0,(4*8)(tp)
 
-        /* Load kernel gp and tp */
-        ld      gp,(0*8)(sp)
-        ld      tp,(1*8)(sp)
-        /* Save mstatus */
-        csrr    t0,mstatus
-        sd      t0,(2*8)(sp)
+        /* Load kernel gp and sp */
+        load_gp_sp
+2:
 
-        amoswap.d sp,sp,(tp)
+        call sched
 
-        /* Set the state to PROC_READY/PROC_SUSPENDED */
-        addi    t0,tp,(5*8)     /* ptr to state */
-        li      t1,4
-        amoand.w x0,t1,(t0)     /* zero lower two bits of state */
-
-__sched:
-        call    Sched
 trap_resume_proc:
-        /* CompareAndSwap(state, PROC_READY, PROC_RUNNING) */
-        addi    t1,tp,(5*8)
-        li      t2,1
-        casw    t0,t1,x0,t2,__sched
 
-        amoswap.d sp,sp,(tp)
+        /* Disable preemption */
+        csrw    mstatus,0
         
-__restore_registers:
-
-        ld      t0,(2*8)(sp)
-        csrw    mstatus,t0
-        ld      t0,(3*8)(sp)
+        /* Set mscratch to proc tp */
+        ld      t0,(4*8)(tp)
         csrw    mscratch,t0
-        ld      t0,(4*8)(sp)
-        csrw    mepc,t0
 
-        ld      t6,(35*8)(sp)
-        ld      t5,(34*8)(sp)
-        ld      t4,(33*8)(sp)
-        ld      t3,(32*8)(sp)
-        ld      s11,(31*8)(sp)
-        ld      s10,(30*8)(sp)
-        ld      s9,(29*8)(sp)
-        ld      s8,(28*8)(sp)
-        ld      s7,(27*8)(sp)
-        ld      s6,(26*8)(sp)
-        ld      s5,(25*8)(sp)
-        ld      s4,(24*8)(sp)
-        ld      s3,(23*8)(sp)
-        ld      s2,(22*8)(sp)
-        ld      a7,(21*8)(sp)
-        ld      a6,(20*8)(sp)
-        ld      a5,(19*8)(sp)
-        ld      a4,(18*8)(sp)
-        ld      a3,(17*8)(sp)
-        ld      a2,(16*8)(sp)
-        ld      a1,(15*8)(sp)
-        ld      a0,(14*8)(sp)
-        ld      s1,(13*8)(sp)
-        ld      s0,(12*8)(sp)
-        ld      t2,(11*8)(sp)
-        ld      t1,(10*8)(sp)
-        ld      t0,(9*8)(sp)
-        ld      tp,(8*8)(sp)
-        ld      gp,(7*8)(sp)
-        ld      ra,(5*8)(sp)
-        ld      sp,(6*8)(sp)
+        /* Restore all registers except pc and tp */
+        restore_context
+        /* Swap proc tp with pcb */
+        csrrw   tp,mscratch,tp
+
         mret
-
-trap_exit:
-
-trap_recv_yield:
-        /* CompareAndSwap(state,PROC_RUNNING, PROC_WAITING) */
-        addi    t1,tp,(5*8)
-        li      t2,1
-        li      t3,2
-        casw    t0,t1,t2,t3,__recv_fail
-        /* Swap to core stack */
-        amoswap.d  sp,sp,(tp)
-        /* Reschedule */
-        j       __sched
-__recv_fail:  /* CAS fail */
-        ret
 
 __hang: 
         j       __hang

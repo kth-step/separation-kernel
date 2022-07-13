@@ -6,35 +6,13 @@
 #include "config.h"
 #include "csr.h"
 #include "kprint.h"
-#include "stack.h"
 
 /* Temporary. */
 extern void user_code();
 
 /* Defined in proc.h */
-Proc processes[N_PROC];
+struct proc processes[N_PROC];
 
-/* Initializes one process. */
-static void proc_init(Proc *proc, int pid) {
-        /* Set the process id */
-        proc->pid = pid;
-        /* Set the process's kernel stack. */
-        proc->ksp = &proc_stack[pid][PROC_STACK_SIZE - sizeof(TrapFrame)];
-        /* TrapFrame sits at the top of the stack */
-        proc->tf = (TrapFrame *)proc->ksp;
-        /* Set the mstatus */
-        proc->tf->mstatus = 0;
-        proc->tf->mscratch = (uint64_t)proc->ksp;
-        register uint64_t gp __asm__("gp");
-        proc->tf->kgp = gp;
-        proc->tf->ktp = (uint64_t)proc;
-        /* Capability table. */
-        proc->cap_table = cap_tables[pid];
-        /* All processes are by default suspended */
-        proc->state = PROC_SUSPENDED;
-        /* channel == -1 means not subscribed to any channel */
-        proc->channel = -1;
-}
 
 static void proc_init_memory(CapNode *pmp, CapNode *memory) {
         uint64_t begin = USER_MEMORY_BEGIN >> 12;
@@ -75,7 +53,7 @@ static void proc_init_supervisor(CapNode *cap_sup) {
         CapInsert(cap, cap_sup, sentinel);
 }
 
-static void proc_init_boot(Proc *boot) {
+static void __proc_init_boot(struct proc *boot) {
         CapNode *cap_table = boot->cap_table;
         proc_init_memory(&cap_table[0], &cap_table[1]);
         proc_init_channels(&cap_table[2]);
@@ -83,13 +61,25 @@ static void proc_init_boot(Proc *boot) {
         proc_init_time(&cap_table[4]);
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
-        boot->tf->pc = (uint64_t)user_code;  // Temporary code.
-        boot->state = PROC_READY;
+        boot->regs.pc = (uint64_t)user_code;  // Temporary code.
+        boot->state = PS_READY;
+}
+
+/* Initializes one process. */
+static void __proc_init(struct proc *proc, int pid) {
+        /* Set the process id */
+        proc->pid = pid;
+        /* Capability table. */
+        proc->cap_table = cap_tables[pid];
+        /* All processes are by default suspended */
+        proc->state = PS_SUSPENDED;
+        /* channel == -1 means not subscribed to any channel */
+        proc->channel = -1;
 }
 
 /* Defined in proc.h */
-void ProcInitProcesses(void) {
+void proc_init(void) {
         for (int i = 0; i < N_PROC; i++)
-                proc_init(&processes[i], i);
-        proc_init_boot(&processes[0]);
+                __proc_init(&processes[i], i);
+        __proc_init_boot(&processes[0]);
 }

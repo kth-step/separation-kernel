@@ -7,7 +7,6 @@
 #include "cap_utils.h"
 #include "csr.h"
 #include "lock.h"
-#include "stack.h"
 
 #define SCHED_SLICE_OFFSET(sched_slice, hartid) \
         ((sched_slice) << ((hartid)-MIN_HARTID) * 16)
@@ -25,7 +24,7 @@ static inline uint64_t sched_pid(uint64_t sched_slice, uint64_t hartid);
 static inline uint64_t sched_depth(uint64_t sched_slice, uint64_t hartid);
 
 /* Gets the processes that should run on _hartid_ at time _time_. */
-static void sched_get_proc(uint64_t hartid, uint64_t time, Proc **proc,
+static void sched_get_proc(uint64_t hartid, uint64_t time, struct proc **proc,
                            uint64_t *length);
 
 static inline bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
@@ -47,7 +46,7 @@ uint64_t sched_depth(uint64_t s, uint64_t hartid) {
         return (sched_entry(s, hartid) >> 8) & 0xFF;
 }
 
-void sched_get_proc(uint64_t hartid, uint64_t time, Proc **proc,
+void sched_get_proc(uint64_t hartid, uint64_t time, struct proc **proc,
                     uint64_t *length) {
         kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
 
@@ -96,12 +95,12 @@ void wait_and_set_timeout(uint64_t time, uint64_t length) {
         write_timeout(hartid, end_time);
 }
 
-void Sched(void) {
+void sched(void) {
         /* The hart/core id */
         uintptr_t hartid = read_csr(mhartid);
 
         /* Process to run and number of time slices to run for */
-        Proc *proc = NULL;
+        struct proc *proc = NULL;
         uint64_t time, length;
 
         do {
