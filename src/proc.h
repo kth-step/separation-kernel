@@ -43,7 +43,7 @@ struct proc {
          * We store the argument registers a0-a7 in the args array,
          * this simplifies inter-process communication.
          */
-        uintptr_t args[8]; // TODO: I don't think this is currently supported? Seems like we stopped storing and loading args here
+        uintptr_t args[8];
         uintptr_t pc;
 
         /* The pmp configurations are stored in these capabilities */

@@ -5,6 +5,7 @@
 
 #include "config.h"
 #include "csr.h"
+#include "lock.h"
 #include "stack.h"
 
 #if SCHEDULE_BENCHMARK == 1
@@ -22,7 +23,8 @@
  *
  * We should probably replace uint64_t with appropriate structs.
  */
-uint64_t schedule[N_QUANTUM];
+static uint64_t schedule[N_QUANTUM];
+static Lock lock = 0;
 
 #if TIME_SLOT_LOANING != 0
         TimeSlotInstanceRoot time_slot_instance_roots[N_QUANTUM][N_CORES];
@@ -265,42 +267,114 @@ void Sched(void) {
         }
 }
 
-static inline bool sched_update_rev(uint8_t begin, uint8_t end, uint8_t hartid,
-                                    uint16_t expected, uint16_t desired, Cap * c) {
-        uint64_t mask = 0xFFFF << (hartid * 16);
-        uint64_t expected64 = expected << (hartid * 16);
-        uint64_t desired64 = desired << (hartid * 16);
-        for (int i = begin; i >= end; i--) {
-                if (c->prev == NULL)
-                        return false;
-                uint64_t s = schedule[i];
-                if ((s & mask) != expected64)
-                        continue;
-                uint64_t s_new = (s & ~mask) | desired64;
-                __sync_val_compare_and_swap(&schedule[i], s, s_new);
-        }
-        return true;
-}
 static inline bool sched_update(uint8_t begin, uint8_t end, uint8_t hartid,
                                 uint16_t expected, uint16_t desired, Cap * c) {
         uint64_t mask = 0xFFFF << (hartid * 16);
         uint64_t expected64 = expected << (hartid * 16);
         uint64_t desired64 = desired << (hartid * 16);
-        for (int i = begin; i <= end; i++) {
-                if (c->prev == NULL)
-                        return false;
+        
+        /* Disable preemption 
+           This is needed since we might remove our own scheduling, and if we are descheduled before
+           completing this function then we might still hold the lock without any chance of being scheduled again. */
+        clear_csr(mstatus, 8);
+        /* Try acquire lock */
+        while (!try_acquire_lock(&lock)) {
+                /* If failed acquire lock, enable preemption temporary */
+                set_csr(mstatus, 8);
+                clear_csr(mstatus, 8);
+        }
+        /* Check that the capability still exists */
+        // TODO: Not sure if this is needed anymore
+        if (c->prev == NULL) {
+                /* If capability deleted, release lock, enable preemption and return */
+                release_lock(&lock);
+                set_csr(mstatus, 8);
+                return false;
+        }
+        /* Return false if we don't manage to update a single time slot. */
+        bool is_updated = false;
+        for (int i = begin; i < end; i++) {
+                uint64_t s = schedule[i];
+                /* This "continue" is needed since we might have a child in a subset of the region and if we move the parent
+                   then it should not update the time slots belonging to the child. 
+                   
+                   Other than that this also protects against overwriting changes made by a revoke
+                   (though a "break" would suffice for this). */
+                if ((s & mask) != expected64)
+                        continue;
+                uint64_t s_new = (s & ~mask) | desired64;
+                schedule[i] = s_new;
+                is_updated = true;
+        }
+        /* Release lock and enable preemption */
+        release_lock(&lock);
+        set_csr(mstatus, 8);
+        return is_updated;
+}
+
+bool SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
+                 uint16_t desired, Cap * c) {
+        if (begin > end)
+                return sched_update(end, begin, hartid, expected, desired, c);
+        else
+                return sched_update(begin, end, hartid, expected, desired, c);
+}
+
+
+bool SchedRevoke(uint8_t begin, uint8_t end, uint8_t hartid,
+                 uint16_t desired, Cap * c) {
+        uint64_t mask = 0xFFFF << (hartid * 16);
+        uint64_t desired64 = desired << (hartid * 16);
+
+        acquire_lock(&lock);
+
+        /* We need to check that our cap has not been removed. If it has we might be in a situation
+           where a parent cap has derived a new cap with lower tsid/depth than this cap and which is 
+           overapping with our region. In this case we would incorrectly overwrite this new cap. */
+        if (c->prev == NULL) {
+                release_lock(&lock);
+                return false;
+        }
+
+        for (int i = begin; i < end; i++) {
+                /* We assume that our cap or its children own all time slots on the given hart in this interval.
+                   That is, we assume that we don't risk stealing time slots from parents or siblings. */
+                uint64_t sched_slice = schedule[i];
+                uint64_t new_sched_slice = (sched_slice & ~mask) | desired64;
+                schedule[i] = new_sched_slice;
+        }
+        release_lock(&lock);
+        return true;
+}
+
+
+bool SchedDelete(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected, uint16_t desired) {
+        uint64_t mask = 0xFFFF << (hartid * 16);
+        uint64_t expected64 = expected << (hartid * 16);
+        uint64_t desired64 = desired << (hartid * 16);
+        
+        /* Disable preemption  
+           This is needed since we might remove all our own scheduling slots, and if we are descheduled before
+           completing this function then we might still hold the lock without any chance of being scheduled again. */
+        clear_csr(mstatus, 8);
+        /* Try acquire lock */
+        while (!try_acquire_lock(&lock)) {
+                /* If failed acquire lock, enable preemption temporary */
+                set_csr(mstatus, 8);
+                clear_csr(mstatus, 8);
+        }
+        /* Return false if we don't manage to update a single time slot. */
+        bool is_updated = false;
+        for (int i = begin; i < end; i++) {
                 uint64_t s = schedule[i];
                 if ((s & mask) != expected64)
                         continue;
                 uint64_t s_new = (s & ~mask) | desired64;
-                __sync_val_compare_and_swap(&schedule[i], s, s_new);
+                schedule[i] = s_new;
+                is_updated = true;
         }
-        return true; 
-}
-bool SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
-                 uint16_t desired, Cap * c) {
-        if (begin > end)
-                return sched_update_rev(begin, end, hartid, expected, desired, c);
-        else
-                return sched_update(begin, end, hartid, expected, desired, c);
+        /* Release lock and enable preemption */
+        release_lock(&lock);
+        set_csr(mstatus, 8);
+        return is_updated;
 }

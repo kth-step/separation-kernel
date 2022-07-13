@@ -4,6 +4,7 @@
 #include "cap.h"
 #include "cap_util.h"
 #include "proc.h"
+#include "sched.h"
 #include "syscall.h"
 #include "syscall_nr.h"
 
@@ -174,9 +175,11 @@ static inline uint64_t ts_slice(const CapTimeSlice ts, Cap *parent, Cap *child,
                 return -1;
         CapTimeSlice ts_child =
             cap_mk_time_slice(ts.hartid, begin, end, tsid, tsid_end);
-        /* TODO: update schedule */
+        // TODO: can we find a situation where the order of CapAppend and SchedUpdate matter?
         return cap_set(child, cap_serialize_time_slice(ts_child)) &&
-               CapAppend(child, parent);
+               CapAppend(child, parent) && 
+               SchedUpdate(begin, end, ts.hartid, ((ts.tsid) << 8) | (uint8_t)current->pid, 
+                           ((tsid) << 8) | (uint8_t)current->pid, parent);
 }
 
 static inline uint64_t ts_split(const CapTimeSlice ts, Cap *parent, Cap *child0,
@@ -184,18 +187,22 @@ static inline uint64_t ts_split(const CapTimeSlice ts, Cap *parent, Cap *child0,
         /* Check that qmid and tsmid are in middle of parents time slice and
          * tsid intervals */
         if (!(ts.begin < qmid && qmid < ts.end && (ts.tsid + 1) < tsmid &&
-              tsmid < ts.tsid_end))
+              tsmid + 1 < ts.tsid_end))
                 return -1;
         if (cap_is_child_ts(ts, cap_get(parent->next)) || child0 == child1)
                 return -1;
-        CapTimeSlice ts_child0 =
-            cap_mk_time_slice(ts.hartid, ts.begin, qmid, ts.tsid + 1, tsmid);
+        CapTimeSlice ts_child0 = cap_mk_time_slice(ts.hartid, ts.begin, qmid, 
+                                                   ts.tsid + 1, tsmid);
         CapTimeSlice ts_child1 = cap_mk_time_slice(ts.hartid, qmid + 1, ts.end,
                                                    tsmid + 1, ts.tsid_end);
-        /* TODO: update schedule, must be after append */
+        // TODO: can we find a situation where the order of CapAppend and SchedUpdate matter?
         return cap_set(child0, cap_serialize_time_slice(ts_child0)) &&
                cap_set(child1, cap_serialize_time_slice(ts_child1)) &&
-               CapAppend(child0, parent) && CapAppend(child1, parent);
+               CapAppend(child0, parent) && CapAppend(child1, parent) &&
+               SchedUpdate(ts_child0.begin, ts_child0.end, ts_child0.hartid, ((ts.tsid) << 8) | (uint8_t)current->pid, 
+                           ((ts_child0.tsid) << 8) | (uint8_t)current->pid, parent) &&
+               SchedUpdate(ts_child1.begin, ts_child1.end, ts_child1.hartid, ((ts.tsid) << 8) | (uint8_t)current->pid, 
+                           ((ts_child1.tsid) << 8) | (uint8_t)current->pid, parent);
 }
 
 uint64_t SyscallTimeSlice(const CapTimeSlice ts, Cap *cap, uint64_t a1,
@@ -210,12 +217,19 @@ uint64_t SyscallTimeSlice(const CapTimeSlice ts, Cap *cap, uint64_t a1,
                         return CapMove(curr_get_cap(a1), cap);
                 case SYSNR_DELETE_CAP:
                         /* Delete time slice */
-                        /* TODO: update schedule */
-                        return CapDelete(cap);
+
+                        /* If doing SchedDelete before CapDelete we might remove our only time slot and not have enough time to complete
+                           CapDelete before being descheduled. 
+                           
+                           To allow CapDelete to be performed before SchedDelete we must allow SchedDelete to perform its operation 
+                           even if the cap is removed. This means that it will still try to delete the cap from the schedule even if 
+                           another revoke already has done it. This is not a problem since the expected value will never match in
+                           this situation and the SchedDelete will simply do nothing. */
+                        return CapDelete(cap) && SchedDelete(ts.begin, ts.end, ts.hartid, (ts.tsid << 8) | ((uint8_t)current->pid), 0x0080);
                 case SYSNR_REVOKE_CAP:
                         /* Revoke time slice */
-                        /* TODO: update schedule */
-                        return CapRevoke(cap);
+                        // TODO: can we find a situation where the order matters?
+                        return SchedRevoke(ts.begin, ts.end, ts.hartid, (ts.tsid << 8) | ((uint8_t)current->pid), cap) && CapRevoke(cap);
                 case SYSNR_TS_SLICE:
                         /* Slice time */
                         return ts_slice(ts, cap, curr_get_cap(a1), a2, a3, a4,
