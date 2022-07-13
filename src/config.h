@@ -20,8 +20,13 @@
 #define N_PMP 8
 
 /* Ticks per second */
-/* "The CPU real time clock (rtcclk) runs at 1 MHz" https://static.dev.sifive.com/FU540-C000-v1.0.pdf */
-#define TICKS_PER_SECOND 1000000UL
+#if QEMU_DEBUGGING == 0
+    /* "The CPU real time clock (rtcclk) runs at 1 MHz" https://static.dev.sifive.com/FU540-C000-v1.0.pdf */
+    #define TICKS_PER_SECOND 1000000UL
+#else
+    /* Ticks per second as approximated in QEMU */
+    #define TICKS_PER_SECOND 10000000UL
+#endif
 
 /* Number of time slices in a major frame. */
 #define N_QUANTUM 1
@@ -56,7 +61,7 @@
 #define BENCHMARK_DURATION (TICKS_PER_SECOND*0)
 /* We get two rounds less than specified because we need to discard the boot round and the very first measure is before having run any round at all.
    Therefore we explicitly add + 2 to remind us of this (if we want a specific number of data points that is). */
-#define BENCHMARK_ROUNDS (1000000 + 2) // (BENCHMARK_DURATION / TICKS)
+#define BENCHMARK_ROUNDS (1000000UL + 2) // (BENCHMARK_DURATION / TICKS)
 
 #define PERFORMANCE_SCHEDULING 0
 #define CRYPTO_APP 0
