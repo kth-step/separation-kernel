@@ -110,7 +110,7 @@ void sched(void) {
                 time = (read_time() / TICKS) + 1;
                 /* Try getting a process at that time slice. */
                 sched_get_proc(hartid, time, &proc, &length);
-        } while (!proc || proc_acquire(proc));
+        } while (!proc || !proc_acquire(proc));
         /* Wait for time slice to start and set timeout */
         current = proc;
         wait_and_set_timeout(time, length);

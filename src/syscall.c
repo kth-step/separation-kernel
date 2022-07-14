@@ -85,7 +85,7 @@ bool syscall_interprocess_move(CapNode *src, CapNode *dest, uint64_t pid) {
                 succ = CapInsert(new_cap, dest, src) && CapDelete(src) &&
                        SchedUpdate(cap, new_cap, dest);
         } else {
-                succ = CapMove(src, dest);
+                succ = CapMove(dest, src);
         }
 
         return succ;
@@ -121,7 +121,7 @@ void syscall_move_cap(struct registers *regs) {
         } else if (!cap_node_is_deleted(cn_dest)) {
                 regs->a0 = S3K_ERROR_CAP_COLLISION;
         } else {
-                regs->a0 = CapMove(cn_src, cn_dest) ? S3K_ERROR_OK
+                regs->a0 = CapMove(cn_dest, cn_src) ? S3K_ERROR_OK
                                                     : S3K_ERROR_CAP_MISSING;
         }
         preemption_enable();
@@ -358,15 +358,7 @@ void syscall_invoke_endpoint(struct registers *regs) {
                 if (__sync_bool_compare_and_swap(&channels[channel], NULL,
                                                  current)) {
                         /* Set waiting bit */
-                        enum proc_state state =
-                            __sync_fetch_and_or(&current->state, PS_WAITING);
-                        /* If we were running while suspended 
-                         * Go to suspended mode, stop listening to channels */
-                        if (state == PS_RUNNING_THEN_SUSPEND) {
-                                current->state = PS_SUSPENDED;
-                                current->channel = -1;
-                                __sync_bool_compare_and_swap(&channels[channel], current, NULL);
-                        }
+                        __sync_bool_compare_and_swap(&current->state, PS_RUNNING, PS_WAITING);
                         /* We yield if suspended or waiting. */
                         trap_yield();
                 } else {
