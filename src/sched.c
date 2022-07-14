@@ -3,8 +3,7 @@
 
 #include <stddef.h>
 
-#include "cap.h"
-#include "cap_utils.h"
+#include "cap_node.h"
 #include "csr.h"
 #include "lock.h"
 
@@ -29,7 +28,7 @@ static void sched_get_proc(uint64_t hartid, uint64_t time, struct proc **proc,
 
 static inline bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
                                 uint64_t expected, uint64_t desired,
-                                CapNode *cn);
+                                struct cap_node *cn);
 
 /**************** Definitions ****************/
 uint64_t sched_entry(uint64_t s, uint64_t hartid) {
@@ -117,7 +116,7 @@ void sched(void) {
 }
 
 bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
-                  uint64_t expected, uint64_t desired, CapNode *cn) {
+                  uint64_t expected, uint64_t desired, struct cap_node *cn) {
         /* Disable preemption */
         /* Try acquire lock */
         lock_acquire(&lock);
@@ -141,7 +140,7 @@ bool sched_update(uint64_t begin, uint64_t end, uint64_t mask,
         return true;
 }
 
-bool SchedRevoke(const Cap cap, CapNode *cn) {
+bool SchedRevoke(struct cap cap, struct cap_node *cn) {
         uint64_t hartid = cap_time_get_hartid(cap);
         uint64_t begin = cap_time_get_begin(cap);
         uint64_t end = cap_time_get_end(cap);
@@ -172,7 +171,7 @@ bool SchedRevoke(const Cap cap, CapNode *cn) {
         return true;
 }
 
-bool SchedUpdate(const Cap cap, const Cap new_cap, CapNode *cn) {
+bool SchedUpdate(struct cap cap, struct cap new_cap, struct cap_node *cn) {
         kassert(cap_get_type(cap) == CAP_TIME);
         kassert(cap_get_type(new_cap) == CAP_TIME);
         uint64_t hartid = cap_time_get_hartid(new_cap);
@@ -195,7 +194,7 @@ bool SchedUpdate(const Cap cap, const Cap new_cap, CapNode *cn) {
         return sched_update(begin, end, mask, expected, desired, cn);
 }
 
-bool SchedDelete(const Cap cap, CapNode *cn) {
+bool SchedDelete(struct cap cap, struct cap_node *cn) {
         kassert(cap_get_type(cap) == CAP_TIME);
         uint64_t depth = cap_time_get_depth(cap);
         uint64_t pid = cap_time_get_pid(cap);

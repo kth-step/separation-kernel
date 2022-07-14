@@ -11,22 +11,22 @@ void sched(void);
 
 /* Revoke scheduling according to time capability cap, check capability node cn
  * for invalidations of the capability. If cn->prev == NULL, break function. */
-bool SchedRevoke(const Cap cap, CapNode *cn);
+bool SchedRevoke(struct cap cap, struct cap_node *cn);
 
 /* Updates scheduling according to time capability cap, check capability node cn
  * for invalidations of the capability. If cn->prev == NULL, break function.*/
-bool SchedUpdate(const Cap cap, const Cap new_cap, CapNode *cn);
+bool SchedUpdate(struct cap cap, struct cap new_cap, struct cap_node *cn);
 
 /* Delete scheduling according to time capability cap, check capability node cn
  * for invalidations of the capability. If cn->prev == NULL, break function.*/
-bool SchedDelete(const Cap cap, CapNode *cn);
+bool SchedDelete(struct cap cap, struct cap_node *cn);
 
 static inline bool SchedEnablePreemption(void) {
-        asm volatile ("csrs mstatus,8");
+        asm volatile("csrs mstatus,8");
         return true;
 }
 
 static inline bool SchedDisablePreemption(void) {
-        asm volatile ("csrc mstatus,8");
+        asm volatile("csrc mstatus,8");
         return true;
 }

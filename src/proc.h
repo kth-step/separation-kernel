@@ -1,7 +1,7 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-#include "cap.h"
+#include "cap_node.h"
 #include "config.h"
 #include "types.h"
 

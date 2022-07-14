@@ -7,6 +7,7 @@ include config.mk
 
 SRCS=$(wildcard src/*.[cS]) $(wildcard bsp/$(BSP)/*.[cS])
 OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
+HDRS=$(wildcard src/*.h)
 DEPS=$(patsubst %.o, %.d, $(OBJS))
 
 ELF=$(BUILD)/$(PROGRAM).elf
@@ -53,11 +54,11 @@ cloc:
 qemu: $(ELF)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
 
-src/cap_utils.h: scripts/cap_gen.py cap.yml
+src/cap.h: scripts/cap_gen.py cap.yml
 	@echo "Generating $@"
 	@./scripts/cap_gen.py cap.yml > $@
 
-$(BUILD)/%.c.o: %.c src/cap_utils.h
+$(BUILD)/%.c.o: %.c src/cap.h
 	@mkdir -p $(@D) 
 	@echo "Compiling $@"
 	@$(CC) $(CFLAGS) -c -o $@ $<

@@ -12,7 +12,8 @@ void kprint(const char *s) {
         }
 }
 
-static inline void output64(long long n, int sig, int base, char padding, int padd_width) {
+static inline void output64(long long n, int sig, int base, char padding,
+                            int padd_width) {
         char buff[64];
         buff[63] = '\0';
         unsigned long long i = n;
@@ -31,7 +32,7 @@ static inline void output64(long long n, int sig, int base, char padding, int pa
                         *--c = '0' + j;
                 i /= base;
                 padd_width--;
-        } while(i != 0);
+        } while (i != 0);
         while (padd_width > 0) {
                 *--c = padding;
                 padd_width--;
@@ -42,7 +43,8 @@ static inline void output64(long long n, int sig, int base, char padding, int pa
         kprint(c);
 }
 
-static inline void output32(int n, bool sig, int base, char padding, int padd_width) {
+static inline void output32(int n, bool sig, int base, char padding,
+                            int padd_width) {
         char buff[64];
         buff[63] = '\0';
         unsigned int i = n;
@@ -61,7 +63,7 @@ static inline void output32(int n, bool sig, int base, char padding, int padd_wi
                         *--c = '0' + j;
                 i /= base;
                 padd_width--;
-        } while(i != 0);
+        } while (i != 0);
         while (padd_width > 0) {
                 *--c = padding;
                 padd_width--;
@@ -74,7 +76,8 @@ static inline void output32(int n, bool sig, int base, char padding, int padd_wi
 
 void kprintf(const char *format, ...) {
         static volatile int lock = 0;
-        while (!__sync_bool_compare_and_swap(&lock, 0, 1));
+        while (!__sync_bool_compare_and_swap(&lock, 0, 1))
+                ;
         va_list argp;
         va_start(argp, format);
         for (const char *f = format; *f != '\0'; ++f) {
@@ -96,13 +99,16 @@ void kprintf(const char *format, ...) {
                 }
                 switch (*f) {
                         case 'd':
-                                output32(va_arg(argp, int), true, 10, padding, padd_width);
+                                output32(va_arg(argp, int), true, 10, padding,
+                                         padd_width);
                                 break;
                         case 'u':
-                                output32(va_arg(argp, int), false, 10, padding, padd_width);
+                                output32(va_arg(argp, int), false, 10, padding,
+                                         padd_width);
                                 break;
                         case 'x':
-                                output32(va_arg(argp, int), false, 1, padding, padd_width);
+                                output32(va_arg(argp, int), false, 1, padding,
+                                         padd_width);
                                 break;
                         case 's':
                                 kprint(va_arg(argp, char *));
@@ -117,18 +123,21 @@ void kprintf(const char *format, ...) {
                                 switch (*(++f)) {
                                         case 'd':
                                                 output64(
-                                                    va_arg(argp, long long), true,
-                                                    10, padding, padd_width);
+                                                    va_arg(argp, long long),
+                                                    true, 10, padding,
+                                                    padd_width);
                                                 break;
                                         case 'u':
                                                 output64(
-                                                    va_arg(argp, long long), false,
-                                                    10, padding, padd_width);
+                                                    va_arg(argp, long long),
+                                                    false, 10, padding,
+                                                    padd_width);
                                                 break;
                                         case 'x':
                                                 output64(
-                                                    va_arg(argp, long long), false,
-                                                    16, padding, padd_width);
+                                                    va_arg(argp, long long),
+                                                    false, 16, padding,
+                                                    padd_width);
                                                 break;
                                 }
                                 break;

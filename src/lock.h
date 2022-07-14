@@ -7,7 +7,8 @@ static inline int lock_try_acquire(Lock *lock);
 static inline void lock_release(Lock *lock);
 
 void lock_acquire(Lock *lock) {
-        while (!__sync_bool_compare_and_swap(lock, 0, 1));
+        while (!__sync_bool_compare_and_swap(lock, 0, 1))
+                ;
 }
 
 int lock_try_acquire(Lock *lock) {

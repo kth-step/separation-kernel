@@ -376,4 +376,3 @@ static inline bool cap_can_derive(const Cap p, const Cap c) {
         }
         return false;
 }
-

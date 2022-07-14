@@ -33,58 +33,58 @@ def get_bin(bins, f):
                 return i, b
 
 def make_assert(s):
-    print(f"\tkassert({s});")
+    print(f"kassert({s});")
 
 def make_getter(cap_name, name, size, bins):
     if name == 'padd':
         return
-    print(f"static inline uint64_t cap_{cap_name}_get_{name}(const Cap cap) {{")
+    print(f"static inline uint64_t cap_{cap_name}_get_{name}(struct cap cap) {{")
     make_assert(f"(cap.word0 >> 56) == CAP_{cap_name.upper()}")
     i, b = get_bin(bins, name)
     offset = get_offset(b, name)
     if offset:
-        print(f"\treturn (cap.word{i} >> {offset}) & 0x{'ff'*size}ull;")
+        print(f"return (cap.word{i} >> {offset}) & 0x{'ff'*size}ull;")
     else:
-        print(f"\treturn cap.word{i} & 0x{'ff'*size}ull;")
-    print('}\n')
+        print(f"return cap.word{i} & 0x{'ff'*size}ull;")
+    print('}')
 
 def make_setter(cap_name, name, size, bins):
     if name == 'padd':
         return
-    print(f'static inline void cap_{cap_name}_set_{name}(Cap *cap, uint64_t {name}) {{')
+    print(f'static inline void cap_{cap_name}_set_{name}(struct cap *cap, uint64_t {name}) {{')
     make_assert(f"(cap->word0 >> 56) == CAP_{cap_name.upper()}")
     make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")
     i, b = get_bin(bins, name) 
     offset = get_offset(b, name)
     mask = f"0x{'ff'*size + '00'*(offset//8)}ull"
     if offset:
-        print(f"\tcap->word{i} = (cap->word{i} & ~{mask}) | {name} << {offset};")
+        print(f"cap->word{i} = (cap->word{i} & ~{mask}) | {name} << {offset};")
     else:
-        print(f"\tcap->word{i} = (cap->word{i} & ~{mask}) | {name};")
-    print("}\n")
+        print(f"cap->word{i} = (cap->word{i} & ~{mask}) | {name};")
+    print("}")
 
 def make_constructor(cap_name, fields, asserts, bins):
     parameters = [f"uint64_t {name}" for (name, size) in fields if name != 'padd']
-    print(f"static inline Cap cap_mk_{cap_name}({', '.join(parameters)}) {{")
+    print(f"static inline struct cap cap_mk_{cap_name}({', '.join(parameters)}) {{")
     for (name, size) in fields:
         if name != 'padd':
             make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")
     for a in asserts:
         make_assert(a)
-    print("\tCap c;")
-    print(f"\tc.word0 = (uint64_t)CAP_{cap_name.upper()} << 56;")
-    print(f"\tc.word1 = 0;")
+    print("struct cap c;")
+    print(f"c.word0 = (uint64_t)CAP_{cap_name.upper()} << 56;")
+    print(f"c.word1 = 0;")
     for (i,b) in enumerate(bins):
         for (f, s) in b:
             if f == 'padd':
                 continue
             offset = get_offset(b, f)
             if offset:
-                print(f"\tc.word{i} |= {f} << {offset};")
+                print(f"c.word{i} |= {f} << {offset};")
             else:
-                print(f"\tc.word{i} |= {f};")
-    print("\treturn c;")
-    print("}\n")
+                print(f"c.word{i} |= {f};")
+    print("return c;")
+    print("}")
 
 def make_cap_functions(data):
     if 'fields' not in data:
@@ -122,20 +122,20 @@ def make_pred_case(case):
     parent_type = f"CAP_{case['parent'].upper()}"
     child_type = f"CAP_{case['child'].upper()}"
     make_translator(case)
-    print(f"\tif (parent_type == {parent_type} && child_type == {child_type}) {{")
+    print(f"if (parent_type == {parent_type} && child_type == {child_type}) {{")
     for rel in case['relations']:
-        print(f"\t\tb &= {rel};")
-    print("\t\treturn b;\n\t}")
+        print(f"b &= {rel};")
+    print("return b;}")
 
 def make_pred(name, cases):
-    print(f"static inline bool cap_{name}(const Cap p, const Cap c) {{")
-    print("\tbool b = true;")
-    print("\tCapType parent_type = cap_get_type(p);")
-    print("\tCapType child_type = cap_get_type(c);")
+    print(f"static inline int cap_{name}(struct cap p, struct cap c) {{")
+    print("int b = 1;")
+    print("enum cap_type parent_type = cap_get_type(p);")
+    print("enum cap_type child_type = cap_get_type(c);")
     for case in cases:
         make_pred_case(case)
-    print("\treturn false;")
-    print("}\n")
+    print("return 0;")
+    print("}")
 
 # Open the file and load the file
 
@@ -144,20 +144,25 @@ with open(sys.argv[1]) as f:
 
 caps = data['caps']
 enums = ", ".join([f"CAP_{d['name'].upper()}"  for d in caps])
+
 print(f"""\
 #pragma once
-#include "cap.h"
+#include "config.h"
 #include "kassert.h"
 #include "pmp.h"
 
-typedef enum cap_type CapType;
+#define NULL_CAP ((struct cap){{0,0}})
 
 enum cap_type {{
-    {enums}
+{enums}
 }};
 
-static inline CapType cap_get_type(const Cap cap) {{
-    return (cap.word0 >> 56) & 0xff;
+struct cap {{
+unsigned long long word0, word1;
+}};
+
+static inline enum cap_type cap_get_type(struct cap cap) {{
+return (cap.word0 >> 56) & 0xff;
 }}
 """)
 

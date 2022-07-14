@@ -1,6 +1,6 @@
 #pragma once
-#include "types.h"
 #include "proc.h"
+#include "types.h"
 
 void syscall_handler(struct registers *regs, uint64_t mcause, uint64_t mtval);
 

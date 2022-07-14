@@ -19,8 +19,6 @@
                 _out;                                  \
         })
 
+#define set_csr(reg, in) ({ __asm__ volatile("csrs " #reg ",%0" ::"r"(in)); })
 
-#define set_csr(reg, in) ({ __asm__ volatile("csrs " #reg ",%0" :: "r"(in)); })
-
-#define clear_csr(reg, in) \
-        ({ __asm__ volatile("csrc " #reg ",%0" :: "r"(in)); })
+#define clear_csr(reg, in) ({ __asm__ volatile("csrc " #reg ",%0" ::"r"(in)); })

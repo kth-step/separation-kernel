@@ -2,7 +2,7 @@
 #pragma once
 
 /* Import board settings fomr 'bsp/$(BSP)/platform.h' */
-#include "platform.h" 
+#include "platform.h"
 
 /* Number of processes. */
 #define N_PROC 4
@@ -27,8 +27,6 @@
  * Used for setting up initial memory of the boot process. */
 #define BOOT_PMP_LENGTH 0x100000UL
 #define USER_MEMORY_BEGIN 0x80000000UL
-#define USER_MEMORY_END  0x100000000UL
+#define USER_MEMORY_END 0x100000000UL
 
 #define MEMORY_PROTECTION 1
-
-

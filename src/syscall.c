@@ -1,6 +1,6 @@
 // See LICENSE file for copyright and license details.
 
-#include "cap_utils.h"
+#include "cap_node.h"
 #include "csr.h"
 #include "preemption.h"
 #include "s3k_consts.h"
@@ -20,8 +20,8 @@ static void syscall_derive_cap(struct registers *regs);
 static void syscall_invoke_endpoint(struct registers *regs);
 static void syscall_invoke_supervisor(struct registers *regs);
 
-static bool syscall_interprocess_move(CapNode *src, CapNode *dest,
-                                      uint64_t pid);
+static bool syscall_interprocess_move(struct cap_node *src,
+                                      struct cap_node *dest, uint64_t pid);
 
 static void (*const syscall_handler_array[])(struct registers *) = {
     syscall_no_cap,          syscall_read_cap,         syscall_move_cap,
@@ -74,13 +74,14 @@ void syscall_no_cap(struct registers *regs) {
         }
 }
 
-bool syscall_interprocess_move(CapNode *src, CapNode *dest, uint64_t pid) {
-        Cap cap = cap_node_get_cap(src);
-        CapType type = cap_get_type(cap);
+bool syscall_interprocess_move(struct cap_node *src, struct cap_node *dest,
+                               uint64_t pid) {
+        struct cap cap = cap_node_get_cap(src);
+        enum cap_type type = cap_get_type(cap);
         bool succ;
 
         if (type == CAP_TIME) {
-                Cap new_cap = cap;
+                struct cap new_cap = cap;
                 cap_time_set_pid(&new_cap, pid);
                 succ = CapInsert(new_cap, dest, src) && CapDelete(src) &&
                        SchedUpdate(cap, new_cap, dest);
@@ -92,14 +93,14 @@ bool syscall_interprocess_move(CapNode *src, CapNode *dest, uint64_t pid) {
 }
 
 void syscall_read_cap(struct registers *regs) {
-        CapNode *cn = proc_get_cap_node(current, regs->a0);
+        struct cap_node *cn = proc_get_cap_node(current, regs->a0);
         if (cn == NULL) {
                 preemption_disable();
                 regs->a0 = S3K_ERROR_INDEX_OUT_OF_BOUNDS;
                 regs->pc += 4;
                 preemption_enable();
         } else {
-                Cap cap = cap_node_get_cap(cn);
+                struct cap cap = cap_node_get_cap(cn);
                 preemption_disable();
                 regs->a0 = S3K_ERROR_OK;
                 regs->a1 = cap.word0;
@@ -110,8 +111,8 @@ void syscall_read_cap(struct registers *regs) {
 }
 
 void syscall_move_cap(struct registers *regs) {
-        CapNode *cn_src = proc_get_cap_node(current, regs->a0);
-        CapNode *cn_dest = proc_get_cap_node(current, regs->a1);
+        struct cap_node *cn_src = proc_get_cap_node(current, regs->a0);
+        struct cap_node *cn_dest = proc_get_cap_node(current, regs->a1);
         preemption_disable();
         regs->pc += 4;
         if (cn_src == NULL || cn_dest == NULL) {
@@ -128,12 +129,12 @@ void syscall_move_cap(struct registers *regs) {
 }
 
 void syscall_delete_cap(struct registers *regs) {
-        CapNode *cn = proc_get_cap_node(current, regs->a0);
+        struct cap_node *cn = proc_get_cap_node(current, regs->a0);
         if (cn == NULL) {
                 regs->pc += 4;
                 regs->a0 = S3K_ERROR_INDEX_OUT_OF_BOUNDS;
         } else {
-                Cap cap = cap_node_get_cap(cn);
+                struct cap cap = cap_node_get_cap(cn);
                 regs->pc += 4;
                 switch (cap_get_type(cap)) {
                         case CAP_INVALID:
@@ -154,7 +155,7 @@ void syscall_delete_cap(struct registers *regs) {
 }
 
 void syscall_revoke_cap(struct registers *regs) {
-        CapNode *cn = proc_get_cap_node(current, regs->a0);
+        struct cap_node *cn = proc_get_cap_node(current, regs->a0);
         if (cn == NULL) {
                 preemption_disable();
                 regs->pc += 4;
@@ -162,8 +163,8 @@ void syscall_revoke_cap(struct registers *regs) {
                 preemption_enable();
                 return;
         }
-        Cap cap = cap_node_get_cap(cn);
-        CapType type = cap_get_type(cap);
+        struct cap cap = cap_node_get_cap(cn);
+        enum cap_type type = cap_get_type(cap);
         switch (type) {
                 case CAP_TIME:
                         cap_time_set_free(&cap, cap_time_get_begin(cap));
@@ -208,8 +209,8 @@ void syscall_revoke_cap(struct registers *regs) {
 }
 
 void syscall_derive_cap(struct registers *regs) {
-        CapNode *cn_parent = proc_get_cap_node(current, regs->a0);
-        CapNode *cn_child = proc_get_cap_node(current, regs->a1);
+        struct cap_node *cn_parent = proc_get_cap_node(current, regs->a0);
+        struct cap_node *cn_child = proc_get_cap_node(current, regs->a1);
         if (cn_parent == NULL || cn_child == NULL) {
                 preemption_disable();
                 regs->a0 = S3K_ERROR_INDEX_OUT_OF_BOUNDS;
@@ -218,11 +219,11 @@ void syscall_derive_cap(struct registers *regs) {
                 return;
         }
 
-        Cap parent = cap_node_get_cap(cn_parent);
-        Cap child = (Cap){regs->a2, regs->a3};
+        struct cap parent = cap_node_get_cap(cn_parent);
+        struct cap child = (struct cap){regs->a2, regs->a3};
 
-        CapType parent_type = cap_get_type(parent);
-        CapType child_type = cap_get_type(child);
+        enum cap_type parent_type = cap_get_type(parent);
+        enum cap_type child_type = cap_get_type(child);
 
         if (!cap_can_derive(parent, child)) {
                 preemption_disable();
@@ -301,8 +302,8 @@ static void syscall_invoke_endpoint_send(struct registers *regs,
         /* Number of capabilities sent */
         regs->a1 = 0;
         while (cid_src < N_CAPS && cid_src < cid_last && cid_dest < N_CAPS) {
-                CapNode *src = &current->cap_table[cid_src];
-                CapNode *dest = &receiver->cap_table[cid_dest];
+                struct cap_node *src = &current->cap_table[cid_src];
+                struct cap_node *dest = &receiver->cap_table[cid_dest];
                 if (!syscall_interprocess_move(src, dest, receiver->pid)) {
                         /* If moving a capability failed */
                         break;
@@ -330,7 +331,7 @@ static void syscall_invoke_endpoint_send(struct registers *regs,
 }
 
 void syscall_invoke_endpoint(struct registers *regs) {
-        CapNode *cn = proc_get_cap_node(current, regs->a0);
+        struct cap_node *cn = proc_get_cap_node(current, regs->a0);
         if (cn == NULL) {
                 preemption_disable();
                 regs->a0 = S3K_ERROR_INDEX_OUT_OF_BOUNDS;
@@ -338,7 +339,7 @@ void syscall_invoke_endpoint(struct registers *regs) {
                 preemption_enable();
                 return;
         }
-        Cap cap = cap_node_get_cap(cn);
+        struct cap cap = cap_node_get_cap(cn);
 
         if (cap_get_type(cap) != CAP_ENDPOINT) {
                 preemption_disable();
@@ -358,7 +359,8 @@ void syscall_invoke_endpoint(struct registers *regs) {
                 if (__sync_bool_compare_and_swap(&channels[channel], NULL,
                                                  current)) {
                         /* Set waiting bit */
-                        __sync_bool_compare_and_swap(&current->state, PS_RUNNING, PS_WAITING);
+                        __sync_bool_compare_and_swap(&current->state,
+                                                     PS_RUNNING, PS_WAITING);
                         /* We yield if suspended or waiting. */
                         trap_yield();
                 } else {
@@ -462,8 +464,9 @@ void syscall_invoke_supervisor_give(struct registers *regs,
                 regs->a1 = 0;
                 while (cid_src < N_CAPS && cid_src < cid_last &&
                        cid_dest < N_CAPS) {
-                        CapNode *src = &current->cap_table[cid_src];
-                        CapNode *dest = &supervisee->cap_table[cid_dest];
+                        struct cap_node *src = &current->cap_table[cid_src];
+                        struct cap_node *dest =
+                            &supervisee->cap_table[cid_dest];
                         if (!syscall_interprocess_move(src, dest,
                                                        supervisee->pid))
                                 break;
@@ -491,8 +494,8 @@ void syscall_invoke_supervisor_take(struct registers *regs,
                 regs->a0 = S3K_ERROR_OK;
                 while (cid_src < N_CAPS && cid_src < cid_last &&
                        cid_dest < N_CAPS) {
-                        CapNode *src = &supervisee->cap_table[cid_src];
-                        CapNode *dest = &current->cap_table[cid_dest];
+                        struct cap_node *src = &supervisee->cap_table[cid_src];
+                        struct cap_node *dest = &current->cap_table[cid_dest];
                         if (!syscall_interprocess_move(src, dest,
                                                        supervisee->pid))
                                 break;
@@ -509,7 +512,7 @@ void syscall_invoke_supervisor_take(struct registers *regs,
 }
 
 void syscall_invoke_supervisor(struct registers *regs) {
-        CapNode *cn = proc_get_cap_node(current, regs->a0);
+        struct cap_node *cn = proc_get_cap_node(current, regs->a0);
         if (cn == NULL) {
                 preemption_disable();
                 regs->pc += 4;
@@ -517,7 +520,7 @@ void syscall_invoke_supervisor(struct registers *regs) {
                 preemption_enable();
                 return;
         }
-        Cap cap = cap_node_get_cap(cn);
+        struct cap cap = cap_node_get_cap(cn);
         if (cap_get_type(cap) != CAP_SUPERVISOR) {
                 preemption_disable();
                 regs->pc += 4;
@@ -569,4 +572,3 @@ void syscall_invoke_supervisor(struct registers *regs) {
                         break;
         }
 }
-
