@@ -384,7 +384,8 @@ void syscall_invoke_supervisor_resume(struct registers* regs, struct proc* super
 void syscall_invoke_supervisor_state(struct registers* regs, struct proc* supervisee)
 {
         preemption_disable();
-        regs->a0 = supervisee->state;
+        regs->a0 = S3K_ERROR_OK;
+        regs->a1 = supervisee->state;
         regs->pc += 4;
         preemption_enable();
 }
