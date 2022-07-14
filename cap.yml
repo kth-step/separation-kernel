@@ -1,5 +1,5 @@
 caps:
-  - name: invalid
+  - name: empty
   - name: memory
     fields:
       - begin 4

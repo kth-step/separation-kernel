@@ -1,11 +1,12 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-#define read_csr(reg)                                          \
-        ({                                                     \
-                register unsigned long out;                    \
-                __asm__ volatile("csrr %0," #reg : "=r"(out)); \
-                out;                                           \
+#define read_csr(reg)                            \
+        ({                                       \
+                register unsigned long out;      \
+                __asm__ volatile("csrr %0," #reg \
+                                 : "=r"(out));   \
+                out;                             \
         })
 
 #define write_csr(reg, _in) __asm__ volatile("csrw " #reg ",%0" ::"r"(_in))

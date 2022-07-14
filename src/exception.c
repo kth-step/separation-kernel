@@ -2,8 +2,8 @@
 #include "sched.h"
 #include "trap.h"
 
-void exception_handler(struct registers *regs, uint64_t mcause,
-                       uint64_t mtval) {
+void exception_handler(struct registers* regs, uint64_t mcause, uint64_t mtval)
+{
         preemption_disable();
         /* Save pc, sp, a0, a1 to trap frame */
         regs->ppc = regs->pc;
@@ -22,8 +22,8 @@ void exception_handler(struct registers *regs, uint64_t mcause,
 #define SRET 0x0120000073
 #define MRET 0x0320000073
 
-void illegal_instruction_handler(struct registers *regs, uint64_t mcause,
-                                 uint64_t mtval) {
+void illegal_instruction_handler(struct registers* regs, uint64_t mcause, uint64_t mtval)
+{
         if (mtval == URET || mtval == SRET || mtval == MRET) {
                 /* Restore sp, pc, a0, a1 */
                 preemption_disable();

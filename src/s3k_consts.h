@@ -29,6 +29,8 @@ enum s3k_error {
         S3K_ERROR_SUPERVISER_PID_OUT_OF_BOUNDS,
         /* */
         S3K_ERROR_SUPERVISER_REG_NR_OUT_OF_BOUNDS,
+        /* Supervisee is already suspended */
+        S3K_ERROR_SUPERVISEE_SUSPENDED,
         /* Some other thread has locked the supervisee. */
         S3K_ERROR_SUPERVISEE_BUSY,
         /* Endpoint send operation aborted */

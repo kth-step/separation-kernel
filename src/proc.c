@@ -11,72 +11,119 @@ extern void user_code();
 /* Defined in proc.h */
 struct proc processes[N_PROC];
 
-static void proc_init_memory(struct cap_node *pmp, struct cap_node *memory) {
+#define MAKE_SENTINEL(s)          \
+        do {                      \
+                s.prev = &s;      \
+                s.next = &s;      \
+                s.cap = NULL_CAP; \
+        } while (0)
+
+static struct cap_node* proc_init_memory(struct cap_node* cn)
+{
+        /* Node at beginning and end of capabiliy list */
+        static struct cap_node sentinel;
+        struct cap cap;
+
+        MAKE_SENTINEL(sentinel);
+
+        /* Arguments for cap_mk_... */
         uint64_t begin = USER_MEMORY_BEGIN >> 12;
         uint64_t end = USER_MEMORY_END >> 12;
+
         uint64_t pmp_length = BOOT_PMP_LENGTH >> 12;
         uint64_t pmp_addr = begin | ((pmp_length - 1) >> 1);
-        struct cap cap_pmp = cap_mk_pmp(pmp_addr, 5);
-        struct cap cap_memory = cap_mk_memory(begin, end, 7, begin, 0);
-        struct cap_node *sentinel = CapInitSentinel();
-        CapInsert(cap_memory, memory, sentinel);
-        CapInsert(cap_pmp, pmp, sentinel);
+
+        /* Make and insert pmp frame */
+        cap = cap_mk_pmp(pmp_addr, 5);
+        cap_node_insert(cap, cn++, &sentinel);
+
+        /* Make and insert memory slice */
+        cap = cap_mk_memory(begin, end, 7, begin, 0);
+        cap_node_insert(cap, cn++, &sentinel);
+
+        return cn;
 }
 
-static void proc_init_channels(struct cap_node *channel) {
+static struct cap_node* proc_init_time(struct cap_node* cn)
+{
+        static struct cap_node sentinel;
+        struct cap cap;
+
+        MAKE_SENTINEL(sentinel);
+
+        /* Default values of time slices */
+        uint64_t pid = 0;
+        uint64_t begin = 0;
+        uint64_t end = N_QUANTUM;
+        uint64_t free = 0;
+        uint64_t depth = 0;
+
+        for (int hartid = MIN_HARTID; hartid <= MAX_HARTID; hartid++) {
+                cap = cap_mk_time(hartid, pid, begin, end, free, depth);
+                cap_node_insert(cap, cn++, &sentinel);
+        }
+        return cn;
+}
+
+static struct cap_node* proc_init_supervisor(struct cap_node* cn)
+{
+        static struct cap_node sentinel;
+        struct cap cap;
+
+        MAKE_SENTINEL(sentinel);
+
+        cap = cap_mk_supervisor(0, N_PROC, 0);
+        cap_node_insert(cap, cn++, &sentinel);
+
+        return cn;
+}
+
+static struct cap_node* proc_init_channels(struct cap_node* cn)
+{
+        static struct cap_node sentinel;
+        struct cap cap;
+
+        MAKE_SENTINEL(sentinel);
+
         uint16_t begin = 0;
         uint16_t end = N_CHANNELS;
-        struct cap cap = cap_mk_channels(begin, end, begin, 0);
-        struct cap_node *sentinel = CapInitSentinel();
-        CapInsert(cap, channel, sentinel);
+
+        cap = cap_mk_channels(begin, end, begin, 0);
+        cap_node_insert(cap, cn++, &sentinel);
+
+        return cn;
 }
 
-static void proc_init_time(struct cap_node time[N_CORES]) {
-        for (int hartid = MIN_HARTID; hartid <= MAX_HARTID; hartid++) {
-                struct cap_node *sentinel = CapInitSentinel();
-                uint64_t pid = 0;
-                uint64_t begin = 0;
-                uint64_t end = N_QUANTUM;
-                uint64_t free = 0;
-                uint64_t depth = 0;
-                struct cap cap =
-                    cap_mk_time(hartid, pid, begin, end, free, depth);
-                CapInsert(cap, &time[hartid - MIN_HARTID], sentinel);
-        }
-}
-
-static void proc_init_supervisor(struct cap_node *cap_sup) {
-        struct cap_node *sentinel = CapInitSentinel();
-        struct cap cap = cap_mk_supervisor(0, N_PROC, 0);
-        CapInsert(cap, cap_sup, sentinel);
-}
-
-static void __proc_init_boot(struct proc *boot) {
-        struct cap_node *cap_table = boot->cap_table;
-        proc_init_memory(&cap_table[0], &cap_table[1]);
-        proc_init_channels(&cap_table[2]);
-        proc_init_supervisor(&cap_table[3]);
-        proc_init_time(&cap_table[4]);
+static void __proc_init_boot(struct proc* boot)
+{
+        struct cap_node* cn;
+        cn = boot->cap_table;
+        cn = proc_init_memory(cn);
+        cn = proc_init_channels(cn);
+        cn = proc_init_supervisor(cn);
+        cn = proc_init_time(cn);
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
-        boot->regs.pc = (uint64_t)user_code;  // Temporary code.
-        boot->state = PS_READY;
+        boot->regs.pc = (uint64_t)user_code; // Temporary code.
+        boot->state = PROC_STATE_READY;
 }
 
 /* Initializes one process. */
-static void __proc_init(struct proc *proc, int pid) {
+static void __proc_init(struct proc* proc, int pid)
+{
         /* Set the process id */
         proc->pid = pid;
         /* Capability table. */
         proc->cap_table = cap_tables[pid];
         /* All processes are by default suspended */
-        proc->state = PS_SUSPENDED;
+        proc->state = PROC_STATE_SUSPENDED;
         /* channel == -1 means not subscribed to any channel */
         proc->channel = -1;
 }
 
 /* Defined in proc.h */
-void proc_init(void) {
+void proc_init(void)
+{
         for (int i = 0; i < N_PROC; i++)
                 __proc_init(&processes[i], i);
         __proc_init_boot(&processes[0]);

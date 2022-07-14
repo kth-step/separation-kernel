@@ -39,7 +39,7 @@ def make_getter(cap_name, name, size, bins):
     if name == 'padd':
         return
     print(f"static inline uint64_t cap_{cap_name}_get_{name}(struct cap cap) {{")
-    make_assert(f"(cap.word0 >> 56) == CAP_{cap_name.upper()}")
+    make_assert(f"(cap.word0 >> 56) == CAP_TYPE_{cap_name.upper()}")
     i, b = get_bin(bins, name)
     offset = get_offset(b, name)
     if offset:
@@ -52,7 +52,7 @@ def make_setter(cap_name, name, size, bins):
     if name == 'padd':
         return
     print(f'static inline void cap_{cap_name}_set_{name}(struct cap *cap, uint64_t {name}) {{')
-    make_assert(f"(cap->word0 >> 56) == CAP_{cap_name.upper()}")
+    make_assert(f"(cap->word0 >> 56) == CAP_TYPE_{cap_name.upper()}")
     make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")
     i, b = get_bin(bins, name) 
     offset = get_offset(b, name)
@@ -72,7 +72,7 @@ def make_constructor(cap_name, fields, asserts, bins):
     for a in asserts:
         make_assert(a)
     print("struct cap c;")
-    print(f"c.word0 = (uint64_t)CAP_{cap_name.upper()} << 56;")
+    print(f"c.word0 = (uint64_t)CAP_TYPE_{cap_name.upper()} << 56;")
     print(f"c.word1 = 0;")
     for (i,b) in enumerate(bins):
         for (f, s) in b:
@@ -119,8 +119,8 @@ def make_translator(case):
     case['relations'] = rels
         
 def make_pred_case(case):
-    parent_type = f"CAP_{case['parent'].upper()}"
-    child_type = f"CAP_{case['child'].upper()}"
+    parent_type = f"CAP_TYPE_{case['parent'].upper()}"
+    child_type = f"CAP_TYPE_{case['child'].upper()}"
     make_translator(case)
     print(f"if (parent_type == {parent_type} && child_type == {child_type}) {{")
     for rel in case['relations']:
@@ -143,7 +143,7 @@ with open(sys.argv[1]) as f:
     data = yaml.load(f, Loader=SafeLoader)
 
 caps = data['caps']
-enums = ", ".join([f"CAP_{d['name'].upper()}"  for d in caps])
+enums = ", ".join([f"CAP_TYPE_{d['name'].upper()}"  for d in caps])
 
 print(f"""\
 #pragma once
