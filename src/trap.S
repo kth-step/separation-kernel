@@ -2,6 +2,7 @@
 
 .globl trap_entry
 .globl trap_resume_proc
+.globl trap_yield
 
 #include "config.h"
 #include "macros.S"
@@ -69,6 +70,10 @@ trap_resume_proc:
         csrrw   tp,mscratch,tp
 
         mret
+
+trap_yield:
+        la      ra,trap_resume_proc
+        tail    sched
 
 .option push
 .option norvc   /* Prevent compressed instructions */

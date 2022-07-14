@@ -8,4 +8,4 @@ void exception_handler(struct registers *regs, uint64_t mcause, uint64_t mtval);
 
 void trap_entry(void) __attribute__((noreturn));
 void trap_resume_proc(void) __attribute__((noreturn));
-void trap_recv_yield(void);
+void trap_yield(void);

@@ -69,3 +69,16 @@ static inline bool proc_write_register(struct proc *proc, uint64_t regi,
         }
         return 0;
 }
+
+static inline void proc_release(struct proc *proc) {
+        if (proc == NULL)
+                return;
+        if (!(proc->state & PS_WAITING)) {
+                /* If not waiting, then go to suspend */
+                __sync_fetch_and_and(&proc->state, PS_SUSPENDED);
+        }
+}
+
+static inline bool proc_acquire(struct proc *proc) {
+        return __sync_bool_compare_and_swap(&proc->state, PS_READY, PS_RUNNING);
+}

@@ -99,6 +99,8 @@ void sched(void) {
         /* The hart/core id */
         uintptr_t hartid = read_csr(mhartid);
 
+        proc_release(current);
+
         /* Process to run and number of time slices to run for */
         struct proc *proc = NULL;
         uint64_t time, length;
@@ -108,7 +110,7 @@ void sched(void) {
                 time = (read_time() / TICKS) + 1;
                 /* Try getting a process at that time slice. */
                 sched_get_proc(hartid, time, &proc, &length);
-        } while (!proc);
+        } while (!proc || proc_acquire(proc));
         /* Wait for time slice to start and set timeout */
         current = proc;
         wait_and_set_timeout(time, length);

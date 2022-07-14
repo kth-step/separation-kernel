@@ -260,13 +260,14 @@ void syscall_derive_cap(struct registers *regs) {
 static void syscall_invoke_endpoint_send(struct registers *regs,
                                          uint64_t channel) {
         struct proc *receiver = channels[channel];
-        preemption_disable();
         if (receiver == NULL) {
+                preemption_disable();
                 regs->a0 = S3K_ERROR_NO_RECEIVER;
                 regs->pc += 4;
                 preemption_enable();
                 return;
         }
+        preemption_disable();
         if (!__sync_bool_compare_and_swap(&channels[channel], receiver, NULL)) {
                 regs->a0 = S3K_ERROR_NO_RECEIVER;
                 regs->pc += 4;
@@ -353,8 +354,21 @@ void syscall_invoke_endpoint(struct registers *regs) {
         uint64_t channel = cap_endpoint_get_channel(cap);
         if (mode == 0) { /* Receive */
                 current->channel = channel;
+                preemption_disable();
                 if (__sync_bool_compare_and_swap(&channels[channel], NULL,
                                                  current)) {
+                        /* Set waiting bit */
+                        enum proc_state state =
+                            __sync_fetch_and_or(&current->state, PS_WAITING);
+                        /* If we were running while suspended 
+                         * Go to suspended mode, stop listening to channels */
+                        if (state == PS_RUNNING_THEN_SUSPEND) {
+                                current->state = PS_SUSPENDED;
+                                current->channel = -1;
+                                __sync_bool_compare_and_swap(&channels[channel], current, NULL);
+                        }
+                        /* We yield if suspended or waiting. */
+                        trap_yield();
                 } else {
                         current->channel = -1;
                 }
