@@ -4,6 +4,7 @@
 
 #include "proc.h"
 #include "sched.h"
+#include "preemption.h"
 
 /** Capability table */
 CapNode cap_tables[N_PROC][N_CAPS];
@@ -69,11 +70,13 @@ bool CapDelete(CapNode *curr) {
 void CapRevoke(CapNode *curr) {
         const Cap parent = cap_node_get_cap(curr);
         while (!cap_node_is_deleted(curr)) {
+                uint64_t tmp = preemption_disable();
                 CapNode *next = curr->next;
                 Cap child = cap_node_get_cap(next);
                 if (!cap_is_child(parent, child))
                         break;
                 cap_delete(curr, next);
+                preemption_restore(tmp);
         }
 }
 

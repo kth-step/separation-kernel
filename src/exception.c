@@ -1,8 +1,10 @@
-#include "trap.h"
+#include "preemption.h"
 #include "sched.h"
+#include "trap.h"
 
-void ExceptionHandler(struct registers *regs, uint64_t mcause, uint64_t mtval) {
-        SchedDisablePreemption();
+void exception_handler(struct registers *regs, uint64_t mcause,
+                       uint64_t mtval) {
+        preemption_disable();
         /* Save pc, sp, a0, a1 to trap frame */
         regs->ppc = regs->pc;
         regs->psp = regs->sp;
@@ -13,23 +15,24 @@ void ExceptionHandler(struct registers *regs, uint64_t mcause, uint64_t mtval) {
         regs->sp = regs->tsp;
         regs->a0 = mcause;
         regs->a1 = mtval;
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 #define URET 0x0020000073
 #define SRET 0x0120000073
 #define MRET 0x0320000073
 
-void IllegalInstructionHandler(struct registers *regs, uint64_t mcause, uint64_t mtval) {
+void illegal_instruction_handler(struct registers *regs, uint64_t mcause,
+                                 uint64_t mtval) {
         if (mtval == URET || mtval == SRET || mtval == MRET) {
-                SchedDisablePreemption();
                 /* Restore sp, pc, a0, a1 */
+                preemption_disable();
                 regs->sp = regs->psp;
                 regs->pc = regs->ppc;
                 regs->a0 = regs->pa0;
                 regs->a1 = regs->pa1;
-                SchedEnablePreemption();
+                preemption_enable();
         } else {
-                ExceptionHandler(regs, mcause, mtval);
+                exception_handler(regs, mcause, mtval);
         }
 }

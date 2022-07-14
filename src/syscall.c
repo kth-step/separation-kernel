@@ -2,13 +2,12 @@
 
 #include "cap_utils.h"
 #include "csr.h"
+#include "preemption.h"
 #include "s3k_consts.h"
 #include "sched.h"
 #include "trap.h"
 #include "types.h"
 #include "utils.h"
-
-void syscall_handler(struct registers regs);
 
 static void syscall_no_cap(struct registers *regs);
 static void syscall_read_cap(struct registers *regs);
@@ -31,39 +30,48 @@ static void (*const syscall_handler_array[])(struct registers *) = {
 
 struct proc *volatile channels[N_CHANNELS];
 
-void SyscallHandler(struct registers *regs, uint64_t mcause, uint64_t mtval) {
+void syscall_handler(struct registers *regs, uint64_t mcause, uint64_t mtval) {
         uint64_t syscall_number = regs->t0;
         if (syscall_number < ARRAY_SIZE(syscall_handler_array)) {
                 syscall_handler_array[syscall_number](regs);
         } else {
-                ExceptionHandler(regs, mcause, mtval);
+                exception_handler(regs, mcause, mtval);
         }
 }
 
 void syscall_no_cap(struct registers *regs) {
         uint64_t op_number = regs->a0;
-        SchedDisablePreemption();
         switch (op_number) {
                 case S3K_SYSNR_NOCAP_GET_PID:
+                        preemption_disable();
                         /* Get the struct process ID */
                         regs->a0 = S3K_ERROR_OK;
                         regs->a1 = current->pid;
+                        regs->pc += 4;
+                        preemption_enable();
                         break;
                 case S3K_SYSNR_NOCAP_READ_REGISTER:
+                        preemption_disable();
                         regs->a0 = S3K_ERROR_OK;
                         regs->a1 = proc_read_register(current, regs->a1);
+                        regs->pc += 4;
+                        preemption_enable();
                         break;
                 case S3K_SYSNR_NOCAP_WRITE_REGISTER:
+                        preemption_disable();
                         regs->a0 = S3K_ERROR_OK;
                         regs->a1 =
                             proc_write_register(current, regs->a1, regs->a2);
+                        regs->pc += 4;
+                        preemption_enable();
                         break;
                 default:
+                        preemption_disable();
                         regs->a0 = S3K_ERROR_NOCAP_BAD_OP;
+                        regs->pc += 4;
+                        preemption_enable();
                         break;
         }
-        regs->pc += 4;
-        SchedEnablePreemption();
 }
 
 bool syscall_interprocess_move(CapNode *src, CapNode *dest, uint64_t pid) {
@@ -84,27 +92,27 @@ bool syscall_interprocess_move(CapNode *src, CapNode *dest, uint64_t pid) {
 }
 
 void syscall_read_cap(struct registers *regs) {
-        uint64_t cid = regs->a0;
-        if (cid >= N_CAPS) {
-                SchedDisablePreemption();
+        CapNode *cn = proc_get_cap_node(current, regs->a0);
+        if (cn == NULL) {
+                preemption_disable();
                 regs->a0 = S3K_ERROR_INDEX_OUT_OF_BOUNDS;
                 regs->pc += 4;
-                SchedEnablePreemption();
-                return;
+                preemption_enable();
+        } else {
+                Cap cap = cap_node_get_cap(cn);
+                preemption_disable();
+                regs->a0 = S3K_ERROR_OK;
+                regs->a1 = cap.word0;
+                regs->a2 = cap.word1;
+                regs->pc += 4;
+                preemption_enable();
         }
-        const Cap cap = cap_node_get_cap(&current->cap_table[cid]);
-        SchedDisablePreemption();
-        regs->a0 = S3K_ERROR_OK;
-        regs->a1 = cap.word0;
-        regs->a2 = cap.word1;
-        regs->pc += 4;
-        SchedEnablePreemption();
 }
 
 void syscall_move_cap(struct registers *regs) {
         CapNode *cn_src = proc_get_cap_node(current, regs->a0);
         CapNode *cn_dest = proc_get_cap_node(current, regs->a1);
-        SchedDisablePreemption();
+        preemption_disable();
         regs->pc += 4;
         if (cn_src == NULL || cn_dest == NULL) {
                 regs->a0 = S3K_ERROR_INDEX_OUT_OF_BOUNDS;
@@ -116,49 +124,47 @@ void syscall_move_cap(struct registers *regs) {
                 regs->a0 = CapMove(cn_src, cn_dest) ? S3K_ERROR_OK
                                                     : S3K_ERROR_CAP_MISSING;
         }
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 void syscall_delete_cap(struct registers *regs) {
         CapNode *cn = proc_get_cap_node(current, regs->a0);
         if (cn == NULL) {
-                SchedDisablePreemption();
                 regs->pc += 4;
                 regs->a0 = S3K_ERROR_INDEX_OUT_OF_BOUNDS;
-                SchedEnablePreemption();
-                return;
+        } else {
+                Cap cap = cap_node_get_cap(cn);
+                regs->pc += 4;
+                switch (cap_get_type(cap)) {
+                        case CAP_INVALID:
+                                regs->a0 = S3K_ERROR_CAP_MISSING;
+                                break;
+                        case CAP_TIME:
+                                regs->a0 = SchedDelete(cap, cn) && CapDelete(cn)
+                                               ? S3K_ERROR_OK
+                                               : S3K_ERROR_CAP_MISSING;
+                                break;
+                        default:
+                                regs->a0 = CapDelete(cn)
+                                               ? S3K_ERROR_OK
+                                               : S3K_ERROR_CAP_MISSING;
+                                break;
+                }
         }
-        Cap cap = cap_node_get_cap(cn);
-        SchedDisablePreemption();
-        regs->pc += 4;
-        switch (cap_get_type(cap)) {
-                case CAP_INVALID:
-                        regs->a0 = S3K_ERROR_CAP_MISSING;
-                        break;
-                case CAP_TIME:
-                        regs->a0 = SchedDelete(cap, cn) && CapDelete(cn)
-                                       ? S3K_ERROR_OK
-                                       : S3K_ERROR_CAP_MISSING;
-                        break;
-                default:
-                        regs->a0 = CapDelete(cn) ? S3K_ERROR_OK
-                                                 : S3K_ERROR_CAP_MISSING;
-                        break;
-        }
-        SchedEnablePreemption();
 }
 
 void syscall_revoke_cap(struct registers *regs) {
         CapNode *cn = proc_get_cap_node(current, regs->a0);
         if (cn == NULL) {
-                SchedDisablePreemption();
+                preemption_disable();
                 regs->pc += 4;
                 regs->a0 = S3K_ERROR_INDEX_OUT_OF_BOUNDS;
-                SchedEnablePreemption();
+                preemption_enable();
                 return;
         }
         Cap cap = cap_node_get_cap(cn);
-        switch (cap_get_type(cap)) {
+        CapType type = cap_get_type(cap);
+        switch (type) {
                 case CAP_TIME:
                         cap_time_set_free(&cap, cap_time_get_begin(cap));
                         CapRevoke(cn);
@@ -180,41 +186,35 @@ void syscall_revoke_cap(struct registers *regs) {
                         CapRevoke(cn);
                         break;
                 default:
-                        break;
+                        preemption_disable();
+                        regs->pc += 4;
+                        regs->a0 = (type == CAP_INVALID)
+                                       ? S3K_ERROR_CAP_MISSING
+                                       : S3K_ERROR_NOT_REVOKABLE;
+                        preemption_enable();
+                        return;
         }
-        SchedDisablePreemption();
-        /* TODO: Make revocation preemptable */
-        switch (cap_get_type(cap)) {
-                case CAP_TIME:
-                        regs->a0 = SchedRevoke(cap, cn) && CapUpdate(cap, cn)
-                                       ? S3K_ERROR_OK
-                                       : S3K_ERROR_CAP_MISSING;
-                        break;
-                case CAP_MEMORY:
-                case CAP_SUPERVISOR:
-                case CAP_CHANNELS:
-                        regs->a0 = CapUpdate(cap, cn) ? S3K_ERROR_OK
-                                                      : S3K_ERROR_CAP_MISSING;
-                        break;
-                case CAP_INVALID:
-                        regs->a0 = S3K_ERROR_CAP_MISSING;
-                        break;
-                default:
-                        regs->a0 = S3K_ERROR_NOT_REVOKABLE;
-                        break;
+        preemption_disable();
+        if (type == CAP_TIME) {
+                regs->a0 = SchedRevoke(cap, cn) && CapUpdate(cap, cn)
+                               ? S3K_ERROR_OK
+                               : S3K_ERROR_CAP_MISSING;
+        } else {
+                regs->a0 =
+                    CapUpdate(cap, cn) ? S3K_ERROR_OK : S3K_ERROR_CAP_MISSING;
         }
         regs->pc += 4;
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 void syscall_derive_cap(struct registers *regs) {
         CapNode *cn_parent = proc_get_cap_node(current, regs->a0);
         CapNode *cn_child = proc_get_cap_node(current, regs->a1);
         if (cn_parent == NULL || cn_child == NULL) {
-                SchedDisablePreemption();
+                preemption_disable();
                 regs->a0 = S3K_ERROR_INDEX_OUT_OF_BOUNDS;
                 regs->pc += 4;
-                SchedEnablePreemption();
+                preemption_enable();
                 return;
         }
 
@@ -225,10 +225,10 @@ void syscall_derive_cap(struct registers *regs) {
         CapType child_type = cap_get_type(child);
 
         if (!cap_can_derive(parent, child)) {
-                SchedDisablePreemption();
+                preemption_disable();
                 regs->a0 = S3K_ERROR_BAD_DERIVATION;
                 regs->pc += 4;
-                SchedEnablePreemption();
+                preemption_enable();
                 return;
         }
 
@@ -246,7 +246,7 @@ void syscall_derive_cap(struct registers *regs) {
                    child_type == CAP_SUPERVISOR) {
                 cap_supervisor_set_free(&parent, cap_supervisor_get_end(child));
         }
-        SchedDisablePreemption();
+        preemption_disable();
         bool succ = CapUpdate(parent, cn_parent) &&
                     CapInsert(child, cn_child, cn_parent);
         if (parent_type == CAP_TIME && succ) {
@@ -254,23 +254,23 @@ void syscall_derive_cap(struct registers *regs) {
         }
         regs->a0 = succ ? S3K_ERROR_OK : S3K_ERROR_CAP_MISSING;
         regs->pc += 4;
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 static void syscall_invoke_endpoint_send(struct registers *regs,
                                          uint64_t channel) {
         struct proc *receiver = channels[channel];
-        SchedDisablePreemption();
+        preemption_disable();
         if (receiver == NULL) {
                 regs->a0 = S3K_ERROR_NO_RECEIVER;
                 regs->pc += 4;
-                SchedEnablePreemption();
+                preemption_enable();
                 return;
         }
         if (!__sync_bool_compare_and_swap(&channels[channel], receiver, NULL)) {
                 regs->a0 = S3K_ERROR_NO_RECEIVER;
                 regs->pc += 4;
-                SchedEnablePreemption();
+                preemption_enable();
                 return;
         }
         while (1) {
@@ -281,7 +281,7 @@ static void syscall_invoke_endpoint_send(struct registers *regs,
                     receiver->channel != channel) {
                         regs->a0 = S3K_ERROR_NO_RECEIVER;
                         regs->pc += 4;
-                        SchedEnablePreemption();
+                        preemption_enable();
                         return;
                 }
         }
@@ -325,27 +325,27 @@ static void syscall_invoke_endpoint_send(struct registers *regs,
         rregs->pc += 4;
         regs->pc += 4;
         __sync_fetch_and_and(&receiver->state, PS_SUSPENDED);
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 void syscall_invoke_endpoint(struct registers *regs) {
         CapNode *cn = proc_get_cap_node(current, regs->a0);
         if (cn == NULL) {
-                SchedDisablePreemption();
+                preemption_disable();
                 regs->a0 = S3K_ERROR_INDEX_OUT_OF_BOUNDS;
                 regs->pc += 4;
-                SchedEnablePreemption();
+                preemption_enable();
                 return;
         }
         Cap cap = cap_node_get_cap(cn);
 
         if (cap_get_type(cap) != CAP_ENDPOINT) {
-                SchedDisablePreemption();
+                preemption_disable();
                 regs->a0 = (cap_get_type(cap) == CAP_INVALID)
                                ? S3K_ERROR_CAP_MISSING
                                : S3K_ERROR_BAD_CAP;
                 regs->pc += 4;
-                SchedEnablePreemption();
+                preemption_enable();
                 return;
         }
 
@@ -365,7 +365,7 @@ void syscall_invoke_endpoint(struct registers *regs) {
 
 void syscall_invoke_supervisor_suspend(struct registers *regs,
                                        struct proc *supervisee) {
-        SchedDisablePreemption();
+        preemption_disable();
         enum proc_state state =
             __sync_fetch_and_or(&supervisee->state, PS_SUSPENDED);
         if (state == PS_WAITING) {
@@ -378,12 +378,12 @@ void syscall_invoke_supervisor_suspend(struct registers *regs,
         }
         regs->a0 = (state & PS_SUSPENDED) == 0;
         regs->pc += 4;
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 void syscall_invoke_supervisor_resume(struct registers *regs,
                                       struct proc *supervisee) {
-        SchedDisablePreemption();
+        preemption_disable();
         if (__sync_bool_compare_and_swap(&supervisee->state, PS_SUSPENDED,
                                          PS_SUSPENDED_BUSY)) {
                 __sync_synchronize();
@@ -393,21 +393,21 @@ void syscall_invoke_supervisor_resume(struct registers *regs,
                 regs->a0 = S3K_ERROR_SUPERVISEE_BUSY;
         }
         regs->pc += 4;
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 void syscall_invoke_supervisor_state(struct registers *regs,
                                      struct proc *supervisee) {
-        SchedDisablePreemption();
+        preemption_disable();
         regs->a0 = supervisee->state;
         regs->pc += 4;
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 void syscall_invoke_supervisor_read_reg(struct registers *regs,
                                         struct proc *supervisee) {
         uint64_t reg_nr = regs->a3;
-        SchedDisablePreemption();
+        preemption_disable();
         regs->pc += 4;
         if (reg_nr >= N_REGISTERS) {
                 regs->a0 = S3K_ERROR_SUPERVISER_REG_NR_OUT_OF_BOUNDS;
@@ -420,14 +420,14 @@ void syscall_invoke_supervisor_read_reg(struct registers *regs,
         } else {
                 regs->a0 = S3K_ERROR_SUPERVISEE_BUSY;
         }
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 void syscall_invoke_supervisor_write_reg(struct registers *regs,
                                          struct proc *supervisee) {
         uint64_t reg_nr = regs->a3;
         uint64_t reg_value = regs->a4;
-        SchedDisablePreemption();
+        preemption_disable();
         regs->pc += 4;
         if (reg_nr >= N_REGISTERS) {
                 regs->a0 = S3K_ERROR_SUPERVISER_REG_NR_OUT_OF_BOUNDS;
@@ -440,7 +440,7 @@ void syscall_invoke_supervisor_write_reg(struct registers *regs,
         } else {
                 regs->a0 = S3K_ERROR_SUPERVISEE_BUSY;
         }
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 void syscall_invoke_supervisor_give(struct registers *regs,
@@ -448,7 +448,7 @@ void syscall_invoke_supervisor_give(struct registers *regs,
         uint64_t cid_src = regs->a3;
         uint64_t cid_dest = regs->a4;
         uint64_t cid_last = cid_src + regs->a5;
-        SchedDisablePreemption();
+        preemption_disable();
         regs->pc += 4;
         if (__sync_bool_compare_and_swap(&supervisee->state, PS_SUSPENDED,
                                          PS_SUSPENDED_BUSY)) {
@@ -469,7 +469,7 @@ void syscall_invoke_supervisor_give(struct registers *regs,
         } else {
                 regs->a0 = S3K_ERROR_SUPERVISEE_BUSY;
         }
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 void syscall_invoke_supervisor_take(struct registers *regs,
@@ -477,10 +477,10 @@ void syscall_invoke_supervisor_take(struct registers *regs,
         uint64_t cid_src = regs->a3;
         uint64_t cid_dest = regs->a4;
         uint64_t cid_last = cid_src + regs->a5;
-        SchedDisablePreemption();
-        regs->pc += 4;
+        preemption_disable();
         if (__sync_bool_compare_and_swap(&supervisee->state, PS_SUSPENDED,
                                          PS_SUSPENDED_BUSY)) {
+                regs->pc += 4;
                 regs->a1 = 0;
                 regs->a0 = S3K_ERROR_OK;
                 while (cid_src < N_CAPS && cid_src < cid_last &&
@@ -496,26 +496,27 @@ void syscall_invoke_supervisor_take(struct registers *regs,
                 }
                 supervisee->state = PS_SUSPENDED;
         } else {
+                regs->pc += 4;
                 regs->a0 = S3K_ERROR_SUPERVISEE_BUSY;
         }
-        SchedEnablePreemption();
+        preemption_enable();
 }
 
 void syscall_invoke_supervisor(struct registers *regs) {
         CapNode *cn = proc_get_cap_node(current, regs->a0);
         if (cn == NULL) {
-                SchedDisablePreemption();
+                preemption_disable();
                 regs->pc += 4;
                 regs->a0 = S3K_ERROR_CAP_MISSING;
-                SchedEnablePreemption();
+                preemption_enable();
                 return;
         }
         Cap cap = cap_node_get_cap(cn);
         if (cap_get_type(cap) != CAP_SUPERVISOR) {
-                SchedDisablePreemption();
+                preemption_disable();
                 regs->pc += 4;
                 regs->a0 = S3K_ERROR_BAD_CAP;
-                SchedEnablePreemption();
+                preemption_enable();
                 return;
         }
         uint64_t pid = regs->a1;
@@ -524,10 +525,10 @@ void syscall_invoke_supervisor(struct registers *regs) {
         uint64_t pid_free = cap_supervisor_get_free(cap);
         uint64_t pid_end = cap_supervisor_get_end(cap);
         if (pid < pid_free || pid >= pid_end) {
-                SchedDisablePreemption();
+                preemption_disable();
                 regs->pc += 4;
                 regs->a0 = S3K_ERROR_SUPERVISER_PID_OUT_OF_BOUNDS;
-                SchedEnablePreemption();
+                preemption_enable();
                 return;
         }
 
@@ -555,10 +556,10 @@ void syscall_invoke_supervisor(struct registers *regs) {
                         syscall_invoke_supervisor_take(regs, supervisee);
                         break;
                 default:
-                        SchedDisablePreemption();
+                        preemption_disable();
                         regs->pc += 4;
                         regs->a0 = S3K_ERROR_SUPERVISER_BAD_OP;
-                        SchedEnablePreemption();
+                        preemption_enable();
                         break;
         }
 }

@@ -33,11 +33,14 @@
         li      x31,0
 .endm
 
-.macro load_gp_sp
+.macro load_gp
         .option push
         .option norelax
         la      gp,__global_pointer$
         .option pop
+.endm
+
+.macro load_sp
         la      sp,core_stack
         csrr    t0,mhartid
         addi    t0,t0,1

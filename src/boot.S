@@ -7,13 +7,13 @@
 /*** This is the kernel's entry point ***/
 .globl _start
 _start:
-        load_gp_sp
+        load_gp
+        load_sp
 
         csrw    mscratch,x0    
 
         /* Set the trap entry function. */
         la      t0,trap_entry
-        ori     t0,t0,1
         csrw    mtvec,t0
 
         /* Enable machine timer interrupt. */
