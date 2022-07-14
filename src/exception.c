@@ -13,7 +13,6 @@ void ExceptionHandler(struct registers *regs, uint64_t mcause, uint64_t mtval) {
         regs->sp = regs->tsp;
         regs->a0 = mcause;
         regs->a1 = mtval;
-        /* If tf->tpc & 1, then vectored mode */
         SchedEnablePreemption();
 }
 
