@@ -17,7 +17,13 @@ typedef struct proc Proc;
  */
 typedef enum proc_state ProcState;
 
-enum proc_state { PROC_HALTED, PROC_SUSPENDED, PROC_RUNNING, PROC_BLOCKED };
+enum proc_state {
+        PROC_HALTED,
+        PROC_RUNNING,
+        PROC_WAITING,
+        PROC_RECEIVING,
+        PROC_SUSPENDED
+};
 
 struct proc {
         /** Kernel stack pointer.

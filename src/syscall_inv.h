@@ -3,10 +3,12 @@
 
 #include "cap.h"
 #include "cap_util.h"
+#include "config.h"
 #include "proc.h"
 #include "sched.h"
 #include "syscall.h"
 #include "syscall_nr.h"
+#include "trap.h"
 
 static inline uint64_t SyscallMemorySlice(const CapMemorySlice ms, Cap *cap,
                                           uint64_t a1, uint64_t a2, uint64_t a3,
@@ -36,6 +38,26 @@ static inline uint64_t SyscallSupervisor(const CapSupervisor sup, Cap *cap,
                                          uint64_t a1, uint64_t a2, uint64_t a3,
                                          uint64_t a4, uint64_t a5, uint64_t a6,
                                          uint64_t a7);
+
+Proc *volatile channels[N_CHANNELS];
+
+bool syscall_interprocess_move(Cap *src, Cap *dest, uint64_t old_pid, uint64_t new_pid) {
+        CapData cd = cap_get(src);
+        CapType type = cap_get_type(cd);
+        bool succ;
+
+        if (type == CAP_TIME_SLICE) {
+                // TODO: add pids to caps and update it here
+                CapTimeSlice ts = cap_deserialize_time_slice(cd);
+                succ = CapMove(dest, src) &&
+                       SchedUpdate(ts.begin, ts.end, ts.hartid, (ts.tsid << 8) | (uint8_t)old_pid,
+                                   (ts.tsid << 8) | (uint8_t)new_pid, dest);
+        } else {
+                succ = CapMove(dest, src);
+        }
+
+        return succ;
+}
 
 /*** MEMORY SLICE HANDLE ***/
 static inline uint64_t ms_slice(const CapMemorySlice ms, Cap *parent,
@@ -178,8 +200,8 @@ static inline uint64_t ts_slice(const CapTimeSlice ts, Cap *parent, Cap *child,
         // TODO: can we find a situation where the order of CapAppend and SchedUpdate matter?
         return cap_set(child, cap_serialize_time_slice(ts_child)) &&
                CapAppend(child, parent) && 
-               SchedUpdate(begin, end, ts.hartid, ((ts.tsid) << 8) | (uint8_t)current->pid, 
-                           ((tsid) << 8) | (uint8_t)current->pid, parent);
+               SchedUpdate(begin, end, ts.hartid, (ts.tsid << 8) | (uint8_t)current->pid, 
+                           (tsid << 8) | (uint8_t)current->pid, parent);
 }
 
 static inline uint64_t ts_split(const CapTimeSlice ts, Cap *parent, Cap *child0,
@@ -199,10 +221,10 @@ static inline uint64_t ts_split(const CapTimeSlice ts, Cap *parent, Cap *child0,
         return cap_set(child0, cap_serialize_time_slice(ts_child0)) &&
                cap_set(child1, cap_serialize_time_slice(ts_child1)) &&
                CapAppend(child0, parent) && CapAppend(child1, parent) &&
-               SchedUpdate(ts_child0.begin, ts_child0.end, ts_child0.hartid, ((ts.tsid) << 8) | (uint8_t)current->pid, 
-                           ((ts_child0.tsid) << 8) | (uint8_t)current->pid, parent) &&
-               SchedUpdate(ts_child1.begin, ts_child1.end, ts_child1.hartid, ((ts.tsid) << 8) | (uint8_t)current->pid, 
-                           ((ts_child1.tsid) << 8) | (uint8_t)current->pid, parent);
+               SchedUpdate(ts_child0.begin, ts_child0.end, ts_child0.hartid, (ts.tsid << 8) | (uint8_t)current->pid, 
+                           (ts_child0.tsid << 8) | (uint8_t)current->pid, parent) &&
+               SchedUpdate(ts_child1.begin, ts_child1.end, ts_child1.hartid, (ts.tsid << 8) | (uint8_t)current->pid, 
+                           (ts_child1.tsid << 8) | (uint8_t)current->pid, parent);
 }
 
 uint64_t SyscallTimeSlice(const CapTimeSlice ts, Cap *cap, uint64_t a1,
@@ -320,8 +342,11 @@ uint64_t SyscallChannels(const CapChannels ch, Cap *cap, uint64_t a1,
 
 uint64_t sn_recv(uint64_t channel) {
         current->listen_channel = channel;
-        while (current->listen_channel == channel) {
-                asm volatile("");
+        current->args[0] = false;
+        if (__sync_bool_compare_and_swap(&channels[channel], NULL, current)) {
+                trap_recv_yield();
+        } else {
+                current->listen_channel = -1;
         }
         /* We just wait to receive a message, sender does all the job */
         return current->args[0];
@@ -349,9 +374,65 @@ uint64_t SyscallReceiver(const CapReceiver receiver, Cap *cap, uint64_t a1,
         }
 }
 
-uint64_t sn_send(uint64_t channel, uint64_t caps_to_send, uint64_t msg[4]) {
-        /* TODO */
-        return -1;
+uint64_t sn_send(uint64_t channel) {
+        Proc *receiver;
+        /* Acquire the receiver in the channel */
+        do {
+                receiver = channels[channel];
+                if (receiver == NULL) {
+                        /* No receiver */
+                        current->args[0] = false;
+                        return current->args[0];
+                }
+                /* Receiver is not waiting */
+                if (receiver->state != PROC_WAITING)
+                        continue;
+        } while (
+            __sync_bool_compare_and_swap(&channels[channel], receiver, NULL));
+        /* Acquire the receiver state */
+        if (!__sync_bool_compare_and_swap(&receiver->state, PROC_WAITING, PROC_RECEIVING)) {
+                current->args[0] = false;
+                return current->args[0];
+        }
+
+        /* From where to get capabilities */
+        uint64_t cid_src = current->args[1];
+        /* From where to set capabilities */
+        uint64_t cid_dest = receiver->args[1];
+        /* Number of capabilities to send */
+        uint64_t n = (current->args[2] > receiver->args[2]) ? receiver->args[2] : current->args[2];
+        /* Position of last capability to send (excl.) */
+        uint64_t cid_last = cid_src + n;
+        /* Number of capabilities sent */
+        current->args[1] = 0;
+        while (cid_src < N_CAPS && cid_src < cid_last && cid_dest < N_CAPS) {
+                Cap *src = &current->cap_table[cid_src];
+                Cap *dest = &receiver->cap_table[cid_dest];
+                if(!syscall_interprocess_move(src, dest, current->pid, receiver->pid)) {
+                        /* If moving a capability failed */
+                        break;
+                }
+                cid_src++;
+                cid_dest++;
+                current->args[1]++;
+        }
+        /* Send successful */
+        current->args[0] = true;
+        receiver->args[0] = true;
+
+        /* Number of caps sent */
+        receiver->args[1] = current->args[1];
+        /* Message passing, 256 bits */
+        uint64_t send[] = current->args[3];
+        uint64_t recv[] = receiver->args[3]
+        recv[0] = send[0];
+        recv[1] = send[1];
+        recv[2] = send[2];
+        recv[3] = send[3];
+
+        /* Sets the receiver to suspended or ready state */
+        __sync_fetch_and_and(&receiver->state, PROC_SUSPENDED);
+        return current->args[0];
 }
 
 /*** SENDER HANDLER ***/
@@ -370,8 +451,7 @@ uint64_t SyscallSender(const CapSender sender, Cap *cap, uint64_t a1,
                         return CapDelete(cap);
                 case SYSNR_SN_SEND:
                         /* Send message */
-                        return sn_send(sender.channel, a1,
-                                       (uint64_t[4]){a2, a3, a4, a5});
+                        return sn_send(sender.channel);
                 default:
                         return -1;
         }

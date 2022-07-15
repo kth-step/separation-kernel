@@ -3,6 +3,20 @@
 
 .globl AsmTrapEntry
 .globl AsmResumeProc
+.globl trap_recv_yield
+
+/* tmp -> working register
+ * addr -> addr to lr/sc
+ * expected -> register with expected value
+ * desired -> register with desired value
+ * failure_label -> where to jump of CAS failure
+ */
+.macro casw tmp,addr,expected,desired,failure_label
+42:     lr.w    \tmp,(\addr)
+        bne     \tmp,\expected,\failure_label
+        sc.w    \tmp,\desired,(\addr)
+        bnez    \tmp,42b
+.endm
 
 .section .text.entry
 .balign 16
@@ -251,6 +265,7 @@ __timer_handler_machine:
         amoswap.d  sp,sp,(tp)
 
         /* Call scheduler */
+__sched:
         call    Sched
         
 AsmResumeProc:
@@ -323,3 +338,16 @@ AsmResumeProc:
         ld      ra,(-4*8)(sp)
         ld      sp,(-5*8)(sp)
         mret
+
+trap_recv_yield:
+        /* CompareAndSwap(state,PROC_RUNNING, PROC_WAITING) */
+        addi    t1,tp,(5*8)
+        li      t2,1
+        li      t3,2
+        casw    t0,t1,t2,t3,__recv_fail
+        /* Swap to core stack */
+        amoswap.d  sp,sp,(tp)
+        /* Reschedule */
+        j       __sched
+__recv_fail:  /* CAS fail */
+        ret

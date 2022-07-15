@@ -151,13 +151,13 @@ static inline uint64_t S3K_MAKE_SENDER(uint64_t cid_send, uint64_t cid_recv) {
         return -1;
 }
 
-static inline uint64_t S3K_RECV(uint64_t cid_recv, uint64_t dest_caps,
+static inline uint64_t S3K_RECV(uint64_t cid_ep, uint64_t cid_recv, uint64_t num_caps,
                                 uint64_t msg[4]) {
-        return -1;
+        return S3K_SYSCALL4(SYSNR_RC_RECEIVE, cid_ep, cid_recv, num_caps, msg);
 }
-static inline uint64_t S3K_SEND(uint64_t cid_send, uint64_t send_caps,
+static inline uint64_t S3K_SEND(uint64_t cid_ep, uint64_t cid_send, uint64_t num_caps,
                                 uint64_t msg[4]) {
-        return -1;
+        return S3K_SYSCALL4(SYSNR_RC_RECEIVE, cid_ep, cid_send, num_caps, msg);
 }
 
 static inline uint64_t S3K_HALT(uint64_t cid_sup) {
