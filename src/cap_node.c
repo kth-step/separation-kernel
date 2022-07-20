@@ -6,29 +6,30 @@
 #include "sched.h"
 
 /** Capability table */
-struct cap_node cap_tables[N_PROC][N_CAPS];
+cap_node_t cap_tables[N_PROC][N_CAPS];
 
 /*
  * Tries to delete node curr.
  * Assumption: prev = NULL or is_marked(prev->prev)
  */
-static inline bool __cap_node_delete(struct cap_node* prev, struct cap_node* curr)
+bool cap_node_try_delete(cap_node_t* node, cap_node_t* prev)
 {
-        /* Mark the curr node if it has the correct prev.
+    /* Mark the curr node if it has the correct prev.
      * The CAS is neccessary to avoid the ABA problem.
      */
-        if (!__sync_bool_compare_and_swap(&curr->prev, prev, NULL))
-                return false;
-        struct cap_node* next = curr->next;
-        if (!__sync_bool_compare_and_swap(&next->prev, curr, prev)) {
-                curr->prev = prev;
-                return false;
-        }
-        /* TODO: Figure out the ordering of operations */
-        curr->next = NULL;
-        prev->next = next;
-        curr->cap = NULL_CAP;
-        return true;
+    if (!__sync_bool_compare_and_swap(&node->prev, prev, NULL))
+        return false;
+    cap_node_t* next = node->next;
+    if (!__sync_bool_compare_and_swap(&next->prev, node, prev)) {
+        node->prev = prev;
+        return false;
+    }
+    /* TODO: Figure out the ordering of operations */
+    prev->next = next;
+    node->next = NULL;
+    __sync_synchronize();
+    node->cap = NULL_CAP;
+    return true;
 }
 
 /*
@@ -36,85 +37,82 @@ static inline bool __cap_node_delete(struct cap_node* prev, struct cap_node* cur
  * Returns 1 if successful, otherwise 0.
  * Assumption: parent != NULL and is_marked(parent->prev)
  */
-static inline bool __cap_node_insert(struct cap cap, struct cap_node* node, struct cap_node* prev)
+bool cap_node_try_insert(cap_t cap, cap_node_t* node, cap_node_t* prev)
 {
-        struct cap_node* next = prev->next;
-        if (__sync_bool_compare_and_swap(&next->prev, prev, node)) {
-                /* TODO: Figure out the ordering of operations */
-                prev->next = node;
-                node->cap = cap;
-                node->next = next;
-                node->prev = prev;
-                return true;
-        }
-        return false;
+    cap_node_t* next = prev->next;
+    if (__sync_bool_compare_and_swap(&next->prev, prev, node)) {
+        /* TODO: Figure out the ordering of operations */
+        prev->next = node;
+        node->cap = cap;
+        node->next = next;
+        node->prev = prev;
+        return true;
+    }
+    return false;
 }
 
-bool cap_node_delete(struct cap_node* curr)
+bool cap_node_delete(cap_node_t* node)
 {
-        while (!cap_node_is_deleted(curr)) {
-                struct cap_node* prev = curr->prev;
-                if (prev == NULL)
-                        continue;
-                if (__cap_node_delete(prev, curr))
-                        return true;
-        }
-        return false;
+    while (!cap_node_is_deleted(node)) {
+        cap_node_t* prev = node->prev;
+        if (prev == NULL)
+            continue;
+        if (cap_node_try_delete(node, prev))
+            return true;
+    }
+    return false;
 }
 
-void cap_node_revoke(struct cap_node* curr)
+void cap_node_revoke(cap_node_t* node)
 {
-        struct cap parent = cap_node_get_cap(curr);
-        while (!cap_node_is_deleted(curr)) {
-                uint64_t tmp = preemption_disable();
-                struct cap_node* next = curr->next;
-                struct cap child = cap_node_get_cap(next);
-                if (!cap_is_child(parent, child))
-                        break;
-                __cap_node_delete(curr, next);
-                preemption_restore(tmp);
-        }
+    cap_t parent = cap_node_get_cap(node);
+    while (!cap_node_is_deleted(node)) {
+        cap_node_t* next = node->next;
+        cap_t child = cap_node_get_cap(next);
+        if (!cap_is_child(parent, child))
+            break;
+        uint64_t tmp = preemption_disable();
+        cap_node_try_delete(next, node);
+        preemption_restore(tmp);
+    }
 }
 
 /**
  * Insert a child capability after the parent
  * only if the parent is not deleted.
  */
-bool cap_node_insert(struct cap cap, struct cap_node* node, struct cap_node* prev)
+bool cap_node_insert(cap_t cap, cap_node_t* node, cap_node_t* prev)
 {
-        /* Child node must be empty */
-        if (!cap_node_is_deleted(node))
-                return false;
-        /* While parent is alive, attempt to insert */
-        while (!cap_node_is_deleted(prev)) {
-                if (__cap_node_insert(cap, node, prev))
-                        return true;
-        }
+    /* Child node must be empty */
+    if (!cap_node_is_deleted(node))
         return false;
+    /* While parent is alive, attempt to insert */
+    while (!cap_node_is_deleted(prev)) {
+        if (cap_node_try_insert(cap, node, prev))
+            return true;
+    }
+    return false;
 }
 
-bool cap_node_update(struct cap cap, struct cap_node* node)
+bool cap_node_update(cap_t cap, cap_node_t* node)
 {
-        struct cap_node* prev;
-        while ((prev = node->prev)) {
-                if (!__sync_bool_compare_and_swap(&node->prev, prev, NULL))
-                        continue;
-                node->cap = cap;
-                __sync_synchronize();
-                node->prev = prev;
-                return true;
-        }
-        return false;
+    cap_node_t* prev;
+    while ((prev = node->prev)) {
+        if (!__sync_bool_compare_and_swap(&node->prev, prev, NULL))
+            continue;
+        node->cap = cap;
+        __sync_synchronize();
+        node->prev = prev;
+        return true;
+    }
+    return false;
 }
 
 /**
  * Moves the capability in src to dest.
  * Uses a CapInsert followed by CapDelete.
  */
-bool cap_node_move(struct cap_node* dest, struct cap_node* src)
+bool cap_node_move(cap_node_t* src, cap_node_t* dest)
 {
-        struct cap cap = cap_node_get_cap(src);
-        if (cap_node_is_deleted(src) || !cap_node_is_deleted(dest))
-                return false;
-        return cap_node_insert(cap, dest, src) && cap_node_delete(src);
+    return cap_node_insert(cap_node_get_cap(src), dest, src) && cap_node_delete(src);
 }

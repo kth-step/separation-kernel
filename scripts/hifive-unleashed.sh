@@ -29,7 +29,7 @@ echo "!!! Program loaded"
 echo "!!! Connecting to GDB sessions"
 for port in 3337 3336 3335 3334; do
         x-terminal-emulator -e \
-                riscv64-unknown-elf-gdb \
+                riscv64-unknown-elf-gdb build/s3k.elf \
                 -q \
                 -iex 'set pagination off' \
                 -iex "target remote localhost:$port" \

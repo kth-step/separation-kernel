@@ -11,7 +11,7 @@
 #define N_CAPS 128
 
 /* Number of time slices in a major frame. */
-#define N_QUANTUM 100
+#define N_QUANTUM 128
 
 /* Number of communications channels */
 #define N_CHANNELS 256
@@ -21,7 +21,7 @@
 #define TICKS (TICKS_PER_SECOND / N_QUANTUM)
 
 /* Number of scheduler ticks. */
-#define SCHEDULER_TICKS 10000
+#define SCHEDULER_TICKS 5000
 
 /* Beginning and end of the user processes' memory region.
  * Used for setting up initial memory of the boot process. */

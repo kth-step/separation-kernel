@@ -21,7 +21,6 @@ caps:
   - name: time
     fields:
       - hartid 1
-      - pid 1
       - begin 2
       - end 2
       - free 2
@@ -37,18 +36,20 @@ caps:
       - begin 2
       - end 2
       - free 2
-      - ep 1
     asserts:
       - 'begin == free'
       - 'begin < end'
       - 'end <= N_CHANNELS'
-      - 'ep == 0'
-  - name: endpoint
+  - name: receiver 
     fields:
       - channel 2
-      - mode 1
     asserts:
-      - 'mode <= 7'
+      - 'channel < N_CHANNELS'
+  - name: sender 
+    fields:
+      - channel 2
+      - yield 1
+    asserts:
       - 'channel < N_CHANNELS'
   - name: supervisor
     fields:
@@ -86,16 +87,24 @@ is_child:
       - 'p:begin <= c:begin'
       - 'c:end <= p:end'
   - parent: channels
-    child: endpoint
+    child: receiver 
     relations:
       - 'p:begin <= c:channel'
       - 'c:channel < p:end'
+  - parent: channels
+    child: sender
+    relations:
+      - 'p:begin <= c:channel'
+      - 'c:channel < p:end'
+  - parent: receiver 
+    child: sender 
+    relations:
+      - 'p:channel == c:channel'
   - parent: supervisor
     child: supervisor
     relations:
       - 'p:begin <= c:begin'
       - 'c:end <= p:end'
-      
 
 can_derive:
   - parent: memory
@@ -126,18 +135,20 @@ can_derive:
   - parent: channels
     child: channels
     relations:
-      - 'p:ep == 0'
-      - 'c:ep == 0'
       - 'p:free <= c:begin'
       - 'c:end <= p:end'
       - 'c:free == c:begin'
       - 'c:begin < c:end'
   - parent: channels
-    child: endpoint
+    child: receiver
     relations:
       - 'p:free <= c:channel'
       - 'c:channel < p:end'
-      - 'c:mode <= 7'
+  - parent: receiver 
+    child: sender
+    relations:
+      - 'p:channel == c:channel'
+      - 'c:yield == 1 || c:yield == 0'
   - parent: supervisor
     child: supervisor
     relations:

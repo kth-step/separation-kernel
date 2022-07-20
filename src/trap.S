@@ -12,18 +12,18 @@
 .align 8
 trap_entry:
         csrrw   tp,mscratch,tp
-        bnez    tp,__user_trap
+        bnez    tp,user_trap
 
-__machine_trap:
+machine_trap:
         csrr    a1,mcause
         csrrw   tp,mscratch,zero
 #ifndef NDEBUG
         /* Check if we have exception in the kernel, hang */
-        bgez    a1,__mhang
+        bgez    a1,mhang
 #endif
-        j       __interrupt
+        j       interrupt
 
-__user_trap:
+user_trap:
         /* Save all registers except tp */
         save_context
 
@@ -36,20 +36,20 @@ __user_trap:
         load_sp
 
         csrr    a1,mcause
-        bltz    a1,__interrupt
+        bltz    a1,interrupt
 
-__exception:
+exception:
         /* Enable preemption */
         csrw    mstatus,8
-        la      ra,__exception_trampoline
+        la      ra,exception_trampoline
         mv      a0,tp
         csrr    a2,mtval
-        j       __trampoline
+        j       trampoline
 
-__interrupt:
-        la      ra,__interrupt_trampoline
+interrupt:
+        la      ra,interrupt_trampoline
 
-__trampoline:
+trampoline:
         /* Add trap code offset */
         slli    t0,a1,2
         add     ra,ra,t0
@@ -77,8 +77,8 @@ trap_yield:
 
 .option push
 .option norvc   /* Prevent compressed instructions */
-__trap_trampoline:
-__exception_trampoline:
+trap_trampoline:
+exception_trampoline:
         /* EXCEPTION HANDLERS */
         j       exception_handler  /* 0: Instruction address misaligned */
         j       exception_handler  /* 1: Instruction access fault */
@@ -89,35 +89,35 @@ __exception_trampoline:
         j       exception_handler  /* 6: Store/AMO address misaligned */
         j       exception_handler  /* 7: Store/AMO access fault */
         j       syscall_handler  /* 8: Environment call from U-mode */
-        j       __hang  /* 9: Environment call from S-mode */
-        j       __hang  /* 10: Reserved */
-        j       __hang  /* 11: Environment call from M-mode */
-        j       __hang  /* 12: Instruction page fault */
-        j       __hang  /* 13: Load page fault */
-        j       __hang  /* 14: Reserved */
-        j       __hang  /* 15: Store/AMO page fault */
-__interrupt_trampoline:
+        j       hang  /* 9: Environment call from S-mode */
+        j       hang  /* 10: Reserved */
+        j       hang  /* 11: Environment call from M-mode */
+        j       hang  /* 12: Instruction page fault */
+        j       hang  /* 13: Load page fault */
+        j       hang  /* 14: Reserved */
+        j       hang  /* 15: Store/AMO page fault */
+interrupt_trampoline:
         /* INTERRUPT HANDLERS */
-        j       __hang  /*  0: User software interrupt */
-        j       __hang  /*  1: Supervisor software interrupt */
-        j       __hang  /*  2: Reserved */
-        j       __hang  /*  3: Machine software interrupt */
-        j       __hang  /*  4: User timer interrupt */
-        j       __hang  /*  5: Supervisor timer interrupt */
-        j       __hang  /*  6: Reserved */
+        j       hang  /*  0: User software interrupt */
+        j       hang  /*  1: Supervisor software interrupt */
+        j       hang  /*  2: Reserved */
+        j       hang  /*  3: Machine software interrupt */
+        j       hang  /*  4: User timer interrupt */
+        j       hang  /*  5: Supervisor timer interrupt */
+        j       hang  /*  6: Reserved */
         j       sched   /*  7: Machine timer interrupt */
-        j       __hang  /*  8: User external interrupt */
-        j       __hang  /*  9: Supervisor external interrupt */
-        j       __hang  /* 10: Reserved */
-        j       __hang  /* 11: Machine external interrupt */
-        j       __hang  /* 12: ? */
-        j       __hang  /* 13: ? */
-        j       __hang  /* 14: ? */
-        j       __hang  /* 15: ? */
+        j       hang  /*  8: User external interrupt */
+        j       hang  /*  9: Supervisor external interrupt */
+        j       hang  /* 10: Reserved */
+        j       hang  /* 11: Machine external interrupt */
+        j       hang  /* 12: ? */
+        j       hang  /* 13: ? */
+        j       hang  /* 14: ? */
+        j       hang  /* 15: ? */
 .option pop
 
-__hang:
-        j __hang
+hang:
+        j       hang
 
-__mhang:
-        j __mhang
+mhang:
+        j       mhang

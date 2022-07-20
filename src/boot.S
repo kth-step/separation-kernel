@@ -10,7 +10,11 @@ _start:
         load_gp
         load_sp
 
+        /* Trap handler interpret mscratch == 0 as trap in machine-mode */
         csrw    mscratch,x0    
+
+        /* No preemption */
+        csrw    mstatus,x0
 
         /* Set the trap entry function. */
         la      t0,trap_entry
@@ -27,12 +31,15 @@ _start:
 
         /* If hartid != 0, then jump to __wait. */
         csrr    t0,mhartid
-        bnez    t0,__wait
+        li      t1,MIN_HARTID
+        blt     t0,t1,__boot_park
+        bne     t0,t1,__wait
 
         /* Single process work*/
         la      t0,_bss
         la      t1,_ebss
         j       2f
+
 1:      sd      x0,0(t0)
         addi    t0,t0,8
 2:      bne     t0,t1,1b
@@ -72,7 +79,7 @@ __wait:
         li      tp,0
         /* Jump to scheduler. */
         la      ra,trap_resume_proc
-        tail    sched
+        tail    sched_start
 
 __boot_park:
         wfi

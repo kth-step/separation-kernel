@@ -4,47 +4,62 @@
 #include "cap.h"
 #include "config.h"
 #include "kassert.h"
-#include "types.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+typedef struct cap_node cap_node_t;
 
 struct cap_node {
-        struct cap_node *prev, *next;
-        struct cap cap;
+    cap_node_t *prev, *next;
+    cap_t cap;
 };
 
-extern struct cap_node cap_tables[N_PROC][N_CAPS];
-extern volatile int ep_receiver[N_CHANNELS];
-
-/* Delete all children of node */
-void cap_node_revoke(struct cap_node* node);
+extern cap_node_t cap_tables[N_PROC][N_CAPS];
 
 /* Delete node */
-bool cap_node_delete(struct cap_node* node);
-
-/* Move node in src to dest */
-bool cap_node_move(struct cap_node* src, struct cap_node* dest);
+bool cap_node_try_delete(cap_node_t* node, cap_node_t* prev);
 
 /* Insert node after parent, if insertion is successful, set the data to cap */
-bool cap_node_insert(struct cap cap, struct cap_node* node, struct cap_node* parent);
+bool cap_node_try_insert(cap_t cap, cap_node_t* node, cap_node_t* parent);
+
+/* Delete all children of node */
+void cap_node_revoke(cap_node_t* node);
+
+/* Delete node */
+bool cap_node_delete(cap_node_t* node);
+
+/* Move node in src to dest */
+bool cap_node_move(cap_node_t* src, cap_node_t* dest);
+
+/* Insert node after parent, if insertion is successful, set the data to cap */
+bool cap_node_insert(cap_t cap, cap_node_t* node, cap_node_t* parent);
 
 /* Updates the cap in the node */
-bool cap_node_update(struct cap cap, struct cap_node* node);
+bool cap_node_update(cap_t cap, cap_node_t* node);
 
-static inline bool cap_node_is_deleted(struct cap_node* cn);
-static inline struct cap cap_node_get_cap(struct cap_node* cn);
+static inline bool cap_node_is_deleted(cap_node_t* cn);
+static inline cap_t cap_node_get_cap(cap_node_t* cn);
 
 /* Check if a node has been deleted */
-bool cap_node_is_deleted(struct cap_node* cn)
+bool cap_node_is_deleted(cap_node_t* cn)
 {
-        // Check if prev is NULL ?
-        return cn->next == NULL;
+    // Check if prev is NULL ?
+    return cn->next == NULL;
 }
 
-struct cap cap_node_get_cap(struct cap_node* cn)
+cap_t cap_node_get_cap(cap_node_t* cn)
 {
-        struct cap cap = cn->cap;
-        __sync_synchronize();
-        if (cap_node_is_deleted(cn)) {
-                return ((struct cap) { 0, 0 });
-        }
-        return cap;
+    cap_t cap = cn->cap;
+    __sync_synchronize();
+    if (cap_node_is_deleted(cn)) {
+        return ((cap_t) { 0, 0 });
+    }
+    return cap;
+}
+
+static inline uint64_t cap_node_get_proc(cap_node_t* cn)
+{
+    uint64_t offset = (uint64_t)cn - (uint64_t)cap_tables;
+    return offset >> 12;
 }

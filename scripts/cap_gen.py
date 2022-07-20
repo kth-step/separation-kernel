@@ -38,7 +38,7 @@ def make_assert(s):
 def make_getter(cap_name, name, size, bins):
     if name == 'padd':
         return
-    print(f"static inline uint64_t cap_{cap_name}_get_{name}(struct cap cap) {{")
+    print(f"static inline uint64_t cap_{cap_name}_get_{name}(cap_t cap) {{")
     make_assert(f"(cap.word0 >> 56) == CAP_TYPE_{cap_name.upper()}")
     i, b = get_bin(bins, name)
     offset = get_offset(b, name)
@@ -51,7 +51,7 @@ def make_getter(cap_name, name, size, bins):
 def make_setter(cap_name, name, size, bins):
     if name == 'padd':
         return
-    print(f'static inline void cap_{cap_name}_set_{name}(struct cap *cap, uint64_t {name}) {{')
+    print(f'static inline void cap_{cap_name}_set_{name}(cap_t *cap, uint64_t {name}) {{')
     make_assert(f"(cap->word0 >> 56) == CAP_TYPE_{cap_name.upper()}")
     make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")
     i, b = get_bin(bins, name) 
@@ -65,13 +65,13 @@ def make_setter(cap_name, name, size, bins):
 
 def make_constructor(cap_name, fields, asserts, bins):
     parameters = [f"uint64_t {name}" for (name, size) in fields if name != 'padd']
-    print(f"static inline struct cap cap_mk_{cap_name}({', '.join(parameters)}) {{")
+    print(f"static inline cap_t cap_mk_{cap_name}({', '.join(parameters)}) {{")
     for (name, size) in fields:
         if name != 'padd':
             make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")
     for a in asserts:
         make_assert(a)
-    print("struct cap c;")
+    print("cap_t c;")
     print(f"c.word0 = (uint64_t)CAP_TYPE_{cap_name.upper()} << 56;")
     print(f"c.word1 = 0;")
     for (i,b) in enumerate(bins):
@@ -128,10 +128,10 @@ def make_pred_case(case):
     print("return b;}")
 
 def make_pred(name, cases):
-    print(f"static inline int cap_{name}(struct cap p, struct cap c) {{")
+    print(f"static inline int cap_{name}(cap_t p, cap_t c) {{")
     print("int b = 1;")
-    print("enum cap_type parent_type = cap_get_type(p);")
-    print("enum cap_type child_type = cap_get_type(c);")
+    print("cap_type_t parent_type = cap_get_type(p);")
+    print("cap_type_t child_type = cap_get_type(c);")
     for case in cases:
         make_pred_case(case)
     print("return 0;")
@@ -151,7 +151,10 @@ print(f"""\
 #include "kassert.h"
 #include "pmp.h"
 
-#define NULL_CAP ((struct cap){{0,0}})
+#define NULL_CAP ((cap_t){{0,0}})
+
+typedef enum cap_type cap_type_t;
+typedef struct cap cap_t;
 
 enum cap_type {{
 {enums}
@@ -161,7 +164,7 @@ struct cap {{
 unsigned long long word0, word1;
 }};
 
-static inline enum cap_type cap_get_type(struct cap cap) {{
+static inline cap_type_t cap_get_type(cap_t cap) {{
 return (cap.word0 >> 56) & 0xff;
 }}
 """)

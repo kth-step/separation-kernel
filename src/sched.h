@@ -3,21 +3,15 @@
 
 #include "cap.h"
 #include "config.h"
+#include "lock.h"
 #include "platform.h"
 #include "proc.h"
-#include "types.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 void sched(void);
+void sched_start(void);
 
-/* Revoke scheduling according to time capability cap, check capability node cn
- * for invalidations of the capability. If cn->prev == NULL, break function. */
-bool sched_revoke(struct cap cap, struct cap_node* cn);
-
-/* Updates scheduling according to time capability cap, check capability node
- * cn for invalidations of the capability. If cn->prev == NULL, break
- * function.*/
-bool sched_update(struct cap cap, struct cap new_cap, struct cap_node* cn);
-
-/* Delete scheduling according to time capability cap, check capability node cn
- * for invalidations of the capability. If cn->prev == NULL, break function.*/
-bool sched_delete(struct cap cap, struct cap_node* cn);
+bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end, uint64_t depth_expected,
+    uint64_t pid_desired, uint64_t depth_desired);

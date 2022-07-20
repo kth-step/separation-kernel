@@ -1,6 +1,5 @@
 #pragma once
 #include "config.h"
-#include "kassert.h"
 #include "pmp.h"
 
 #define NULL_CAP ((cap_t){0,0})
@@ -21,15 +20,6 @@ return (cap.word0 >> 56) & 0xff;
 }
 
 static inline cap_t cap_mk_memory(uint64_t begin, uint64_t end, uint64_t rwx, uint64_t free, uint64_t pmp) {
-kassert((begin & 0xffffffffull) == begin);
-kassert((end & 0xffffffffull) == end);
-kassert((rwx & 0xffull) == rwx);
-kassert((free & 0xffffffffull) == free);
-kassert((pmp & 0xffull) == pmp);
-kassert(begin == free);
-kassert(begin < end);
-kassert(pmp == 0);
-kassert(rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7);
 cap_t c;
 c.word0 = (uint64_t)CAP_TYPE_MEMORY << 56;
 c.word1 = 0;
@@ -41,54 +31,36 @@ c.word1 |= end << 32;
 return c;
 }
 static inline uint64_t cap_memory_get_begin(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_MEMORY);
 return (cap.word0 >> 16) & 0xffffffffull;
 }
 static inline void cap_memory_set_begin(cap_t *cap, uint64_t begin) {
-kassert((cap->word0 >> 56) == CAP_TYPE_MEMORY);
-kassert((begin & 0xffffffffull) == begin);
 cap->word0 = (cap->word0 & ~0xffffffff0000ull) | begin << 16;
 }
 static inline uint64_t cap_memory_get_end(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_MEMORY);
 return (cap.word1 >> 32) & 0xffffffffull;
 }
 static inline void cap_memory_set_end(cap_t *cap, uint64_t end) {
-kassert((cap->word0 >> 56) == CAP_TYPE_MEMORY);
-kassert((end & 0xffffffffull) == end);
 cap->word1 = (cap->word1 & ~0xffffffff00000000ull) | end << 32;
 }
 static inline uint64_t cap_memory_get_rwx(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_MEMORY);
 return (cap.word0 >> 8) & 0xffull;
 }
 static inline void cap_memory_set_rwx(cap_t *cap, uint64_t rwx) {
-kassert((cap->word0 >> 56) == CAP_TYPE_MEMORY);
-kassert((rwx & 0xffull) == rwx);
 cap->word0 = (cap->word0 & ~0xff00ull) | rwx << 8;
 }
 static inline uint64_t cap_memory_get_free(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_MEMORY);
 return cap.word1 & 0xffffffffull;
 }
 static inline void cap_memory_set_free(cap_t *cap, uint64_t free) {
-kassert((cap->word0 >> 56) == CAP_TYPE_MEMORY);
-kassert((free & 0xffffffffull) == free);
 cap->word1 = (cap->word1 & ~0xffffffffull) | free;
 }
 static inline uint64_t cap_memory_get_pmp(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_MEMORY);
 return cap.word0 & 0xffull;
 }
 static inline void cap_memory_set_pmp(cap_t *cap, uint64_t pmp) {
-kassert((cap->word0 >> 56) == CAP_TYPE_MEMORY);
-kassert((pmp & 0xffull) == pmp);
 cap->word0 = (cap->word0 & ~0xffull) | pmp;
 }
 static inline cap_t cap_mk_pmp(uint64_t addr, uint64_t rwx) {
-kassert((addr & 0xffffffffull) == addr);
-kassert((rwx & 0xffull) == rwx);
-kassert(rwx == 0x4 || rwx == 0x5 || rwx == 0x6 || rwx == 0x7);
 cap_t c;
 c.word0 = (uint64_t)CAP_TYPE_PMP << 56;
 c.word1 = 0;
@@ -97,34 +69,18 @@ c.word0 |= addr << 8;
 return c;
 }
 static inline uint64_t cap_pmp_get_addr(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_PMP);
 return (cap.word0 >> 8) & 0xffffffffull;
 }
 static inline void cap_pmp_set_addr(cap_t *cap, uint64_t addr) {
-kassert((cap->word0 >> 56) == CAP_TYPE_PMP);
-kassert((addr & 0xffffffffull) == addr);
 cap->word0 = (cap->word0 & ~0xffffffff00ull) | addr << 8;
 }
 static inline uint64_t cap_pmp_get_rwx(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_PMP);
 return cap.word0 & 0xffull;
 }
 static inline void cap_pmp_set_rwx(cap_t *cap, uint64_t rwx) {
-kassert((cap->word0 >> 56) == CAP_TYPE_PMP);
-kassert((rwx & 0xffull) == rwx);
 cap->word0 = (cap->word0 & ~0xffull) | rwx;
 }
 static inline cap_t cap_mk_time(uint64_t hartid, uint64_t begin, uint64_t end, uint64_t free, uint64_t depth) {
-kassert((hartid & 0xffull) == hartid);
-kassert((begin & 0xffffull) == begin);
-kassert((end & 0xffffull) == end);
-kassert((free & 0xffffull) == free);
-kassert((depth & 0xffull) == depth);
-kassert(MIN_HARTID <= hartid);
-kassert(hartid <= MAX_HARTID);
-kassert(begin == free);
-kassert(begin < end);
-kassert(end <= N_QUANTUM);
 cap_t c;
 c.word0 = (uint64_t)CAP_TYPE_TIME << 56;
 c.word1 = 0;
@@ -136,57 +92,36 @@ c.word1 |= depth;
 return c;
 }
 static inline uint64_t cap_time_get_hartid(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_TIME);
 return (cap.word0 >> 48) & 0xffull;
 }
 static inline void cap_time_set_hartid(cap_t *cap, uint64_t hartid) {
-kassert((cap->word0 >> 56) == CAP_TYPE_TIME);
-kassert((hartid & 0xffull) == hartid);
 cap->word0 = (cap->word0 & ~0xff000000000000ull) | hartid << 48;
 }
 static inline uint64_t cap_time_get_begin(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_TIME);
 return (cap.word0 >> 32) & 0xffffull;
 }
 static inline void cap_time_set_begin(cap_t *cap, uint64_t begin) {
-kassert((cap->word0 >> 56) == CAP_TYPE_TIME);
-kassert((begin & 0xffffull) == begin);
 cap->word0 = (cap->word0 & ~0xffff00000000ull) | begin << 32;
 }
 static inline uint64_t cap_time_get_end(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_TIME);
 return (cap.word0 >> 16) & 0xffffull;
 }
 static inline void cap_time_set_end(cap_t *cap, uint64_t end) {
-kassert((cap->word0 >> 56) == CAP_TYPE_TIME);
-kassert((end & 0xffffull) == end);
 cap->word0 = (cap->word0 & ~0xffff0000ull) | end << 16;
 }
 static inline uint64_t cap_time_get_free(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_TIME);
 return cap.word0 & 0xffffull;
 }
 static inline void cap_time_set_free(cap_t *cap, uint64_t free) {
-kassert((cap->word0 >> 56) == CAP_TYPE_TIME);
-kassert((free & 0xffffull) == free);
 cap->word0 = (cap->word0 & ~0xffffull) | free;
 }
 static inline uint64_t cap_time_get_depth(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_TIME);
 return cap.word1 & 0xffull;
 }
 static inline void cap_time_set_depth(cap_t *cap, uint64_t depth) {
-kassert((cap->word0 >> 56) == CAP_TYPE_TIME);
-kassert((depth & 0xffull) == depth);
 cap->word1 = (cap->word1 & ~0xffull) | depth;
 }
 static inline cap_t cap_mk_channels(uint64_t begin, uint64_t end, uint64_t free) {
-kassert((begin & 0xffffull) == begin);
-kassert((end & 0xffffull) == end);
-kassert((free & 0xffffull) == free);
-kassert(begin == free);
-kassert(begin < end);
-kassert(end <= N_CHANNELS);
 cap_t c;
 c.word0 = (uint64_t)CAP_TYPE_CHANNELS << 56;
 c.word1 = 0;
@@ -196,35 +131,24 @@ c.word0 |= begin << 32;
 return c;
 }
 static inline uint64_t cap_channels_get_begin(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_CHANNELS);
 return (cap.word0 >> 32) & 0xffffull;
 }
 static inline void cap_channels_set_begin(cap_t *cap, uint64_t begin) {
-kassert((cap->word0 >> 56) == CAP_TYPE_CHANNELS);
-kassert((begin & 0xffffull) == begin);
 cap->word0 = (cap->word0 & ~0xffff00000000ull) | begin << 32;
 }
 static inline uint64_t cap_channels_get_end(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_CHANNELS);
 return (cap.word0 >> 16) & 0xffffull;
 }
 static inline void cap_channels_set_end(cap_t *cap, uint64_t end) {
-kassert((cap->word0 >> 56) == CAP_TYPE_CHANNELS);
-kassert((end & 0xffffull) == end);
 cap->word0 = (cap->word0 & ~0xffff0000ull) | end << 16;
 }
 static inline uint64_t cap_channels_get_free(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_CHANNELS);
 return cap.word0 & 0xffffull;
 }
 static inline void cap_channels_set_free(cap_t *cap, uint64_t free) {
-kassert((cap->word0 >> 56) == CAP_TYPE_CHANNELS);
-kassert((free & 0xffffull) == free);
 cap->word0 = (cap->word0 & ~0xffffull) | free;
 }
 static inline cap_t cap_mk_receiver(uint64_t channel) {
-kassert((channel & 0xffffull) == channel);
-kassert(channel < N_CHANNELS);
 cap_t c;
 c.word0 = (uint64_t)CAP_TYPE_RECEIVER << 56;
 c.word1 = 0;
@@ -232,18 +156,12 @@ c.word0 |= channel;
 return c;
 }
 static inline uint64_t cap_receiver_get_channel(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_RECEIVER);
 return cap.word0 & 0xffffull;
 }
 static inline void cap_receiver_set_channel(cap_t *cap, uint64_t channel) {
-kassert((cap->word0 >> 56) == CAP_TYPE_RECEIVER);
-kassert((channel & 0xffffull) == channel);
 cap->word0 = (cap->word0 & ~0xffffull) | channel;
 }
 static inline cap_t cap_mk_sender(uint64_t channel, uint64_t yield) {
-kassert((channel & 0xffffull) == channel);
-kassert((yield & 0xffull) == yield);
-kassert(channel < N_CHANNELS);
 cap_t c;
 c.word0 = (uint64_t)CAP_TYPE_SENDER << 56;
 c.word1 = 0;
@@ -252,30 +170,18 @@ c.word0 |= channel << 8;
 return c;
 }
 static inline uint64_t cap_sender_get_channel(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_SENDER);
 return (cap.word0 >> 8) & 0xffffull;
 }
 static inline void cap_sender_set_channel(cap_t *cap, uint64_t channel) {
-kassert((cap->word0 >> 56) == CAP_TYPE_SENDER);
-kassert((channel & 0xffffull) == channel);
 cap->word0 = (cap->word0 & ~0xffff00ull) | channel << 8;
 }
 static inline uint64_t cap_sender_get_yield(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_SENDER);
 return cap.word0 & 0xffull;
 }
 static inline void cap_sender_set_yield(cap_t *cap, uint64_t yield) {
-kassert((cap->word0 >> 56) == CAP_TYPE_SENDER);
-kassert((yield & 0xffull) == yield);
 cap->word0 = (cap->word0 & ~0xffull) | yield;
 }
 static inline cap_t cap_mk_supervisor(uint64_t begin, uint64_t end, uint64_t free) {
-kassert((begin & 0xffull) == begin);
-kassert((end & 0xffull) == end);
-kassert((free & 0xffull) == free);
-kassert(begin == free);
-kassert(begin < end);
-kassert(end <= N_PROC);
 cap_t c;
 c.word0 = (uint64_t)CAP_TYPE_SUPERVISOR << 56;
 c.word1 = 0;
@@ -285,30 +191,21 @@ c.word0 |= begin << 16;
 return c;
 }
 static inline uint64_t cap_supervisor_get_begin(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_SUPERVISOR);
 return (cap.word0 >> 16) & 0xffull;
 }
 static inline void cap_supervisor_set_begin(cap_t *cap, uint64_t begin) {
-kassert((cap->word0 >> 56) == CAP_TYPE_SUPERVISOR);
-kassert((begin & 0xffull) == begin);
 cap->word0 = (cap->word0 & ~0xff0000ull) | begin << 16;
 }
 static inline uint64_t cap_supervisor_get_end(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_SUPERVISOR);
 return (cap.word0 >> 8) & 0xffull;
 }
 static inline void cap_supervisor_set_end(cap_t *cap, uint64_t end) {
-kassert((cap->word0 >> 56) == CAP_TYPE_SUPERVISOR);
-kassert((end & 0xffull) == end);
 cap->word0 = (cap->word0 & ~0xff00ull) | end << 8;
 }
 static inline uint64_t cap_supervisor_get_free(cap_t cap) {
-kassert((cap.word0 >> 56) == CAP_TYPE_SUPERVISOR);
 return cap.word0 & 0xffull;
 }
 static inline void cap_supervisor_set_free(cap_t *cap, uint64_t free) {
-kassert((cap->word0 >> 56) == CAP_TYPE_SUPERVISOR);
-kassert((free & 0xffull) == free);
 cap->word0 = (cap->word0 & ~0xffull) | free;
 }
 static inline int cap_is_child(cap_t p, cap_t c) {

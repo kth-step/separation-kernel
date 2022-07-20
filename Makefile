@@ -24,7 +24,7 @@ CFLAGS+=-MMD
 #CFLAGS+= -DNDEBUG
 
 # Commands
-.PHONY: all settings format clean size cloc qemu
+.PHONY: all settings format clean size cloc qemu tags
 
 # Show settings, compile elf and make a disassembly by default.
 all: settings $(ELF) $(DA)
@@ -54,26 +54,33 @@ cloc:
 qemu: $(ELF)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
 
+tags:
+	@ctags $(SRCS) $(HDRS)
+
 src/cap.h: scripts/cap_gen.py cap.yml
 	@echo "Generating $@"
 	@./scripts/cap_gen.py cap.yml > $@
 
-$(BUILD)/%.c.o: %.c src/cap.h
+src/s3k_cap.h: src/cap.h
+	@echo "Generating $@"
+	@sed '/kassert/d' $< > $@
+
+$(BUILD)/%.c.o: %.c src/cap.h src/s3k_cap.h
 	@mkdir -p $(@D) 
-	@echo "Compiling $@"
+	@echo "Compiling C object $@"
 	@$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.S.o: %.S
 	@mkdir -p $(@D) 
-	@echo "Compiling $@"
+	@echo "Compiling ASM object $@"
 	@$(CC) $(CFLAGS) -c -o $@ $<
 
 $(ELF): $(OBJS) $(LDS)
-	@echo "Compiling $@"
+	@echo "Linking ELF $@"
 	@$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 %.da: %.elf
-	@echo "Disassembling $<"
+	@echo "Disassembling ELF $<"
 	@$(OBJDUMP) -d $< > $@
 
 
