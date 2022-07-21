@@ -32,8 +32,8 @@ _start:
         /* If hartid != 0, then jump to __wait. */
         csrr    t0,mhartid
         li      t1,MIN_HARTID
-        blt     t0,t1,__boot_park
-        bne     t0,t1,__wait
+        blt     t0,t1,boot_park
+        bne     t0,t1,wait
 
         /* Single process work*/
         la      t0,_bss
@@ -53,8 +53,7 @@ _start:
 
         call    proc_init
 
-        la      a0,msg_done
-        call    kprint
+        call    print_info
 
         /* Unlock the other harts. */
         fence   rw,rw
@@ -63,16 +62,16 @@ _start:
 
        
         /* Wait for hart 0 to finish process initialization. */
-__wait: 
+wait: 
         la      t0,lock
         ld      t1,(t0)
-        bnez    t1,__wait
+        bnez    t1,wait
 
         csrr    t0,mhartid
         li      t1,MIN_HARTID
         li      t2,MAX_HARTID
-        blt     t0,t1,__boot_park
-        blt     t2,t0,__boot_park
+        blt     t0,t1,boot_park
+        blt     t2,t0,boot_park
 
         /*** Here we start executing the kernel. ***/
         /* Set thread pointer to 0. */
@@ -81,13 +80,10 @@ __wait:
         la      ra,trap_resume_proc
         tail    sched_start
 
-__boot_park:
+boot_park:
         wfi
-        j       __boot_park
+        j       boot_park
 
 .section .data.init
 /* This lock is used for process initialization */
 lock: .dword 1
-
-msg_init: .string "s3k init\r\n"
-msg_done: .string "s3k init done\r\n"

@@ -1,8 +1,9 @@
 #pragma once
-#include "proc.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include "proc.h"
 
 void syscall_handler(registers_t* regs);
 

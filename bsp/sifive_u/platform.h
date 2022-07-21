@@ -16,6 +16,8 @@
 #define LOG_STACK_SIZE 12
 #define STACK_SIZE (1UL << LOG_STACK_SIZE)
 
+#define PLATFORM_NAME "sifive_u"
+
 #ifndef __ASSEMBLER__
 #define MTIME ((volatile unsigned long long *)0x200bff8UL)
 #define MTIMECMP(x) ((volatile unsigned long long *)(0x2004000UL + ((x)*8)))

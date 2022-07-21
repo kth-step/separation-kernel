@@ -1,18 +1,19 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-#include "cap.h"
-#include "config.h"
-#include "kassert.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
+#include "cap.h"
+#include "config.h"
+#include "kassert.h"
+
 typedef struct cap_node cap_node_t;
 
 struct cap_node {
-    cap_node_t *prev, *next;
-    cap_t cap;
+        cap_node_t *prev, *next;
+        cap_t cap;
 };
 
 extern cap_node_t cap_tables[N_PROC][N_CAPS];
@@ -44,22 +45,22 @@ static inline cap_t cap_node_get_cap(cap_node_t* cn);
 /* Check if a node has been deleted */
 bool cap_node_is_deleted(cap_node_t* cn)
 {
-    // Check if prev is NULL ?
-    return cn->next == NULL;
+        // Check if prev is NULL ?
+        return cn->next == NULL;
 }
 
 cap_t cap_node_get_cap(cap_node_t* cn)
 {
-    cap_t cap = cn->cap;
-    __sync_synchronize();
-    if (cap_node_is_deleted(cn)) {
-        return ((cap_t) { 0, 0 });
-    }
-    return cap;
+        cap_t cap = cn->cap;
+        __sync_synchronize();
+        if (cap_node_is_deleted(cn)) {
+                return ((cap_t){0, 0});
+        }
+        return cap;
 }
 
 static inline uint64_t cap_node_get_proc(cap_node_t* cn)
 {
-    uint64_t offset = (uint64_t)cn - (uint64_t)cap_tables;
-    return offset >> 12;
+        uint64_t offset = (uint64_t)cn - (uint64_t)cap_tables;
+        return offset >> 12;
 }
