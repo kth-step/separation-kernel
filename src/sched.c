@@ -267,7 +267,7 @@ void Sched(void) {
         }
 }
 
-static inline bool sched_update(uint8_t begin, uint8_t end, uint8_t hartid,
+static inline bool sched_update(uint64_t begin, uint64_t end, uint8_t hartid,
                                 uint16_t expected, uint16_t desired, Cap * c) {
         uint64_t mask = 0xFFFF << (hartid * 16);
         uint64_t expected64 = expected << (hartid * 16);
@@ -312,7 +312,7 @@ static inline bool sched_update(uint8_t begin, uint8_t end, uint8_t hartid,
         return is_updated;
 }
 
-bool SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
+bool SchedUpdate(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected,
                  uint16_t desired, Cap * c) {
         if (begin > end)
                 return sched_update(end, begin, hartid, expected, desired, c);
@@ -321,7 +321,7 @@ bool SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
 }
 
 
-bool SchedRevoke(uint8_t begin, uint8_t end, uint8_t hartid,
+bool SchedRevoke(uint64_t begin, uint64_t end, uint8_t hartid,
                  uint16_t desired, Cap * c) {
         uint64_t mask = 0xFFFF << (hartid * 16);
         uint64_t desired64 = desired << (hartid * 16);
@@ -348,7 +348,7 @@ bool SchedRevoke(uint8_t begin, uint8_t end, uint8_t hartid,
 }
 
 
-bool SchedDelete(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected, uint16_t desired) {
+bool SchedDelete(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected, uint16_t desired) {
         uint64_t mask = 0xFFFF << (hartid * 16);
         uint64_t expected64 = expected << (hartid * 16);
         uint64_t desired64 = desired << (hartid * 16);
@@ -376,5 +376,31 @@ bool SchedDelete(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected, 
         /* Release lock and enable preemption */
         release_lock(&lock);
         set_csr(mstatus, 8);
+        return is_updated;
+}
+
+bool SchedDeleteAssumeNoPreemption(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected, uint16_t desired) {
+        uint64_t mask = 0xFFFF << (hartid * 16);
+        uint64_t expected64 = expected << (hartid * 16);
+        uint64_t desired64 = desired << (hartid * 16);
+        
+        /* Try acquire lock */
+        while (!try_acquire_lock(&lock)) {
+                /* If failed acquire lock, enable preemption temporary */
+                set_csr(mstatus, 8);
+                clear_csr(mstatus, 8);
+        }
+        /* Return false if we don't manage to update a single time slot. */
+        bool is_updated = false;
+        for (int i = begin; i < end; i++) {
+                uint64_t s = schedule[i];
+                if ((s & mask) != expected64)
+                        continue;
+                uint64_t s_new = (s & ~mask) | desired64;
+                schedule[i] = s_new;
+                is_updated = true;
+        }
+        /* Release lock */
+        release_lock(&lock);
         return is_updated;
 }

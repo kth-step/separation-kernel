@@ -43,13 +43,16 @@
 
 void Sched(void);
 
-bool SchedUpdate(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
+bool SchedUpdate(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected,
                  uint16_t desired, Cap * c);
 
-bool SchedRevoke(uint8_t begin, uint8_t end, uint8_t hartid,
+bool SchedRevoke(uint64_t begin, uint64_t end, uint8_t hartid,
                  uint16_t desired, Cap * c);
 
-bool SchedDelete(uint8_t begin, uint8_t end, uint8_t hartid, uint16_t expected,
+bool SchedDelete(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected,
+                 uint16_t desired);
+
+bool SchedDeleteAssumeNoPreemption(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected,
                  uint16_t desired);
 
 void InitSched();

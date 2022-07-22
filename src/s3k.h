@@ -14,7 +14,7 @@ static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0,
         register uint64_t a3 __asm__("a3") = arg3;
         register uint64_t a4 __asm__("a4") = arg4;
         register uint64_t a5 __asm__("a5") = arg5;
-        register uint64_t a6 __asm__("a5") = arg6;
+        register uint64_t a6 __asm__("a6") = arg6;
         register uint64_t a7 __asm__("a7") = sysnr;
         switch (argc) {
                 case 1:
@@ -57,7 +57,7 @@ static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0,
         return a0;
 }
 
-#define S3K_SYSCALL7(a0, a1, a2, a3, a4, a5, a6) \
+#define S3K_SYSCALL7(sysnr, a0, a1, a2, a3, a4, a5, a6) \
         S3K_SYSCALL(7, sysnr, a0, a1, a2, a3, a4, a5, a6)
 #define S3K_SYSCALL6(sysnr, a0, a1, a2, a3, a4, a5) \
         S3K_SYSCALL(6, sysnr, a0, a1, a2, a3, a4, a5, 0)
@@ -87,48 +87,48 @@ static inline uint64_t S3K_READ_CAP(uint64_t cid, uint64_t data[2]) {
         return a0 > 0;
 }
 
-uint64_t S3K_MOVE_CAP(uint64_t src, uint64_t dest) {
+static inline uint64_t S3K_MOVE_CAP(uint64_t src, uint64_t dest) {
         return S3K_SYSCALL2(SYSNR_MOVE_CAP, src, dest);
 }
 
-uint64_t S3K_DELETE_CAP(uint64_t cid) {
+static inline uint64_t S3K_DELETE_CAP(uint64_t cid) {
         return S3K_SYSCALL1(SYSNR_DELETE_CAP, cid);
 }
 
-uint64_t S3K_REVOKE_CAP(uint64_t cid) {
+static inline uint64_t S3K_REVOKE_CAP(uint64_t cid) {
         return S3K_SYSCALL1(SYSNR_REVOKE_CAP, cid);
 }
 
-uint64_t S3K_SLICE_MEMORY(uint64_t src, uint64_t dest, uint64_t begin,
+static inline uint64_t S3K_SLICE_MEMORY(uint64_t src, uint64_t dest, uint64_t begin,
                           uint64_t end, uint64_t rwx) {
         return S3K_SYSCALL5(SYSNR_MS_SLICE, src, dest, begin, end, rwx);
 }
 
-uint64_t S3K_SPLIT_MEMORY(uint64_t src, uint64_t dest0, uint64_t dest1,
+static inline uint64_t S3K_SPLIT_MEMORY(uint64_t src, uint64_t dest0, uint64_t dest1,
                           uint64_t mid) {
         return S3K_SYSCALL4(SYSNR_MS_SPLIT, src, dest0, dest1, mid);
 }
 
-uint64_t S3K_MAKE_PMP(uint64_t cid_ms, uint64_t cid_pmp, uint64_t addr,
+static inline uint64_t S3K_MAKE_PMP(uint64_t cid_ms, uint64_t cid_pmp, uint64_t addr,
                       uint64_t rwx) {
         return S3K_SYSCALL4(SYSNR_MS_INSTANCIATE, cid_ms, cid_pmp, addr, rwx);
 }
 
-uint64_t S3K_LOAD_PMP(uint64_t cid_pmp, uint64_t index) {
+static inline uint64_t S3K_LOAD_PMP(uint64_t cid_pmp, uint64_t index) {
         return S3K_SYSCALL2(SYSNR_PE_LOAD, cid_pmp, index);
 }
 
-uint64_t S3K_UNLOAD_PMP(uint64_t cid_pmp) {
+static inline uint64_t S3K_UNLOAD_PMP(uint64_t cid_pmp) {
         return S3K_SYSCALL1(SYSNR_PE_UNLOAD, cid_pmp);
 }
 
-uint64_t S3K_SLICE_TIME(uint64_t src, uint64_t dest, uint64_t begin,
+static inline uint64_t S3K_SLICE_TIME(uint64_t src, uint64_t dest, uint64_t begin,
                         uint64_t end, uint64_t tsid, uint64_t tsid_end) {
         return S3K_SYSCALL6(SYSNR_TS_SLICE, src, dest, begin, end, tsid,
                             tsid_end);
 }
 
-uint64_t S3K_SPLIT_TIME(uint64_t src, uint64_t dest0, uint64_t dest1,
+static inline uint64_t S3K_SPLIT_TIME(uint64_t src, uint64_t dest0, uint64_t dest1,
                         uint64_t mid_quantum, uint64_t mid_tsid) {
         return S3K_SYSCALL5(SYSNR_TS_SPLIT, src, dest0, dest1, mid_quantum,
                             mid_tsid);
@@ -151,13 +151,19 @@ static inline uint64_t S3K_MAKE_SENDER(uint64_t cid_send, uint64_t cid_recv) {
         return -1;
 }
 
-static inline uint64_t S3K_RECV(uint64_t cid_ep, uint64_t cid_recv, uint64_t num_caps,
+static inline uint64_t S3K_RECV(uint64_t cid_recv_cap, uint64_t cid_recv, uint64_t num_caps,
                                 uint64_t msg[4]) {
-        return S3K_SYSCALL4(SYSNR_RC_RECEIVE, cid_ep, cid_recv, num_caps, msg);
+        return S3K_SYSCALL4(SYSNR_RC_RECEIVE, cid_recv_cap, cid_recv, num_caps, (uint64_t)msg);
 }
-static inline uint64_t S3K_SEND(uint64_t cid_ep, uint64_t cid_send, uint64_t num_caps,
+
+static inline uint64_t S3K_RECV_DELETE_TS(uint64_t cid_recv_cap, uint64_t cid_recv, uint64_t num_caps,
+                                uint64_t msg[4], uint64_t cid_ts) {
+        return S3K_SYSCALL5(SYSNR_RC_RECEIVE_DELETE_TS, cid_recv_cap, cid_recv, num_caps, (uint64_t)msg, cid_ts);
+}
+
+static inline uint64_t S3K_SEND(uint64_t cid_send_cap, uint64_t cid_send, uint64_t num_caps,
                                 uint64_t msg[4]) {
-        return S3K_SYSCALL4(SYSNR_RC_RECEIVE, cid_ep, cid_send, num_caps, msg);
+        return S3K_SYSCALL4(SYSNR_RC_RECEIVE, cid_send_cap, cid_send, num_caps, (uint64_t)msg);
 }
 
 static inline uint64_t S3K_HALT(uint64_t cid_sup) {

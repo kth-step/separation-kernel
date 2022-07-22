@@ -104,7 +104,7 @@ void proc_init_time(Cap time[N_CORES]) {
         for (int hartid = 0; hartid < N_CORES; hartid++) {
                 sentinel = CapInitSentinel();
                 begin = 0;
-                end = N_QUANTUM - 1;
+                end = N_QUANTUM;
                 tsid = 0;
                 fuel = 255;
                 ts = cap_mk_time_slice(hartid, begin, end, tsid, fuel);

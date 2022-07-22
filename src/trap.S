@@ -4,6 +4,7 @@
 .globl AsmTrapEntry
 .globl AsmResumeProc
 .globl trap_recv_yield
+.globl sys_to_sched
 
 /* tmp -> working register
  * addr -> addr to lr/sc
@@ -260,7 +261,7 @@ __timer_handler_machine:
         csrr    t0,mstatus
         sd      t0,(-3*8)(sp)
 
-
+sys_to_sched:
         /* Swap core and process sp */
         amoswap.d  sp,sp,(tp)
 

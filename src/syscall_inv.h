@@ -4,6 +4,7 @@
 #include "cap.h"
 #include "cap_util.h"
 #include "config.h"
+#include "csr.h"
 #include "proc.h"
 #include "sched.h"
 #include "syscall.h"
@@ -352,6 +353,33 @@ uint64_t sn_recv(uint64_t channel) {
         return current->args[0];
 }
 
+uint64_t sn_recv_delete_ts(uint64_t channel, Cap * cap_ts) {
+        current->listen_channel = channel;
+        current->args[0] = false;
+        CapTimeSlice ts = cap_deserialize_time_slice(cap_get(cap_ts));
+        
+        if (__sync_bool_compare_and_swap(&channels[channel], NULL, current)) {
+                uint64_t ret = CapDelete(cap_ts);
+                if (!ret) 
+                        return ret;
+                /* We ned to disable prevention during both the delete and updating our state. Both of them
+                   prevents us from being scheduled anew, so if we are descheduled between them we will no be able to perform the other. 
+                   The delete must happen first since it will temporarily enable preemption if it cant get the lock. */
+                clear_csr(mstatus, 8);
+                ret = ret && SchedDeleteAssumeNoPreemption(ts.begin, ts.end, ts.hartid, (ts.tsid << 8) | ((uint8_t)current->pid), 0x0080)
+                          && __sync_bool_compare_and_swap(&current->state, PROC_RUNNING, PROC_WAITING);
+                
+                set_csr(mstatus, 8);
+                if (!ret) 
+                        return ret;
+                sys_to_sched();
+        } else {
+                current->listen_channel = -1;
+        }
+        /* We just wait to receive a message, sender does all the job */
+        return current->args[0];
+}
+
 /*** RECEIVER HANDLER ***/
 uint64_t SyscallReceiver(const CapReceiver receiver, Cap *cap, uint64_t a1,
                          uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
@@ -369,6 +397,13 @@ uint64_t SyscallReceiver(const CapReceiver receiver, Cap *cap, uint64_t a1,
                 case SYSNR_RC_RECEIVE:
                         /* Receive message */
                         return sn_recv(receiver.channel);
+                case SYSNR_RC_RECEIVE_DELETE_TS:
+                        /* Receive message and delete a timeslice before yielding */
+                        Cap *cap_ts = curr_get_cap(a4);
+                        CapData cd = cap_get(cap_ts);
+                        if (cap_get_type(cd) != CAP_TIME_SLICE) 
+                                return -1;
+                        return sn_recv_delete_ts(receiver.channel, cap_ts);
                 default:
                         return -1;
         }
@@ -377,6 +412,7 @@ uint64_t SyscallReceiver(const CapReceiver receiver, Cap *cap, uint64_t a1,
 uint64_t sn_send(uint64_t channel) {
         Proc *receiver;
         /* Acquire the receiver in the channel */
+        bool acquired_channel = false;
         do {
                 receiver = channels[channel];
                 if (receiver == NULL) {
@@ -387,8 +423,8 @@ uint64_t sn_send(uint64_t channel) {
                 /* Receiver is not waiting */
                 if (receiver->state != PROC_WAITING)
                         continue;
-        } while (
-            __sync_bool_compare_and_swap(&channels[channel], receiver, NULL));
+                acquired_channel = __sync_bool_compare_and_swap(&channels[channel], receiver, NULL);
+        } while (!acquired_channel);
         /* Acquire the receiver state */
         if (!__sync_bool_compare_and_swap(&receiver->state, PROC_WAITING, PROC_RECEIVING)) {
                 current->args[0] = false;
@@ -423,15 +459,15 @@ uint64_t sn_send(uint64_t channel) {
         /* Number of caps sent */
         receiver->args[1] = current->args[1];
         /* Message passing, 256 bits */
-        uint64_t send[] = current->args[3];
-        uint64_t recv[] = receiver->args[3]
+        uint64_t *send = (uint64_t *)current->args[3];
+        uint64_t *recv = (uint64_t *)receiver->args[3];
         recv[0] = send[0];
         recv[1] = send[1];
         recv[2] = send[2];
         recv[3] = send[3];
 
-        /* Sets the receiver to suspended or ready state */
-        __sync_fetch_and_and(&receiver->state, PROC_SUSPENDED);
+        /* Sets the receiver to suspended */
+        receiver->state = PROC_SUSPENDED;
         return current->args[0];
 }
 
