@@ -7,6 +7,9 @@
 /*** This is the kernel's entry point ***/
 .globl _start
 _start:
+        csrr    t0,mhartid
+        li      t1,N_CORES
+        bge     t0,t1,__hang // Assmues we are in QEMU. Would be bgt on board.
         /*** Load the global pointer. ***/
         /* We load gp first so we can used relaxed (gp-relative) addressing. */
         .option push
@@ -67,6 +70,10 @@ __wait: la      t0,lock
         /* Jump to scheduler. */
         call    Sched
         tail    AsmResumeProc
+
+__hang:
+        wfi
+        j       __hang
 
 .section .data.init
 /* This lock is used for process initialization */
