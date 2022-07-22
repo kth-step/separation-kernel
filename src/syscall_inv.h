@@ -11,6 +11,9 @@
 #include "syscall_nr.h"
 #include "trap.h"
 
+// TODO: fix return values in this file. 
+// Currently functions typically return an unsigned int but can also return -1, which is not very intuitive. 
+
 static inline uint64_t SyscallMemorySlice(const CapMemorySlice ms, Cap *cap,
                                           uint64_t a1, uint64_t a2, uint64_t a3,
                                           uint64_t a4, uint64_t a5, uint64_t a6,
@@ -189,13 +192,14 @@ static inline uint64_t ts_slice(const CapTimeSlice ts, Cap *parent, Cap *child,
                                 uint64_t tsid_end) {
         /* Check validity of time slice */
         if (!(begin < end && tsid < tsid_end))
-                return -1;
+                return 0;
         /* Check containment */
         if (!(ts.begin <= begin && end <= ts.end && ts.tsid < tsid &&
               tsid_end <= ts.tsid_end))
-                return -1;
+                return 0;
+        /* If the parent already has a child it can't have another one */
         if (cap_is_child_ts(ts, cap_get(parent->next)))
-                return -1;
+                return 0;
         CapTimeSlice ts_child =
             cap_mk_time_slice(ts.hartid, begin, end, tsid, tsid_end);
         // TODO: can we find a situation where the order of CapAppend and SchedUpdate matter?
@@ -402,7 +406,7 @@ uint64_t SyscallReceiver(const CapReceiver receiver, Cap *cap, uint64_t a1,
                         Cap *cap_ts = curr_get_cap(a4);
                         CapData cd = cap_get(cap_ts);
                         if (cap_get_type(cd) != CAP_TIME_SLICE) 
-                                return -1;
+                                return 0;
                         return sn_recv_delete_ts(receiver.channel, cap_ts);
                 default:
                         return -1;
