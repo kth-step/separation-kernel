@@ -2,7 +2,7 @@
 #pragma once
 
 /* Number of cores. */
-#define N_CORES 2
+#define N_CORES 1//2 ////// Temp
 /* Number of processes. */
 #define N_PROC 4
 /* Number of capabilities per process */
@@ -31,11 +31,12 @@
 
 #define N_CHANNELS 256
 
-#define SCHEDULE_BENCHMARK 1
+#define SCHEDULE_BENCHMARK 0
 /* Currently 1 round = 1 quantum, and the duration consequently assumes a process is only scheduled for one quantum. */
-#define BENCHMARK_DURATION (TICKS_PER_SECOND*10)
+#define BENCHMARK_DURATION (TICKS_PER_SECOND*1)
 #define BENCHMARK_ROUNDS (BENCHMARK_DURATION / TICKS)
 
-#define PERFORMANCE_SCHEDULING 1
-#define TIME_SLOT_LOANING 1
+#define PERFORMANCE_SCHEDULING 0
+#define IPC_BENCHMARK 1
+#define TIME_SLOT_LOANING 0
 #define CRYPTO_APP 0

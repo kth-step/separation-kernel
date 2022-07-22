@@ -21,19 +21,52 @@
 extern void user_code();
 
 /* Benchmarking */
-#if CRYPTO_APP == 1
+#if IPC_BENCHMARK != 0
+        extern void ipc_benchmark();
+        extern Proc *volatile channels[N_CHANNELS];
+#endif
+#if SCHEDULE_BENCHMARK != 0
+        extern void benchmark_code();
+#endif
+#if CRYPTO_APP != 0
         extern void crypto_decrypt_code();
         extern void cypher_provider_code();
         extern void plaintext_consumer_code();
 #endif
-extern void benchmark_code();
 
 /* Defined in proc.h */
 Proc processes[N_PROC];
 
 static void proc_init_boot_proc(Proc *boot);
 
-#if CRYPTO_APP == 1
+#if IPC_BENCHMARK != 0
+void ProcIpcInit() {
+        uint64_t dummy_msg[4];
+
+        processes[0].pc = (uintptr_t)ipc_benchmark;
+        /* We just make all our receivers and senders children of the root channel for simplicity */
+        cap_set(&processes[0].cap_table[3 + N_CORES + N_PROC], cap_serialize_sender(cap_mk_sender(1)));
+        CapAppend(&processes[0].cap_table[3 + N_CORES + N_PROC], &processes[0].cap_table[2]);
+        for (int i = 1; i < N_PROC; i++) {
+                Proc * p = &processes[i];
+                p->args[1] = 2; // Where to place caps
+                p->args[2] = 1; // How many caps
+                p->args[3] = (uintptr_t)dummy_msg;
+                cap_set(&processes[i].cap_table[0], cap_serialize_receiver(cap_mk_receiver(i)));
+                CapAppend(&processes[i].cap_table[0], &processes[0].cap_table[2]);
+                cap_set(&processes[i].cap_table[1], cap_serialize_sender(cap_mk_sender(i+1)));
+                CapAppend(&processes[i].cap_table[1], &processes[0].cap_table[2]);
+
+                processes[i].pc = (uintptr_t)ipc_benchmark;
+
+                processes[i].listen_channel = i;
+                channels[i] = &processes[i];
+                processes[i].state = PROC_WAITING;
+        }
+}
+#endif
+
+#if CRYPTO_APP != 0
 void ProcCryptoAppInit() {
         if (N_PROC < 3) {
                 return;
@@ -143,8 +176,12 @@ void ProcInitProcesses(void) {
                 ProcReset(i);
         /*** Boot process ***/
         proc_init_boot_proc(&processes[0]);
-
-        processes[0].pc = (uintptr_t)benchmark_code;
+        #if SCHEDULE_BENCHMARK != 0
+                processes[0].pc = (uintptr_t)benchmark_code;
+        #endif
+        #if IPC_BENCHMARK != 0 
+                ProcIpcInit();
+        #endif
         #if CRYPTO_APP != 0
                 ProcCryptoAppInit();
                 InitSched();
