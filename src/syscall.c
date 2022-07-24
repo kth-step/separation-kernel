@@ -36,12 +36,14 @@ static void (*const syscall_handler_array[])(registers_t*, cap_node_t* cn, cap_t
 
 void syscall_handler(registers_t* regs)
 {
-        if (regs->a0 == 0) {
+        if (regs->a7 < S3K_SYSNR_READ_CAP) {
                 syscall_handle_0(regs);
-        } else {
+        } else if (regs->a7 < S3K_SYSNR_LAST) {
                 cap_node_t* cn = proc_get_cap_node(current, regs->a0);
                 cap_t cap = cap_node_get_cap(cn);
                 syscall_handler_array[cap_get_type(cap)](regs, cn, cap);
+        } else {
+            exception_handler(regs, 8, 0);
         }
 }
 

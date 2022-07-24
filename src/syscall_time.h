@@ -13,7 +13,7 @@ static inline uint64_t time_interprocess_move(cap_t cap, proc_t* psrc, proc_t* p
         uint64_t end = cap_time_get_end(cap);
         uint64_t depth = cap_time_get_depth(cap);
 
-        if (cap_node_is_deleted(cndest))
-                return cap_node_move(cnsrc, cndest) && sched_update(cndest, hartid, begin, end, depth, pdest->pid, depth) ? S3K_OK : S3K_EMPTY;
-        return S3K_COLLISION;
+        if (!cap_node_is_deleted(cndest))
+                return S3K_COLLISION;
+        return cap_node_move(cnsrc, cndest) && sched_update(cndest, hartid, begin, end, depth, pdest->pid, depth) ? S3K_OK : S3K_EMPTY;
 }

@@ -18,9 +18,6 @@ static inline uint64_t sched_entry(uint64_t sched_slice, uint64_t hartid);
 /* Returns pid on an sched_slice for a hart */
 static inline uint64_t sched_pid(uint64_t sched_slice, uint64_t hartid);
 
-/* Returns pid on an sched_slice for a hart */
-static inline uint64_t sched_depth(uint64_t sched_slice, uint64_t hartid);
-
 /* Gets the processes that should run on _hartid_ at time _time_. */
 static void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* length);
 

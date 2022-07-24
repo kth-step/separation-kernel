@@ -103,7 +103,7 @@ static cap_node_t* proc_init_channels(cap_node_t* cn)
 void proc_init_boot(proc_t* boot)
 {
         cap_node_t* cn;
-        cn = &boot->cap_table[1];
+        cn = boot->cap_table;
         cn = proc_init_memory(cn);
         cn = proc_init_channels(cn);
         cn = proc_init_supervisor(cn);
@@ -121,7 +121,6 @@ void proc_init_proc(proc_t* proc, int pid)
         proc->pid = pid;
         /* Capability table. */
         proc->cap_table = cap_tables[pid];
-        MAKE_SENTINEL(cap_tables[pid][0]);
         /* All processes are by default suspended */
         proc->state = PROC_STATE_SUSPENDED;
 }

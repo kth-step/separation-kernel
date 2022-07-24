@@ -11,10 +11,8 @@ static inline uint64_t receiver_revoke_cap(cap_node_t* cn, cap_t cap);
 uint64_t channels_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_CHANNELS);
-
         if (!cap_node_is_deleted(newcn))
                 return S3K_COLLISION;
-
         if (!cap_can_derive(cap, newcap))
                 return S3K_ILLEGAL_DERIVATION;
 
@@ -95,10 +93,7 @@ void syscall_handle_channels(registers_t* regs, cap_node_t* cn, cap_t cap)
                         break;
 
                 case S3K_SYSNR_REVOKE_CAP:
-                        preemption_enable();
-                        cap_node_revoke(cn);
-                        preemption_disable();
-                        regs->a0 = S3K_OK;
+                        regs->a0 = channels_revoke_cap(cn, cap);
                         break;
 
                 case S3K_SYSNR_DERIVE_CAP: {
@@ -135,10 +130,7 @@ void syscall_handle_receiver(registers_t* regs, cap_node_t* cn, cap_t cap)
                         break;
 
                 case S3K_SYSNR_REVOKE_CAP:
-                        preemption_enable();
-                        cap_node_revoke(cn);
-                        preemption_disable();
-                        regs->a0 = S3K_OK;
+                        regs->a0 = receiver_revoke_cap(cn, cap);
                         break;
 
                 case S3K_SYSNR_DERIVE_CAP: {
