@@ -8,8 +8,6 @@ static inline uint64_t interprocess_move(proc_t* psrc, proc_t* pdest, uint64_t c
 {
         cap_node_t* cnsrc = proc_get_cap_node(psrc, cidsrc);
         cap_node_t* cndest = proc_get_cap_node(pdest, ciddest);
-        if (cnsrc == NULL || cndest == NULL)
-            return S3K_ERROR;
 
         cap_t cap = cap_node_get_cap(cnsrc);
 
