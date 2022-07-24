@@ -4,4 +4,5 @@
 *.elf
 *.bin
 src/cap.h
+src/s3k_cap.h
 

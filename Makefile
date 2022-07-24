@@ -42,7 +42,7 @@ format:
 
 clean:
 	@echo "Cleaning"
-	@rm -f $(ELF) $(DA) $(DEPS) $(OBJS) src/cap_utils.h
+	@rm -f $(ELF) $(DA) $(DEPS) $(OBJS) src/cap.h src/s3k_cap.h
 
 size: $(ELF)
 	@echo "Size of binary:"
