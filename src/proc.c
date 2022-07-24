@@ -107,7 +107,7 @@ void proc_init_boot(proc_t* boot)
         cn = proc_init_memory(cn);
         cn = proc_init_channels(cn);
         cn = proc_init_supervisor(cn);
-        cn = proc_init_time(cn);
+        proc_init_time(cn);
         /* Set the initial PC. */
         // boot->pc = (uintptr_t)(pe_begin << 2);
         boot->regs.pc = (uint64_t)user_code;  // Temporary code.

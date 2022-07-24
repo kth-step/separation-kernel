@@ -38,9 +38,10 @@ static inline uint64_t time_revoke_cap(cap_node_t* cn, cap_t cap)
         uint64_t free = cap_time_get_free(cap);
         uint64_t depth = cap_time_get_depth(cap);
 
-        preemption_enable();
         /* Special revoke routine */
         while (1) {
+                /* Enable preemption */
+                preemption_enable();
                 /* Check that cn has note been deleted */
                 cap_node_t* next = cn->next;
                 if (next == NULL)
@@ -65,14 +66,12 @@ static inline uint64_t time_revoke_cap(cap_node_t* cn, cap_t cap)
                         /* If slice is deleted, revoke the associated time */
                         sched_update(cn, hartid, begin_next, end_next, depth_next, current->pid, depth);
                 }
-                /* Enable preemption */
-                preemption_enable();
         }
         preemption_disable();
 
         cap_time_set_free(&cap, begin);
 
-        if (sched_update(cn, hartid, begin, free, 255, current->pid, depth) && cap_node_update(cap, cn))
+        if (sched_update(cn, hartid, begin, free, 0xFF, current->pid, depth) && cap_node_update(cap, cn))
                 return S3K_OK;
         return S3K_ERROR;
 }
@@ -83,7 +82,7 @@ static inline uint64_t time_delete_cap(cap_node_t* cn, cap_t cap)
         uint64_t begin = cap_time_get_begin(cap);
         uint64_t end = cap_time_get_end(cap);
         uint64_t depth = cap_time_get_depth(cap);
-        if (sched_update(cn, hartid, begin, end, depth, current->pid, 255) && cap_node_delete(cn))
+        if (sched_update(cn, hartid, begin, end, depth, 0xFF, 0xFF) && cap_node_delete(cn))
                 return S3K_OK;
         return S3K_ERROR;
 }

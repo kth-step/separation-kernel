@@ -37,11 +37,6 @@ uint64_t sched_pid(uint64_t s, uint64_t hartid)
         return sched_entry(s, hartid) & 0xFF;
 }
 
-uint64_t sched_depth(uint64_t s, uint64_t hartid)
-{
-        return (sched_entry(s, hartid) >> 8) & 0xFF;
-}
-
 void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* length)
 {
         kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
@@ -57,7 +52,7 @@ void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* len
         uint64_t pid = sched_pid(sched_slice, hartid);
 
         /* Check if slot is invalid/inactive */
-        if (pid & 0x80)
+        if (pid == 0xFF)
                 return;
 
         /* Check if some other thread preempts */
