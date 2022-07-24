@@ -58,9 +58,3 @@ cap_t cap_node_get_cap(cap_node_t* cn)
         }
         return cap;
 }
-
-static inline uint64_t cap_node_get_proc(cap_node_t* cn)
-{
-        uint64_t offset = (uint64_t)cn - (uint64_t)cap_tables;
-        return offset >> 12;
-}

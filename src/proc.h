@@ -54,7 +54,7 @@ register proc_t* current __asm__("tp");
 
 void proc_init(void);
 
-static inline cap_node_t* proc_get_cap_node(proc_t* proc, uint64_t cid);
+static inline cap_node_t * proc_get_cap_node(proc_t* proc, uint64_t cid);
 static inline cap_t proc_get_cap(proc_t* proc, uint64_t cid);
 static inline uint64_t proc_read_register(proc_t* proc, uint64_t regi);
 static inline uint64_t proc_write_register(proc_t* proc, uint64_t regi, uint64_t regv);
@@ -142,9 +142,6 @@ bool proc_supervisor_suspend(proc_t* proc)
 {
         /* Set the suspended bit */
         enum proc_state state = __sync_fetch_and_or(&proc->state, PROC_STATE_SUSPENDED);
-        if (state & PROC_STATE_SUSPENDED) /* Already suspended */
-                return S3K_SUPERVISEE_SUSPENDED;
-
         if ((state & 7) == PROC_STATE_WAITING) {
                 proc->state = PROC_STATE_SUSPENDED;
         }

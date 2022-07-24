@@ -13,20 +13,8 @@ enum s3k_error {
         S3K_EMPTY,
         /* In move/derive, target destination is occupied */
         S3K_COLLISION,
-        /* Capability index out of bounds */
-        S3K_INDEX_OUT_OF_BOUNDS,
         /* Capability can not be derived */
         S3K_ILLEGAL_DERIVATION,
-        /* Wrong capability for invocation */
-        S3K_BAD_CAP,
-        /* Capability has no children, can not revoke */
-        S3K_CAP_NOT_REVOKEABLE,
-        /* PID in superviser call is out of bounds */
-        S3K_PID_NOT_IN_RANGE,
-        /* */
-        S3K_REG_NOT_IN_RANGE,
-        /* */
-        S3K_SUPERVISEE_SUSPENDED,
         /* Some other thread has locked the supervisee. */
         S3K_SUPERVISEE_BUSY,
         /* Endpoint send operation aborted */
