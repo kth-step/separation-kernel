@@ -1,20 +1,45 @@
 #include "syscall_ipc.h"
 
+#include "ipc.h"
 #include "preemption.h"
 #include "s3k_consts.h"
+#include "trap.h"
 
-static inline uint64_t channels_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap);
-static inline uint64_t channels_revoke_cap(cap_node_t* cn, cap_t cap);
-static inline uint64_t receiver_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap);
-static inline uint64_t receiver_revoke_cap(cap_node_t* cn, cap_t cap);
-
-uint64_t channels_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap)
+void syscall_channels_revoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_CHANNELS);
-        if (!cap_node_is_deleted(newcn))
-                return S3K_COLLISION;
-        if (!cap_can_derive(cap, newcap))
-                return S3K_ILLEGAL_DERIVATION;
+
+        cap_node_revoke(cn);
+
+        cap_channels_set_free(&cap, cap_channels_get_begin(cap));
+
+        preemption_disable();
+        regs->a0 = cap_node_update(cap, cn) ? S3K_OK : S3K_ERROR;
+        regs->pc += 4;
+        preemption_enable();
+}
+
+void syscall_channels_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
+{
+        kassert(cap_get_type(cap) == CAP_TYPE_CHANNELS);
+
+        cap_node_t* newcn = proc_get_cap_node(current, regs->a1);
+        cap_t newcap = (cap_t){regs->a2, regs->a3};
+
+        if (!cap_node_is_deleted(newcn)) {
+                preemption_disable();
+                regs->a0 = S3K_COLLISION;
+                regs->pc += 4;
+                preemption_enable();
+                return;
+        }
+        if (!cap_can_derive(cap, newcap)) {
+                preemption_disable();
+                regs->a0 = S3K_ILLEGAL_DERIVATION;
+                regs->pc += 4;
+                preemption_enable();
+                return;
+        }
 
         kassert(cap_get_type(newcap) == CAP_TYPE_CHANNELS || cap_get_type(newcap) == CAP_TYPE_RECEIVER);
 
@@ -24,152 +49,100 @@ uint64_t channels_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t
         if (cap_get_type(newcap) == CAP_TYPE_RECEIVER)
                 cap_channels_set_free(&cap, cap_receiver_get_channel(newcap) + 1);
 
+        preemption_disable();
         if (cap_node_update(cap, cn) && cap_node_insert(newcap, newcn, cn))
-                return S3K_OK;
-
-        return S3K_ERROR;
-}
-
-uint64_t channels_revoke_cap(cap_node_t* cn, cap_t cap)
-{
-        kassert(cap_get_type(cap) == CAP_TYPE_CHANNELS);
-
-        preemption_enable();
-        cap_node_revoke(cn);
-        preemption_disable();
-
-        cap_channels_set_free(&cap, cap_channels_get_begin(cap));
-
-        if (cap_node_update(cap, cn))
-                return S3K_OK;
-
-        return S3K_ERROR;
-}
-
-uint64_t receiver_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap)
-{
-        kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER);
-
-        if (!cap_node_is_deleted(newcn))
-                return S3K_COLLISION;
-
-        if (!cap_can_derive(cap, newcap))
-                return S3K_ILLEGAL_DERIVATION;
-
-        if (cap_node_insert(newcap, newcn, cn))
-                return S3K_OK;
-
-        return S3K_ERROR;
-}
-
-uint64_t receiver_revoke_cap(cap_node_t* cn, cap_t cap)
-{
-        kassert(cap_get_type(cap) == CAP_TYPE_CHANNELS);
-
-        preemption_enable();
-        cap_node_revoke(cn);
-        preemption_disable();
-
-        return S3K_OK;
-}
-
-void syscall_handle_channels(registers_t* regs, cap_node_t* cn, cap_t cap)
-{
-        kassert(cap_get_type(cap) == CAP_TYPE_CHANNELS);
-        preemption_disable();
-        switch (regs->a7) {
-                case S3K_SYSNR_READ_CAP:
-                        regs->a0 = S3K_OK;
-                        regs->a1 = cap.word0;
-                        regs->a2 = cap.word1;
-                        break;
-
-                case S3K_SYSNR_MOVE_CAP:
-                        regs->a0 = cap_node_move(cn, proc_get_cap_node(current, regs->a1)) ? S3K_OK : S3K_ERROR;
-                        break;
-
-                case S3K_SYSNR_DELETE_CAP:
-                        regs->a0 = cap_node_delete(cn) ? S3K_OK : S3K_ERROR;
-                        break;
-
-                case S3K_SYSNR_REVOKE_CAP:
-                        regs->a0 = channels_revoke_cap(cn, cap);
-                        break;
-
-                case S3K_SYSNR_DERIVE_CAP: {
-                        cap_node_t* newcn = proc_get_cap_node(current, regs->a1);
-                        cap_t newcap = (cap_t){regs->a2, regs->a3};
-                        regs->a0 = channels_derive_cap(cn, cap, newcn, newcap);
-                } break;
-
-                default:
-                        regs->a0 = S3K_UNIMPLEMENTED;
-                        break;
-        }
+                regs->a0 = S3K_OK;
+        else
+                regs->a0 = S3K_ERROR;
         regs->pc += 4;
         preemption_enable();
 }
 
-void syscall_handle_receiver(registers_t* regs, cap_node_t* cn, cap_t cap)
+void syscall_receiver_revoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
-        kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER);
+        kassert(cap_get_type(cap) == CAP_TYPE_CHANNELS);
+
+        cap_node_revoke(cn);
+
         preemption_disable();
-        switch (regs->a7) {
-                case S3K_SYSNR_READ_CAP:
-                        regs->a0 = S3K_OK;
-                        regs->a1 = cap.word0;
-                        regs->a2 = cap.word1;
-                        break;
-
-                case S3K_SYSNR_MOVE_CAP:
-                        regs->a0 = cap_node_move(cn, proc_get_cap_node(current, regs->a1)) ? S3K_OK : S3K_ERROR;
-                        break;
-
-                case S3K_SYSNR_DELETE_CAP:
-                        regs->a0 = cap_node_delete(cn) ? S3K_OK : S3K_ERROR;
-                        break;
-
-                case S3K_SYSNR_REVOKE_CAP:
-                        regs->a0 = receiver_revoke_cap(cn, cap);
-                        break;
-
-                case S3K_SYSNR_DERIVE_CAP: {
-                        cap_node_t* newcn = proc_get_cap_node(current, regs->a1);
-                        cap_t newcap = (cap_t){regs->a2, regs->a3};
-                        regs->a0 = receiver_derive_cap(cn, cap, newcn, newcap);
-                } break;
-
-                default:
-                        regs->a0 = S3K_UNIMPLEMENTED;
-                        break;
-        }
+        regs->a0 = S3K_OK;
         regs->pc += 4;
         preemption_enable();
 }
 
-void syscall_handle_sender(registers_t* regs, cap_node_t* cn, cap_t cap)
+void syscall_receiver_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
+{
+        kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER);
+
+        cap_node_t* newcn = proc_get_cap_node(current, regs->a1);
+        cap_t newcap = (cap_t){regs->a2, regs->a3};
+
+        if (!cap_node_is_deleted(newcn)) {
+                preemption_disable();
+                regs->a0 = S3K_COLLISION;
+                regs->pc += 4;
+                preemption_enable();
+                return;
+        }
+
+        if (!cap_can_derive(cap, newcap)) {
+                preemption_disable();
+                regs->a0 = S3K_ILLEGAL_DERIVATION;
+                regs->pc += 4;
+                preemption_enable();
+                return;
+        }
+
+        preemption_disable();
+        regs->a0 = cap_node_insert(newcap, newcn, cn) ? S3K_OK : S3K_ERROR;
+        regs->pc += 4;
+        preemption_enable();
+}
+
+void syscall_receiver_receive(registers_t* regs, cap_node_t* cn, cap_t cap)
+{
+        kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER);
+
+        preemption_disable();
+        uint64_t channel = cap_receiver_get_channel(cap);
+        if (ipc_subscribe(current, channel)) {
+                if (proc_receiver_wait(current, channel)) {
+                        trap_yield();
+                }
+                ipc_unsubscribe(channel);
+                trap_yield();
+        }
+        regs->a0 = S3K_ERROR;
+        regs->a1 = 0;
+        regs->a2 = 0;
+        regs->a3 = 0;
+        regs->a4 = 0;
+        regs->pc += 4;
+        preemption_enable();
+}
+
+void syscall_sender_send(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_SENDER);
+
+        uint64_t channel = cap_sender_get_channel(cap);
+        proc_t* receiver = ipc_get_subscriber(channel);
         preemption_disable();
-        switch (regs->a7) {
-                case S3K_SYSNR_READ_CAP:
-                        regs->a0 = S3K_OK;
-                        regs->a1 = cap.word0;
-                        regs->a2 = cap.word1;
-                        break;
+        if (receiver == NULL || !proc_sender_acquire(receiver, channel)) {
+                regs->a0 = S3K_NO_RECEIVER;
+                regs->pc += 4;
+        } else {
+                regs->a0 = S3K_OK;
+                regs->pc += 4;
 
-                case S3K_SYSNR_MOVE_CAP:
-                        regs->a0 = cap_node_move(cn, proc_get_cap_node(current, regs->a1)) ? S3K_OK : S3K_ERROR;
-                        break;
-
-                case S3K_SYSNR_DELETE_CAP:
-                        regs->a0 = cap_node_delete(cn) ? S3K_OK : S3K_ERROR;
-                        break;
-
-                default:
-                        regs->a0 = S3K_UNIMPLEMENTED;
-                        break;
+                receiver->regs.a0 = S3K_OK;
+                receiver->regs.pc += 4;
+                receiver->regs.a1 = regs->a1;
+                receiver->regs.a2 = regs->a2;
+                receiver->regs.a3 = regs->a3;
+                receiver->regs.a4 = regs->a4;
+                ipc_unsubscribe(channel);
+                proc_sender_release(receiver);
         }
-        regs->pc += 4;
         preemption_enable();
 }

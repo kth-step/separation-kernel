@@ -9,6 +9,9 @@
 void print_cap(cap_t cap)
 {
         switch (cap_get_type(cap)) {
+                case CAP_TYPE_EMPTY:
+                        kprintf("EMPTY {}\n");
+                        break;
                 case CAP_TYPE_MEMORY:
                         kprintf(
                             "MEMORY {begin=0x%lx, end=0x%lx, free=0x%lx, "
@@ -35,8 +38,8 @@ void print_cap(cap_t cap)
                         kprintf("SENDER {channel=%ld}\n", cap_sender_get_channel(cap));
                         break;
                 case CAP_TYPE_SUPERVISOR:
-                        kprintf("SUPERVISOR {begin=%ld, end=%ld, free=%ld}\n", cap_supervisor_get_begin(cap), cap_supervisor_get_free(cap),
-                                cap_supervisor_get_end(cap));
+                        kprintf("SUPERVISOR {begin=%ld, end=%ld, free=%ld}\n", cap_supervisor_get_begin(cap), cap_supervisor_get_end(cap),
+                                cap_supervisor_get_free(cap));
                         break;
                 default:
                         kprintf("INVALID\n");
@@ -49,7 +52,6 @@ void user_code();
 void user_main(uint64_t pid, uint64_t begin, uint64_t end)
 {
         cap_t cap;
-        uint64_t code;
         kprintf("\n\n");
         kprintf("pid %3lx:\t%016lx\t%016lx\r\n", pid, begin, end);
         kprintf("\n");
@@ -60,7 +62,6 @@ void user_main(uint64_t pid, uint64_t begin, uint64_t end)
                 if (cap_get_type(cap) != CAP_TYPE_EMPTY) {
                         kprintf("%3d: ", i);
                         print_cap(cap);
-                        s3k_yield();
                 }
         }
 
@@ -68,62 +69,36 @@ void user_main(uint64_t pid, uint64_t begin, uint64_t end)
                 cap_t new_time = cap_mk_time(2, 10, 32, 10, 1);
                 cap_t new_recvpoint = cap_mk_receiver(5);
                 cap_t new_sendpoint = cap_mk_sender(5, 1);
-                uint64_t sup_cap = 4;
-                uint64_t supervisee_pid = 1;
-                kprintf("Derive time, %d\n", s3k_derive_cap(6, 9, new_time));
-                s3k_yield();
+                uint64_t sup_cap = 3;
+                uint64_t supervisee_pid = 3;
+                kprintf("Derive time, %d\n", s3k_derive_cap(5, 9, new_time));
                 for (int i = 0; i < 6; i++) {
                         cap_t new_time = cap_mk_time(1, i * 8, (i + 1) * 8, i * 8, 1);
-                        s3k_derive_cap(5, 24 + i, new_time);
-                        s3k_yield();
+                        s3k_derive_cap(4, 24 + i, new_time);
                 }
                 kprintf("Move time cap %d\n", s3k_move_cap(9, 10));
-                s3k_yield();
-                kprintf("Derive receiver %d\n", s3k_derive_cap(3, 11, new_recvpoint));
-                s3k_yield();
+                print_cap(new_recvpoint);
+                kprintf("Derive receiver %d\n", s3k_derive_cap(2, 11, new_recvpoint));
                 kprintf("Derive sender %d\n", s3k_derive_cap(11, 12, new_sendpoint));
-                s3k_yield();
 
                 for (int i = 0; i < 30; i++) {
                         cap = s3k_read_cap(i);
                         if (cap_get_type(cap) != CAP_TYPE_EMPTY) {
                                 kprintf("%3d: ", i);
                                 print_cap(cap);
-                                s3k_yield();
                         }
                 }
 
-                kprintf("Give cap %d\n", s3k_supervisor_give_caps(sup_cap, supervisee_pid, 10, 1));
-                s3k_yield();
-                kprintf("Give cap %d\n", s3k_supervisor_give_caps(sup_cap, supervisee_pid, 12, 2));
-                s3k_yield();
-                kprintf("Write reg %d\n", s3k_supervisor_write_reg(sup_cap, supervisee_pid, 0, (uint64_t)user_code));
-                s3k_yield();
+                kprintf("Give cap %d\n", s3k_supervisor_give_cap(sup_cap, supervisee_pid, 5, 0));
+                kprintf("Give cap %d\n", s3k_supervisor_give_cap(sup_cap, supervisee_pid, 12, 1));
+                print_cap(s3k_supervisor_read_cap(sup_cap, supervisee_pid, 0));
+                kprintf("Write PC %d\n", s3k_supervisor_write_reg(sup_cap, supervisee_pid, 0, (uint64_t)user_code));
                 kprintf("Resume %d\n", s3k_supervisor_resume(sup_cap, supervisee_pid));
-                s3k_yield();
-                kprintf("Receive %d\n", (code = S3K_SYSCALL3(S3K_SYSNR_IPC_RECEIVE, 11, 20, 8)));
-                s3k_yield();
-                int i = 0;
-                while (1) {
-                        s3k_get_pid();
-                        s3k_yield();
-                        i++;
-                }
-
-                if (code != 0)
-                        return;
-
-                kprintf("Dumping capabilities\n");
-                for (int i = 0; i < 30; i++) {
-                        cap = s3k_read_cap(i);
-                        if (cap_get_type(cap) != CAP_TYPE_EMPTY) {
-                                kprintf("%3d: ", i);
-                                print_cap(cap);
-                                s3k_yield();
-                        }
-                }
-        } else if (pid == 1) {
-                kprintf("Send %d\n", (code = S3K_SYSCALL3(S3K_SYSNR_IPC_SEND, 2, 20, 8)));
-                s3k_yield();
+                uint64_t msg[4];
+                kprintf("Receive %d\n", s3k_receive(11, msg));
+                kprintf("Msg = { %d, %d, %d, %d }\n", msg[0], msg[1], msg[2], msg[3]);
+        } else {
+                uint64_t msg[4] = {1, 2, 3, 4};
+                kprintf("Send %d\n", s3k_send(1, msg));
         }
 }

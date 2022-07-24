@@ -1,7 +1,11 @@
 #pragma once
 
 #include "proc.h"
+#include "proc_state.h"
 
-void syscall_handle_channels(registers_t* regs, cap_node_t* cn, cap_t cap);
-void syscall_handle_sender(registers_t* regs, cap_node_t* cn, cap_t cap);
-void syscall_handle_receiver(registers_t* regs, cap_node_t* cn, cap_t cap);
+void syscall_channels_revoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
+void syscall_channels_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
+void syscall_receiver_revoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
+void syscall_receiver_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
+void syscall_receiver_receive(registers_t* regs, cap_node_t* cn, cap_t cap);
+void syscall_sender_send(registers_t* regs, cap_node_t* cn, cap_t cap);

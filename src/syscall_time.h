@@ -2,7 +2,9 @@
 #include "proc.h"
 #include "sched.h"
 
-void syscall_handle_time(registers_t* regs, cap_node_t* cn, cap_t cap);
+void syscall_time_delete_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
+void syscall_time_revoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
+void syscall_time_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
 
 static inline uint64_t time_interprocess_move(cap_t cap, proc_t* psrc, proc_t* pdest, cap_node_t* cnsrc, cap_node_t* cndest)
 {
@@ -15,5 +17,5 @@ static inline uint64_t time_interprocess_move(cap_t cap, proc_t* psrc, proc_t* p
 
         if (!cap_node_is_deleted(cndest))
                 return S3K_COLLISION;
-        return cap_node_move(cnsrc, cndest) && sched_update(cndest, hartid, begin, end, depth, pdest->pid, depth) ? S3K_OK : S3K_EMPTY;
+        return cap_node_move(cnsrc, cndest) && sched_update(cndest, hartid, begin, end, depth, pdest->pid, depth) ? S3K_OK : S3K_ERROR;
 }

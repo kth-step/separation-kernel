@@ -14,8 +14,7 @@ user_code:
         .option pop
 
         // Do syscall, get_pid
-        li      a0,0
-        li      a7,0
+        li      a7,-1
         ecall                           // Fetch process ID to a0                    
 
         // Prepare user data

@@ -52,6 +52,7 @@ _start:
 2:      bne     t0,t1,1b
 
         call    proc_init
+        call    syscall_init
 
         call    print_info
 

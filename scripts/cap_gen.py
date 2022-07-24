@@ -157,7 +157,7 @@ typedef enum cap_type cap_type_t;
 typedef struct cap cap_t;
 
 enum cap_type {{
-{enums}
+{enums}, NUM_OF_CAP_TYPES
 }};
 
 struct cap {{

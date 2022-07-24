@@ -6,6 +6,7 @@
 #include "cap_node.h"
 #include "csr.h"
 #include "lock.h"
+#include "proc_state.h"
 
 #define SCHED_SLICE_OFFSET(sched_slice, hartid) ((sched_slice) << ((hartid)-MIN_HARTID) * 16)
 
@@ -102,7 +103,7 @@ void sched_start(void)
                 end_time = (time + length) * TICKS - SCHEDULER_TICKS;
                 if (timeout >= end_time)
                         continue;
-                if (!proc_acquire(proc))
+                if (proc_acquire(proc))
                         break;
         }
         /* Wait for time slice to start and set timeout */

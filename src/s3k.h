@@ -77,14 +77,11 @@ static inline cap_t s3k_read_cap(uint64_t cid)
 {
         register int64_t a0 __asm__("a0");
         register uint64_t a1 __asm__("a1");
-        register uint64_t a2 __asm__("a2");
         register uint64_t a7 __asm__("a7");
         a0 = cid;
         a7 = S3K_SYSNR_READ_CAP;
-        __asm__ volatile("ecall" : "+r"(a0), "=r"(a1), "=r"(a2) : "r"(a7));
-        if (a0 == S3K_EMPTY)
-                return (cap_t){0, 0};
-        return (cap_t){a1, a2};
+        __asm__ volatile("ecall" : "+r"(a0), "=r"(a1) : "r"(a7));
+        return (cap_t){a0, a1};
 }
 
 static inline uint64_t s3k_move_cap(uint64_t src, uint64_t dest)
@@ -107,6 +104,42 @@ static inline uint64_t s3k_derive_cap(uint64_t src, uint64_t dest, cap_t cap)
         return S3K_SYSCALL4(S3K_SYSNR_DERIVE_CAP, src, dest, cap.word0, cap.word1);
 }
 
+static inline uint64_t s3k_receive(uint64_t cid, uint64_t msg[4])
+{
+        register uint64_t a0 __asm__("a0");
+        register uint64_t a1 __asm__("a1");
+        register uint64_t a2 __asm__("a2");
+        register uint64_t a3 __asm__("a3");
+        register uint64_t a4 __asm__("a4");
+        register uint64_t a7 __asm__("a7");
+        a0 = cid;
+        a7 = S3K_SYSNR_RECEIVE;
+        __asm__("ecall" : "+r"(a0), "=r"(a1), "=r"(a2), "=r"(a3), "=r"(a4) : "r"(a7));
+        msg[0] = a1;
+        msg[1] = a2;
+        msg[2] = a3;
+        msg[3] = a4;
+        return a0;
+}
+
+static inline uint64_t s3k_send(uint64_t cid, uint64_t msg[4])
+{
+        register uint64_t a0 __asm__("a0");
+        register uint64_t a1 __asm__("a1");
+        register uint64_t a2 __asm__("a2");
+        register uint64_t a3 __asm__("a3");
+        register uint64_t a4 __asm__("a4");
+        register uint64_t a7 __asm__("a7");
+        a0 = cid;
+        a1 = msg[0];
+        a2 = msg[1];
+        a3 = msg[2];
+        a4 = msg[3];
+        a7 = S3K_SYSNR_SEND;
+        __asm__("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a7));
+        return a0;
+}
+
 static inline uint64_t s3k_supervisor_suspend(uint64_t sup_cid, uint64_t pid)
 {
         return S3K_SYSCALL2(S3K_SYSNR_SUPERVISOR_SUSPEND, sup_cid, pid);
@@ -127,17 +160,28 @@ static inline uint64_t s3k_supervisor_write_reg(uint64_t sup_cid, uint64_t pid, 
         return S3K_SYSCALL4(S3K_SYSNR_SUPERVISOR_WRITE_REG, sup_cid, pid, reg_nr, val);
 }
 
-static inline uint64_t s3k_supervisor_read_caps(uint64_t sup_cid, uint64_t pid, uint64_t cid)
+static inline cap_t s3k_supervisor_read_cap(uint64_t sup_cid, uint64_t pid, uint64_t cid)
 {
-        return S3K_SYSCALL3(S3K_SYSNR_SUPERVISOR_READ_CAP, sup_cid, pid, cid);
+        register uint64_t a0 __asm__("a0");
+        register uint64_t a1 __asm__("a1");
+        register uint64_t a2 __asm__("a2");
+        register uint64_t a7 __asm__("a7");
+        a0 = sup_cid;
+        a1 = pid;
+        a2 = cid;
+        a7 = S3K_SYSNR_SUPERVISOR_READ_CAP;
+        __asm__ volatile("ecall" : "+r"(a0), "+r"(a1), "+r"(a2) : "r"(a7));
+        if (a0 == S3K_OK)
+                return (cap_t){a1, a2};
+        return NULL_CAP;
 }
 
-static inline uint64_t s3k_supervisor_give_caps(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest)
+static inline uint64_t s3k_supervisor_give_cap(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest)
 {
         return S3K_SYSCALL4(S3K_SYSNR_SUPERVISOR_GIVE_CAP, sup_cid, pid, src, dest);
 }
 
-static inline uint64_t s3k_supervisor_take_caps(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest)
+static inline uint64_t s3k_supervisor_take_cap(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest)
 {
         return S3K_SYSCALL4(S3K_SYSNR_SUPERVISOR_TAKE_CAP, sup_cid, pid, src, dest);
 }
