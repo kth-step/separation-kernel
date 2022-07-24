@@ -127,6 +127,11 @@ static inline uint64_t s3k_supervisor_write_reg(uint64_t sup_cid, uint64_t pid, 
         return S3K_SYSCALL4(S3K_SYSNR_SUPERVISOR_WRITE_REG, sup_cid, pid, reg_nr, val);
 }
 
+static inline uint64_t s3k_supervisor_read_caps(uint64_t sup_cid, uint64_t pid, uint64_t cid)
+{
+        return S3K_SYSCALL3(S3K_SYSNR_SUPERVISOR_READ_CAP, sup_cid, pid, cid);
+}
+
 static inline uint64_t s3k_supervisor_give_caps(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest)
 {
         return S3K_SYSCALL4(S3K_SYSNR_SUPERVISOR_GIVE_CAP, sup_cid, pid, src, dest);
