@@ -20,7 +20,7 @@ static inline uint64_t memory_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* 
                 cap_memory_set_free(&cap, cap_memory_get_end(newcap));
 
         if (cap_get_type(newcap) == CAP_TYPE_PMP)
-                cap_memory_set_free(&cap, pmp_napot_begin(cap_pmp_get_addr(newcap)));
+                cap_memory_set_pmp(&cap, 1);
 
         if (cap_node_update(cap, cn) && cap_node_insert(newcap, newcn, cn))
                 return S3K_OK;
@@ -36,6 +36,7 @@ static inline uint64_t memory_revoke_cap(cap_node_t* cn, cap_t cap)
         preemption_disable();
 
         cap_memory_set_free(&cap, cap_memory_get_begin(cap));
+        cap_memory_set_pmp(&cap, 0);
 
         if (cap_node_update(cap, cn))
                 return S3K_OK;
@@ -64,6 +65,12 @@ void syscall_handle_memory(registers_t* regs, cap_node_t* cn, cap_t cap)
                 case S3K_SYSNR_REVOKE_CAP:
                         regs->a0 = memory_revoke_cap(cn, cap);
                         break;
+
+                case S3K_SYSNR_DERIVE_CAP: {
+                        cap_node_t* newcn = proc_get_cap_node(current, regs->a1);
+                        cap_t newcap = (cap_t){regs->a2, regs->a3};
+                        regs->a0 = memory_derive_cap(cn, cap, newcn, newcap);
+                } break;
 
                 default:
                         regs->a0 = S3K_UNIMPLEMENTED;
