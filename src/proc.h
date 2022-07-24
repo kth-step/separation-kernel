@@ -133,9 +133,9 @@ bool proc_supervisor_resume(proc_t* proc)
 {
         if (proc_supervisor_acquire(proc)) {
                 proc->state = PROC_STATE_READY;
-                return true;
+                return S3K_OK;
         }
-        return false;
+        return S3K_SUPERVISEE_BUSY;
 }
 
 bool proc_supervisor_suspend(proc_t* proc)

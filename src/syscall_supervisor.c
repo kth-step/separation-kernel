@@ -49,10 +49,10 @@ static inline uint64_t supervisor_invoke(registers_t* regs, cap_node_t* cn, cap_
 
         switch (regs->a7) {
                 case S3K_SYSNR_SUPERVISOR_SUSPEND:
-                        return proc_supervisor_suspend(supervisee) ? S3K_OK : S3K_ERROR;
+                        return proc_supervisor_suspend(supervisee);
 
                 case S3K_SYSNR_SUPERVISOR_RESUME:
-                        return proc_supervisor_resume(supervisee) ? S3K_OK : S3K_ERROR;
+                        return proc_supervisor_resume(supervisee);
 
                 case S3K_SYSNR_SUPERVISOR_GET_STATE:
                         regs->a1 = supervisee->state;
