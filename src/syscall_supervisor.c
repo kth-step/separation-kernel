@@ -75,9 +75,7 @@ static inline uint64_t supervisor_invoke(registers_t* regs, cap_node_t* cn, cap_
                         return S3K_SUPERVISEE_BUSY;
 
                 case S3K_SYSNR_SUPERVISOR_GIVE_CAP:
-                        if ((regs->a2 % N_CAPS == 0) || (regs->a3 % N_CAPS == 0)) {
-                                return S3K_ERROR;
-                        } else if (proc_supervisor_acquire(supervisee)) {
+                        if (proc_supervisor_acquire(supervisee)) {
                                 uint64_t state = interprocess_move(current, supervisee, regs->a2, regs->a3);
                                 proc_supervisor_release(supervisee);
                                 return state;
