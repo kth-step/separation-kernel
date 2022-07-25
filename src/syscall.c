@@ -69,14 +69,14 @@ static handler_t cap_handlers[NUM_OF_CAP_TYPES][NUM_OF_CAP_SYSNR] = {
             [S3K_SYSNR_DELETE_CAP] = syscall_delete_cap,
             [S3K_SYSNR_REVOKE_CAP] = syscall_receiver_revoke_cap,
             [S3K_SYSNR_DERIVE_CAP] = syscall_receiver_derive_cap,
-            [S3K_SYSNR_RECEIVE] = syscall_receiver_receive,
+            [S3K_SYSNR_INVOKE_CAP] = syscall_receiver_invoke_cap,
         },
     [CAP_TYPE_SENDER] =
         {
             [S3K_SYSNR_READ_CAP] = syscall_read_cap,
             [S3K_SYSNR_MOVE_CAP] = syscall_move_cap,
             [S3K_SYSNR_DELETE_CAP] = syscall_delete_cap,
-            [S3K_SYSNR_SEND] = syscall_sender_send,
+            [S3K_SYSNR_INVOKE_CAP] = syscall_sender_invoke_cap,
         },
     /* SUPERVISOR */
     [CAP_TYPE_SUPERVISOR] =
@@ -84,14 +84,9 @@ static handler_t cap_handlers[NUM_OF_CAP_TYPES][NUM_OF_CAP_SYSNR] = {
             [S3K_SYSNR_READ_CAP] = syscall_read_cap,
             [S3K_SYSNR_MOVE_CAP] = syscall_move_cap,
             [S3K_SYSNR_DELETE_CAP] = syscall_delete_cap,
-            [S3K_SYSNR_SUPERVISOR_SUSPEND] = syscall_supervisor_suspend,
-            [S3K_SYSNR_SUPERVISOR_RESUME] = syscall_supervisor_resume,
-            [S3K_SYSNR_SUPERVISOR_GET_STATE] = syscall_supervisor_get_state,
-            [S3K_SYSNR_SUPERVISOR_READ_REG] = syscall_supervisor_read_reg,
-            [S3K_SYSNR_SUPERVISOR_WRITE_REG] = syscall_supervisor_write_reg,
-            [S3K_SYSNR_SUPERVISOR_READ_CAP] = syscall_supervisor_read_cap,
-            [S3K_SYSNR_SUPERVISOR_GIVE_CAP] = syscall_supervisor_give_cap,
-            [S3K_SYSNR_SUPERVISOR_TAKE_CAP] = syscall_supervisor_take_cap,
+            [S3K_SYSNR_REVOKE_CAP] = syscall_supervisor_revoke_cap,
+            [S3K_SYSNR_DERIVE_CAP] = syscall_supervisor_derive_cap,
+            [S3K_SYSNR_INVOKE_CAP] = syscall_supervisor_invoke_cap,
         },
 };
 

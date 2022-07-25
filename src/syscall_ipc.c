@@ -99,7 +99,7 @@ void syscall_receiver_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
         preemption_enable();
 }
 
-void syscall_receiver_receive(registers_t* regs, cap_node_t* cn, cap_t cap)
+void syscall_receiver_invoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER);
 
@@ -121,7 +121,7 @@ void syscall_receiver_receive(registers_t* regs, cap_node_t* cn, cap_t cap)
         preemption_enable();
 }
 
-void syscall_sender_send(registers_t* regs, cap_node_t* cn, cap_t cap)
+void syscall_sender_invoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_SENDER);
 

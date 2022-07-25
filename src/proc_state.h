@@ -1,6 +1,6 @@
 #pragma once
-#include "proc.h"
 #include "ipc.h"
+#include "proc.h"
 
 static inline void proc_release(proc_t* proc);
 static inline bool proc_acquire(proc_t* proc);
