@@ -6,16 +6,13 @@
 
 #define USER_DATA_SIZE 4096
 
+
 user_code:
         // Load global pointer
         .option push
         .option norelax
         la      gp,__global_pointer$
         .option pop
-
-        // Do syscall, get_pid
-        li      a7,-1
-        ecall                           // Fetch process ID to a0                    
 
         // Prepare user data
         la      a1,user_data            // a2=user_data
@@ -28,9 +25,21 @@ user_code:
         mv      t0,zero
 
         // Call main with (pid, user data start, user data end)
-        mv      t3,a0
-        call    user_main
+        la      ra,user_trampoline
+        slli    t0,a0,2
+        add     ra,ra,t0
+        jalr    ra,(ra)
 1:      j       1b
+
+user_trampoline:
+.option push
+.option norvc
+        j       main_supervisor
+        j       main_uart
+        j       main_app1
+        j       main_app2
+        j       main_crypt
+.option pop
 
 .section .bss.user_data
 // This is data for all processes

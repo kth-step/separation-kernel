@@ -5,7 +5,7 @@
 #include "platform.h"
 
 /* Number of processes. */
-#define N_PROC 4
+#define N_PROC 5
 
 /* Number of capabilities per process */
 #define N_CAPS 128
