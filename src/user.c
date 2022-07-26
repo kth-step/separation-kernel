@@ -54,11 +54,17 @@ void print_cap(Cap cap) {
         kprintf("\n");
 }
 void user_code();
-void user_main(uintptr_t pid, uint64_t begin, uint64_t end) {
+
+int wait(uint64_t t) {
+   uint64_t time = read_time();
+   while (read_time() - t < time) {
+
+   }
+   return read_time();
+}
+
+void dump_capabilities() {
         Cap cap;
-        kprintf("\n\n");
-        kprintf("pid %3lx:\t%016lx\t%016lx\r\n", pid, begin, end);
-        kprintf("\n");
         kprintf("Printing available capabilities\n");
         kprintf("--------------------------------\n");
         for (int i = 0; i < 30; i++) {
@@ -69,14 +75,75 @@ void user_main(uintptr_t pid, uint64_t begin, uint64_t end) {
                 }
         }
 
+}
+
+#define WAIT_TIME 100000
+
+void boot_init() {
+        kprintf("boot init start: %d\n", read_time());
+        s3k_delete_cap(5);
+        s3k_delete_cap(6);
+        s3k_delete_cap(7);
+
+        Cap new_time = cap_mk_time(1, 1, 10, 32, 10, 2);
+        uint64_t sup_cap = 3;
+        uint64_t supervisee_pid = 1;
+        uint64_t time_cap = 8;
+        kprintf("%d\n", s3k_derive_cap(4, time_cap, new_time));
+        dump_capabilities();
+
+        kprintf("%d\n", s3k_supervisor_give_cap(sup_cap, supervisee_pid, time_cap, 1, 1));
+        dump_capabilities();
+
+        kprintf("%d\n", s3k_supervisor_write_reg(sup_cap, supervisee_pid, 0, (uint64_t)user_code));
+        kprintf("%d\n", s3k_supervisor_resume(sup_cap, supervisee_pid));
+
+        new_time = cap_mk_time(1, 2, 33, 40, 33, 2);
+        supervisee_pid = 2;
+        time_cap = 8;
+        dump_capabilities();
+        kprintf("derive %d\n", s3k_derive_cap(4, time_cap, new_time));
+        dump_capabilities();
+        kprintf("give %d\n", s3k_supervisor_give_cap(sup_cap, supervisee_pid, time_cap, 1, 1));
+        dump_capabilities();
+        kprintf("%d\n", s3k_supervisor_write_reg(sup_cap, supervisee_pid, 0, (uint64_t)user_code));
+        kprintf("%d\n", s3k_supervisor_resume(sup_cap, supervisee_pid));
+
+        kprintf("boot init end: %d\n", read_time());
+
+        int i = 0;
+        while (1) {
+                wait(WAIT_TIME);
+                kprintf("boot init loop: %d %d\n", i++, read_time());
+        }
+}
+
+void uart_driver_init() {
+        kprintf("Starting UART driver\n");
+        while (1) {
+                wait(WAIT_TIME);
+                kprintf("driver loop: %d\n", read_time());
+        }
+}
+
+void client_init () {
+        kprintf("Starting client\n");
+        while (1) {
+                wait(WAIT_TIME);
+                kprintf("client loop: %d\n", read_time());
+        }
+}
+void user_main(uintptr_t pid, uint64_t begin, uint64_t end) {
+        kprintf("\n\n");
+        kprintf("pid %3lx:\t%016lx\t%016lx\r\n", pid, begin, end);
+        kprintf("\n");
+        dump_capabilities();
+
         if (pid == 0) {
-                Cap new_time = cap_mk_time(2, 1, 10, 32, 10, 2);
-                uint64_t sup_cap = 3;
-                uint64_t supervisee_pid = 1;
-                uint64_t time_cap = 8;
-                kprintf("%d\n", s3k_derive_cap(5, time_cap, new_time));
-                kprintf("%d\n", s3k_supervisor_give_cap(sup_cap, supervisee_pid, time_cap, 1, 1));
-                kprintf("%d\n", s3k_supervisor_write_reg(sup_cap, supervisee_pid, 0, (uint64_t)user_code));
-                kprintf("%d\n", s3k_supervisor_resume(sup_cap, supervisee_pid));
+                boot_init();
+        } else if (pid == 1) {
+                uart_driver_init();
+        } else if (pid == 2) {
+                client_init();
         }
 }

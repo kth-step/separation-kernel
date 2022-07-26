@@ -1,4 +1,4 @@
-# See LICENSE file for copyright and license details.
+# See LICENSE file for copyright and license detail
 # Dummy user code 
 .globl user_code
 .extern main
