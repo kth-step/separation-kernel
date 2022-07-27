@@ -141,7 +141,7 @@ void proc_init_time(Cap time[N_CORES]) {
                 begin = 0;
                 end = N_QUANTUM;
                 tsid = 0;
-                fuel = 255;
+                fuel = MAX_FUEL;
                 ts = cap_mk_time_slice(hartid, begin, end, tsid, fuel);
                 cap_set(&time[hartid], cap_serialize_time_slice(ts));
                 CapAppend(&time[hartid], sentinel);

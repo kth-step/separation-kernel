@@ -31,6 +31,8 @@
 
 #define N_CHANNELS 256
 
+#define MAX_FUEL 255
+
 #define SCHEDULE_BENCHMARK 0
 /* Currently 1 round = 1 quantum, and the duration consequently assumes a process is only scheduled for one quantum. */
 #define BENCHMARK_DURATION (TICKS_PER_SECOND*1)

@@ -1,6 +1,7 @@
 #include "sched.h"
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "config.h"
@@ -30,14 +31,43 @@ static Lock lock = 0;
         TimeSlotInstanceRoot time_slot_instance_roots[N_QUANTUM][N_CORES];
 #endif
 
-void InitSched() {
-        for (int i = 0; i < N_QUANTUM; i++) {
-                if (i % 2 == 0) {
-                        schedule[i] = 0x0000000200010000;
-                } else {
-                        schedule[i] = 0x0000000100020000;
+TsIdStatus ts_id_statuses[N_CORES][MAX_FUEL];
+
+static uint64_t ts_creation_timestamps[N_CORES];
+uint64_t get_ts_creation_timestamp(uint64_t hartid) {
+        if (ts_creation_timestamps[hartid] + 1 == UINT64_MAX) {
+                // TODO: handle the case where the creation timestamp overflows.
+                // Idea: iterate over all ts_id_status objects for the given hart, order them according to their timestamps,
+                //       then replace their timestamps with their order instead. I.e. the object with the lowest timestamp gets a new timestamp 0, 
+                //       the second lowest gets timestamp 1 etc. Then set the ts_creation_timestamps[hartid] to the highest assigned timestamp + 1
+        }
+        return ts_creation_timestamps[hartid]++;
+}
+
+void ts_id_statuses_init() {
+        for (int i = 0; i < N_CORES; i++) {
+                // Currently we assume a setup where each hart has one root time slice each, all with tsid 0.
+                ts_creation_timestamps[i] = 1;
+                ts_id_statuses[i][0] = (TsIdStatus){0, 0, true, 0};
+                for (int j = 1; j < MAX_FUEL; j++) {
+                        ts_id_statuses[i][j] = (TsIdStatus){0, 0, false, 0};
                 }
         }
+}
+
+void InitSched() {
+        for (int i = 0; i < N_QUANTUM; i++) {
+                #if CRYPTO_APP != 0
+                        if (i % 2 == 0) {
+                                schedule[i] = 0x0000000200010000;
+                        } else {
+                                schedule[i] = 0x0000000100020000;
+                        }
+                #else
+                        schedule[i] = 0;
+                #endif
+        }
+        ts_id_statuses_init();
 }
 
 #if TIME_SLOT_LOANING != 0
@@ -107,9 +137,10 @@ void InitSched() {
         }
 #endif
 
-static inline uint64_t sched_get_tid(uint64_t s, uintptr_t hartid) {
-        return ((s >> (hartid * 16)) & 0xFF00);
-}
+// When do we want this? Do we want to shift the tsid down when using it?
+/*static inline uint64_t sched_get_tsid(uint64_t s, uintptr_t hartid) {
+        return ((s >> (hartid * 16)) & 0xFF00); 
+}*/
 
 static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
         return ((s >> (hartid * 16)) & 0xFF);
@@ -256,8 +287,8 @@ void Sched(void) {
                         /* Returns to AsmSwitchToProc. */
                         return;
                 } else {
-                        // To prevent constant attempts to acquire the lock when another hart got it.
-                        // While not necessary in the non-performance version, it doesn't hurt either.
+                        /* To prevent constant attempts to acquire the lock when another hart got it.
+                           While not necessary in the non-performance version, it doesn't hurt either. */
 
                         // TODO: Have not been able to establish that this makes a meaningful difference.
                         // Tested with 4 cores with 3 not getting scheduled, for over 200 quanta in a row, with 20000 TICKS each quanta.
@@ -272,6 +303,10 @@ static inline bool sched_update(uint64_t begin, uint64_t end, uint8_t hartid,
         uint64_t mask = 0xFFFF << (hartid * 16);
         uint64_t expected64 = expected << (hartid * 16);
         uint64_t desired64 = desired << (hartid * 16);
+        
+        const uint8_t previous_tsid = (expected & 0xFF00) >> 8;
+        const uint8_t new_tsid = (desired & 0xFF00) >> 8;
+        const uint8_t new_pid = desired & 0xFF;
         
         /* Disable preemption 
            This is needed since we might remove our own scheduling, and if we are descheduled before
@@ -305,6 +340,19 @@ static inline bool sched_update(uint64_t begin, uint64_t end, uint8_t hartid,
                 uint64_t s_new = (s & ~mask) | desired64;
                 schedule[i] = s_new;
                 is_updated = true;
+        }
+        if (is_updated) {
+                /* If previous and new tsid are different then we are updating schedule after a derive. */
+                if (previous_tsid != new_tsid) {
+                        ts_id_statuses[hartid][new_tsid].parent_tsid = previous_tsid;
+                        ts_id_statuses[hartid][new_tsid].creation_timestamp = get_ts_creation_timestamp(hartid);
+                        ts_id_statuses[hartid][new_tsid].tsid_active = true;
+                } 
+                else {
+                        /* Pid is only changed on interprocess move; 
+                           if an intraprocess move brought us here this simply does nothing. */
+                        ts_id_statuses[hartid][new_tsid].pid = new_pid; 
+                }
         }
         /* Release lock and enable preemption */
         release_lock(&lock);
@@ -341,66 +389,102 @@ bool SchedRevoke(uint64_t begin, uint64_t end, uint8_t hartid,
                    That is, we assume that we don't risk stealing time slots from parents or siblings. */
                 uint64_t sched_slice = schedule[i];
                 uint64_t new_sched_slice = (sched_slice & ~mask) | desired64;
+
+                uint8_t old_tsid = (schedule[i] & (0xFF00 << (hartid * 16))) >> (hartid * 16 + 8);
+                uint8_t new_tsid = (desired & 0xFF00) >> 8;
+
+                /* If old and new tsid are the same we would set the cap performing the revoke to inactive
+                   with the following statement. But a revoke does not remove the cap performing the revoke. */
+                if (old_tsid != new_tsid) 
+                        ts_id_statuses[hartid][old_tsid].tsid_active = false;
+
                 schedule[i] = new_sched_slice;
         }
         release_lock(&lock);
         return true;
 }
 
+bool sched_delete(uint64_t begin, uint64_t end, uint8_t hartid, uint64_t expected64, 
+                  uint64_t mask, const uint8_t previous_tsid) {
+        /* Try acquire lock */
+        while (!try_acquire_lock(&lock)) {
+                /* If failed acquire lock, enable preemption temporary */
+                set_csr(mstatus, 8);
+                clear_csr(mstatus, 8);
+        }
+        /* If the time slice has no parent we make all its quanta invalid in the schedule. */
+        uint64_t desired64 = 0x0080 << (hartid * 16);
 
-bool SchedDelete(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected, uint16_t desired) {
+        // TODO: probably rewrite this to make it more readable
+        uint8_t parent_tsid = ts_id_statuses[hartid][previous_tsid].parent_tsid;
+        uint64_t creation_timestamp = ts_id_statuses[hartid][previous_tsid].creation_timestamp;
+        /* This condition will never change, but saves us from wrapping the loop in an if-statement. */
+        // TODO: if newer timestamp then we are about to be revoked
+        // Should we just return false if that is the case?
+        while (previous_tsid != 0) {
+                if (ts_id_statuses[hartid][parent_tsid].tsid_active && 
+                    ts_id_statuses[hartid][parent_tsid].creation_timestamp < creation_timestamp) {
+                        /* We found our closest valid parent (both active and created prior to us, 
+                           meaning it can actually be our parent). */
+                        desired64 = (parent_tsid << 8 | ts_id_statuses[hartid][parent_tsid].pid) << (hartid * 16);
+                        break;
+                }
+                if (parent_tsid == 0) {
+                        /* If we get here the parent must be the root time slice.
+                           A root time slice can't have a later timestamp than ours, 
+                           so to get here it can't be active, meaning it has been deleted. */
+                        break;
+                }
+                /* Get parent of parent to continue towards our closest active (and valid) parent. */
+                parent_tsid = ts_id_statuses[hartid][parent_tsid].parent_tsid;
+        }
+
+        /* Return false if we don't manage to update a single time slot. */
+        bool is_updated = false;
+        for (int i = begin; i < end; i++) {
+                uint64_t s = schedule[i];
+                if ((s & mask) != expected64)
+                        continue;
+                uint64_t s_new = (s & ~mask) | desired64;
+                schedule[i] = s_new;
+                is_updated = true;
+        }
+        if (is_updated) {
+                ts_id_statuses[hartid][previous_tsid].tsid_active = false;
+        }
+        /* Release lock */
+        release_lock(&lock);
+        return is_updated;
+}
+
+
+bool SchedDelete(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected) {
         uint64_t mask = 0xFFFF << (hartid * 16);
         uint64_t expected64 = expected << (hartid * 16);
-        uint64_t desired64 = desired << (hartid * 16);
+        const uint8_t previous_tsid = (expected & 0xFF00) >> 8;
         
         /* Disable preemption  
            This is needed since we might remove all our own scheduling slots, and if we are descheduled before
            completing this function then we might still hold the lock without any chance of being scheduled again. */
         clear_csr(mstatus, 8);
-        /* Try acquire lock */
-        while (!try_acquire_lock(&lock)) {
-                /* If failed acquire lock, enable preemption temporary */
-                set_csr(mstatus, 8);
-                clear_csr(mstatus, 8);
-        }
-        /* Return false if we don't manage to update a single time slot. */
-        bool is_updated = false;
-        for (int i = begin; i < end; i++) {
-                uint64_t s = schedule[i];
-                if ((s & mask) != expected64)
-                        continue;
-                uint64_t s_new = (s & ~mask) | desired64;
-                schedule[i] = s_new;
-                is_updated = true;
-        }
-        /* Release lock and enable preemption */
-        release_lock(&lock);
+
+        /* Do the actual work */
+        bool is_updated = sched_delete(begin, end, hartid, expected64, mask, previous_tsid);
+
+        /* Enable preemption */
         set_csr(mstatus, 8);
         return is_updated;
 }
 
-bool SchedDeleteAssumeNoPreemption(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected, uint16_t desired) {
+bool SchedDeleteAssumeNoPreemption(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected) {
         uint64_t mask = 0xFFFF << (hartid * 16);
         uint64_t expected64 = expected << (hartid * 16);
-        uint64_t desired64 = desired << (hartid * 16);
+        const uint8_t previous_tsid = (expected & 0xFF00) >> 8;
         
-        /* Try acquire lock */
-        while (!try_acquire_lock(&lock)) {
-                /* If failed acquire lock, enable preemption temporary */
-                set_csr(mstatus, 8);
-                clear_csr(mstatus, 8);
-        }
-        /* Return false if we don't manage to update a single time slot. */
-        bool is_updated = false;
-        for (int i = begin; i < end; i++) {
-                uint64_t s = schedule[i];
-                if ((s & mask) != expected64)
-                        continue;
-                uint64_t s_new = (s & ~mask) | desired64;
-                schedule[i] = s_new;
-                is_updated = true;
-        }
-        /* Release lock */
-        release_lock(&lock);
+        /* We can only share the lock acquiring part of this helper function with the disable preemption delete because we assume that
+           SchedDeleteAssumeNoPreemption is called before making other changes which would prevent us from being
+           scheduled again. */
+        bool is_updated = sched_delete(begin, end, hartid, expected64, mask, previous_tsid);
+
         return is_updated;
 }

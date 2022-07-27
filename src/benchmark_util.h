@@ -31,5 +31,6 @@ void print_all_config() {
             "USER_MEMORY_END=  0x%lx\n"
             "BOOT_PMP_LENGTH=0x%lx\n"
             "N_CHANNELS=%d\n"
-            , LOG_STACK_SIZE, USER_MEMORY_BEGIN, USER_MEMORY_END, BOOT_PMP_LENGTH, N_CHANNELS);
+            "MAX_FUEL=%d\n"
+            , LOG_STACK_SIZE, USER_MEMORY_BEGIN, USER_MEMORY_END, BOOT_PMP_LENGTH, N_CHANNELS, MAX_FUEL);
 }

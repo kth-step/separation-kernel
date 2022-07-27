@@ -14,6 +14,9 @@
 // TODO: fix return values in this file. 
 // Currently functions typically return an unsigned int but can also return -1, which is not very intuitive. 
 
+// TODO: since we have definitions in a header file all functions should probably be static, or
+// we should move the definitions to a .c file.
+
 static inline uint64_t SyscallMemorySlice(const CapMemorySlice ms, Cap *cap,
                                           uint64_t a1, uint64_t a2, uint64_t a3,
                                           uint64_t a4, uint64_t a5, uint64_t a6,
@@ -45,7 +48,7 @@ static inline uint64_t SyscallSupervisor(const CapSupervisor sup, Cap *cap,
 
 Proc *volatile channels[N_CHANNELS];
 
-bool syscall_interprocess_move(Cap *src, Cap *dest, uint64_t old_pid, uint64_t new_pid) {
+static bool syscall_interprocess_move(Cap *src, Cap *dest, uint64_t old_pid, uint64_t new_pid) {
         CapData cd = cap_get(src);
         CapType type = cap_get_type(cd);
         bool succ;
@@ -252,7 +255,7 @@ uint64_t SyscallTimeSlice(const CapTimeSlice ts, Cap *cap, uint64_t a1,
                            even if the cap is removed. This means that it will still try to delete the cap from the schedule even if 
                            another revoke already has done it. This is not a problem since the expected value will never match in
                            this situation and the SchedDelete will simply do nothing. */
-                        return CapDelete(cap) && SchedDelete(ts.begin, ts.end, ts.hartid, (ts.tsid << 8) | ((uint8_t)current->pid), 0x0080);
+                        return CapDelete(cap) && SchedDelete(ts.begin, ts.end, ts.hartid, (ts.tsid << 8) | ((uint8_t)current->pid));
                 case SYSNR_REVOKE_CAP:
                         /* Revoke time slice */
                         // TODO: can we find a situation where the order matters?
@@ -366,11 +369,11 @@ uint64_t sn_recv_delete_ts(uint64_t channel, Cap * cap_ts) {
                 uint64_t ret = CapDelete(cap_ts);
                 if (!ret) 
                         return ret;
-                /* We ned to disable prevention during both the delete and updating our state. Both of them
+                /* We need to disable preemption during both the delete and updating our state. Both of them
                    prevents us from being scheduled anew, so if we are descheduled between them we will no be able to perform the other. 
                    The delete must happen first since it will temporarily enable preemption if it cant get the lock. */
                 clear_csr(mstatus, 8);
-                ret = ret && SchedDeleteAssumeNoPreemption(ts.begin, ts.end, ts.hartid, (ts.tsid << 8) | ((uint8_t)current->pid), 0x0080)
+                ret = ret && SchedDeleteAssumeNoPreemption(ts.begin, ts.end, ts.hartid, (ts.tsid << 8) | ((uint8_t)current->pid))
                           && __sync_bool_compare_and_swap(&current->state, PROC_RUNNING, PROC_WAITING);
                 
                 set_csr(mstatus, 8);
