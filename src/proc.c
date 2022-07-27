@@ -88,6 +88,8 @@ void ProcReset(int pid) {
         proc->ksp = &proc_stack[pid][STACK_SIZE / 8];
         for (int i = 0; i < STACK_SIZE / 8; i++)
                 proc_stack[pid][i] = 0;
+        /* The assembly trap handeling assumes the user stack pointer is not 0, and that it is found on the kernel stack */
+        proc->ksp[-6] = 1;
         /* Zero the capability table. */
         proc->cap_table = cap_tables[pid];
         for (int i = 0; i < N_CAPS; ++i) {
@@ -184,11 +186,16 @@ void ProcInitProcesses(void) {
         #endif
         #if CRYPTO_APP != 0
                 ProcCryptoAppInit();
-                InitSched();
         #endif
+        InitSched();
         #if TIME_SLOT_LOANING != 0
                 InitTimeSlotInstanceRoots();
         #endif
+        /* The assembly trap handeling tries to restore the PC from the stack */
+        for (int i = 0; i < N_PROC; i++) {
+                processes[i].ksp[-4] = processes[i].pc;
+        }
+        
 }
 
 void ProcHalt(Proc *proc) {

@@ -65,27 +65,53 @@ __exception_handler:
         /* If mscratch is 0, we have bug in the kernel */
         beqz    sp,__mhang
 #endif
-        /* Store user gp, tp registers. */
-        sd      gp,(-3*8)(sp)
-        sd      tp,(-4*8)(sp)
-        /* Load kernel gp and tp. */
-        ld      gp,(-1*8)(sp)   /* points to kernel global data */
-        ld      tp,(-2*8)(sp)   /* points to current pcb */
-        /* Store user t0-t6, ra registers. */
-        sd      t0,(-5*8)(sp)
+        sd      ra,(-5*8)(sp)
+        sd      gp,(-7*8)(sp)
+        sd      tp,(-8*8)(sp)
+        sd      t0,(-9*8)(sp)
+        sd      t1,(-10*8)(sp)
+        sd      t2,(-11*8)(sp)
+        sd      s0,(-12*8)(sp)
+        sd      s1,(-13*8)(sp)
+        sd      a0,(-14*8)(sp)
+        sd      a1,(-15*8)(sp)
+        sd      a2,(-16*8)(sp)
+        sd      a3,(-17*8)(sp)
+        sd      a4,(-18*8)(sp)
+        sd      a5,(-19*8)(sp)
+        sd      a6,(-20*8)(sp)
+        sd      a7,(-21*8)(sp)
+        sd      s2,(-22*8)(sp)
+        sd      s3,(-23*8)(sp)
+        sd      s4,(-24*8)(sp)
+        sd      s5,(-25*8)(sp)
+        sd      s6,(-26*8)(sp)
+        sd      s7,(-27*8)(sp)
+        sd      s8,(-28*8)(sp)
+        sd      s9,(-29*8)(sp)
+        sd      s10,(-30*8)(sp)
+        sd      s11,(-31*8)(sp)
+        sd      t3,(-32*8)(sp)
+        sd      t4,(-33*8)(sp)
+        sd      t5,(-34*8)(sp)
+        sd      t6,(-35*8)(sp)
+
+        /* Save user sp */
+        csrrw   t1,mscratch,zero
         sd      t1,(-6*8)(sp)
-        sd      t2,(-7*8)(sp)
-        sd      t3,(-8*8)(sp)
-        sd      t4,(-9*8)(sp)
-        sd      t5,(-10*8)(sp)
-        sd      t6,(-11*8)(sp)
-        sd      ra,(-12*8)(sp)
 
-        /* Write user sp to stack. */
-        csrrw   t3,mscratch,zero
-        sd      t3,(-13*8)(sp)
+        /* Store mstatus */
+        csrr    t0,mstatus
+        sd      t0,(-2*8)(sp)
+        /* Save mstatus */
+        #csrrs   t0,mstatus,8
+        #sd      t0,(-2*8)(sp)
 
-        /* Save user a0-a7. */
+        /* Load kernel gp and tp */
+        ld      gp,(0*8)(sp) /* points to kernel global data */
+        ld      tp,(-1*8)(sp) /* points to current pcb */
+        
+        /* Save user a0-a7 in proc struct. */
         sd      a0,(3*8)(tp)
         sd      a1,(4*8)(tp)
         sd      a2,(5*8)(tp)
@@ -94,6 +120,7 @@ __exception_handler:
         sd      a5,(8*8)(tp)
         sd      a6,(9*8)(tp)
         sd      a7,(10*8)(tp)
+
         /* Get user pc, saved later as we might modify it. */
         csrr    t3,mepc
 
@@ -110,17 +137,17 @@ __syscall:
         /* Adds 4 to pc (jumping over ecall instruction */
         addi    t3,t3,4
         /* Store user pc */
-        sd      t3,(-14*8)(sp)
+        sd      t3,(-4*8)(sp)
 
         /* Fix sp and enable preemption */
-        addi    sp,sp,-14*8
+        addi    sp,sp,-36*8
         csrwi   mstatus,8
 
         call    SyscallHandler
 
         /* Fix sp and disable preemption */
         csrwi   mstatus,0
-        addi    sp,sp,14*8
+        addi    sp,sp,36*8
 
         j       __exception_exit
 
@@ -137,9 +164,9 @@ __exception:
         slli    t1,t1,2
 
         /* Store user pc */
-        sd      t3,(-14*8)(sp)
+        sd      t3,(-4*8)(sp)
 
-        addi    sp,sp,-14*8
+        addi    sp,sp,-36*8
         csrwi   mstatus,8
 
         /* Jump to trampoline */
@@ -148,44 +175,8 @@ __exception:
 
         /* Fix sp and disable preemption */
         csrwi   mstatus,0
-        addi    sp,sp,14*8
-
-__exception_exit:
-        /* Write user pc to mepc. */
-        ld      t3,(-14*8)(sp)
-        beqz    t3,__hang
-        csrw    mepc,t3
-        /* Write user sp to mscratch. */
-        ld      t0,(-13*8)(sp)
-        csrw    mscratch,t0
-        /* Load user a0-a7. */
-        ld      a7,(10*8)(tp)
-        ld      a6,(9*8)(tp)
-        ld      a5,(8*8)(tp)
-        ld      a4,(7*8)(tp)
-        ld      a3,(6*8)(tp)
-        ld      a2,(5*8)(tp)
-        ld      a1,(4*8)(tp)
-        ld      a0,(3*8)(tp)
-        /* Load process ra,t0-t6 register. */
-        ld      ra,(-12*8)(sp)
-        ld      t6,(-11*8)(sp)
-        ld      t5,(-10*8)(sp)
-        ld      t4,(-9*8)(sp)
-        ld      t3,(-8*8)(sp)
-        ld      t2,(-7*8)(sp)
-        ld      t1,(-6*8)(sp)
-        ld      t0,(-5*8)(sp)
-        /* Store kernel gp and tp. */
-        sd      tp,(-2*8)(sp)
-        sd      gp,(-1*8)(sp)
-        /* Load user gp and tp. */
-        ld      tp,(-4*8)(sp)
-        ld      gp,(-3*8)(sp)
-        /* Load process sp, store kernel sp. */
-        csrrw   sp,mscratch,sp
-        /* Go to user mode. */
-        mret
+        addi    sp,sp,36*8
+        j       __exception_exit
 
 __hang: 
         j       __hang
@@ -197,45 +188,62 @@ __timer_handler:
         bnez    sp,1f
 __timer_handler_machine:
         csrr    sp,mscratch
+        addi    sp,sp,-36*8
         /* Store kernel gp, tp */
-        sd      gp,(-1*8)(sp)
-        sd      tp,(-2*8)(sp)
-1:      
-        sd      ra,(-4*8)(sp)
-        //sd      sp,(-5*8)(sp)
-        sd      gp,(-6*8)(sp)
-        sd      tp,(-7*8)(sp)
-        sd      t0,(-8*8)(sp)
-        sd      t1,(-9*8)(sp)
-        sd      t2,(-10*8)(sp)
-        sd      s0,(-11*8)(sp)
-        sd      s1,(-12*8)(sp)
-        sd      a0,(-13*8)(sp)
-        sd      a1,(-14*8)(sp)
-        sd      a2,(-15*8)(sp)
-        sd      a3,(-16*8)(sp)
-        sd      a4,(-17*8)(sp)
-        sd      a5,(-18*8)(sp)
-        sd      a6,(-19*8)(sp)
-        sd      a7,(-20*8)(sp)
-        sd      s2,(-21*8)(sp)
-        sd      s3,(-22*8)(sp)
-        sd      s4,(-23*8)(sp)
-        sd      s5,(-24*8)(sp)
-        sd      s6,(-25*8)(sp)
-        sd      s7,(-26*8)(sp)
-        sd      s8,(-27*8)(sp)
-        sd      s9,(-28*8)(sp)
-        sd      s10,(-29*8)(sp)
-        sd      s11,(-30*8)(sp)
-        sd      t3,(-31*8)(sp)
-        sd      t4,(-32*8)(sp)
-        sd      t5,(-33*8)(sp)
-        sd      t6,(-34*8)(sp)
+        sd      gp,(0*8)(sp)
+        sd      tp,(-1*8)(sp)
 
-        /* Load kernel gp, tp */
-        ld      tp,(-2*8)(sp)
-        ld      gp,(-1*8)(sp)
+        sd      zero,(-6*8)(sp)
+        sd      t0,(-9*8)(sp)
+        j       2f
+1:
+        /* Store user sp, but first store t0 so we can use it */
+        sd      t0,(-9*8)(sp)
+        csrr    t0,mscratch
+        sd      t0,(-6*8)(sp)
+2:      
+        sd      ra,(-5*8)(sp)
+        sd      gp,(-7*8)(sp)
+        sd      tp,(-8*8)(sp)
+        
+        sd      t1,(-10*8)(sp)
+        sd      t2,(-11*8)(sp)
+        sd      s0,(-12*8)(sp)
+        sd      s1,(-13*8)(sp)
+        sd      a0,(-14*8)(sp)
+        sd      a1,(-15*8)(sp)
+        sd      a2,(-16*8)(sp)
+        sd      a3,(-17*8)(sp)
+        sd      a4,(-18*8)(sp)
+        sd      a5,(-19*8)(sp)
+        sd      a6,(-20*8)(sp)
+        sd      a7,(-21*8)(sp)
+        sd      s2,(-22*8)(sp)
+        sd      s3,(-23*8)(sp)
+        sd      s4,(-24*8)(sp)
+        sd      s5,(-25*8)(sp)
+        sd      s6,(-26*8)(sp)
+        sd      s7,(-27*8)(sp)
+        sd      s8,(-28*8)(sp)
+        sd      s9,(-29*8)(sp)
+        sd      s10,(-30*8)(sp)
+        sd      s11,(-31*8)(sp)
+        sd      t3,(-32*8)(sp)
+        sd      t4,(-33*8)(sp)
+        sd      t5,(-34*8)(sp)
+        sd      t6,(-35*8)(sp)
+
+        /* Save sp */
+        //csrr    t1,mscratch
+        //sd      t1,(-6*8)(sp)
+
+        /* Store mstatus */
+        csrr    t0,mstatus
+        sd      t0,(-2*8)(sp)
+
+        /* Load kernel gp and tp */
+        ld      gp,(0*8)(sp) /* points to kernel global data */
+        ld      tp,(-1*8)(sp) /* points to current pcb */
 
         #if SCHEDULE_BENCHMARK == 1
                 /* To allow usage of current->args[] vector */
@@ -251,94 +259,98 @@ __timer_handler_machine:
 
         /* Store PC */
         csrr    t1,mepc
-        sd      t1,(11*8)(tp)
+        //sd      t1,(11*8)(tp)
+        sd      t1,(-4*8)(sp)
 
-        /* Store SP */
-        csrr    t0,mscratch
-        sd      t0,(-5*8)(sp)
-        
-        /* Store mstatus */
-        csrr    t0,mstatus
-        sd      t0,(-3*8)(sp)
-
-sys_to_sched:
         /* Swap core and process sp */
         amoswap.d  sp,sp,(tp)
 
         /* Call scheduler */
-__sched:
         call    Sched
         
 AsmResumeProc:
         /* Swap core and process sp */
         amoswap.d  sp,sp,(tp)
+        ld      a7,(-21*8)(sp)
+        ld      a6,(-20*8)(sp)
+        ld      a5,(-19*8)(sp)
+        ld      a4,(-18*8)(sp)
+        ld      a3,(-17*8)(sp)
+        ld      a2,(-16*8)(sp)
+        ld      a1,(-15*8)(sp)
+        ld      a0,(-14*8)(sp)
+        j       3f
+__exception_exit:
+        /* To allow usage of current->args[] vector */
+        ld      a7,(10*8)(tp)
+        ld      a6,(9*8)(tp)
+        ld      a5,(8*8)(tp)
+        ld      a4,(7*8)(tp)
+        ld      a3,(6*8)(tp)
+        ld      a2,(5*8)(tp)
+        ld      a1,(4*8)(tp)
+        ld      a0,(3*8)(tp)
 
-        csrw    mscratch,sp
-
-        /* Load mstatus */
-        ld      t0,(-3*8)(sp)
-        csrw    mstatus,t0
-
-        beqz    t0,1f
-        /* MPP = 1 */
-        sd      sp,(-5*8)(sp)
-        csrw    mscratch,zero
-1:
-        
+3:
         /* Load PC */
-        ld      t1,(11*8)(tp)
+        //ld      t1,(11*8)(tp)
+        ld      t1,(-4*8)(sp)
         csrw    mepc,t1
 
         /* Store kernel gp, tp */
-        sd      gp,(-1*8)(sp)
-        sd      tp,(-2*8)(sp)
+        sd      gp,(0*8)(sp)
+        sd      tp,(-1*8)(sp)
 
+        /* Load mstatus */
+        ld      t0,(-2*8)(sp)
+        csrw    mstatus,t0
 
-        ld      t6,(-34*8)(sp)
-        ld      t5,(-33*8)(sp)
-        ld      t4,(-32*8)(sp)
-        ld      t3,(-31*8)(sp)
-        ld      s11,(-30*8)(sp)
-        ld      s10,(-29*8)(sp)
-        ld      s9,(-28*8)(sp)
-        ld      s8,(-27*8)(sp)
-        ld      s7,(-26*8)(sp)
-        ld      s6,(-25*8)(sp)
-        ld      s5,(-24*8)(sp)
-        ld      s4,(-23*8)(sp)
-        ld      s3,(-22*8)(sp)
-        ld      s2,(-21*8)(sp)
-        ld      a7,(-20*8)(sp)
-        ld      a6,(-19*8)(sp)
-        ld      a5,(-18*8)(sp)
-        ld      a4,(-17*8)(sp)
-        ld      a3,(-16*8)(sp)
-        ld      a2,(-15*8)(sp)
-        ld      a1,(-14*8)(sp)
-        ld      a0,(-13*8)(sp)
-        ld      s1,(-12*8)(sp)
-        ld      s0,(-11*8)(sp)
-        ld      t2,(-10*8)(sp)
-        ld      t1,(-9*8)(sp)
-        ld      t0,(-8*8)(sp)
+        ld      t0,(-6*8)(sp)
+        csrw    mscratch,t0
 
-        #if SCHEDULE_BENCHMARK == 1
-                /* To allow usage of current->args[] vector */
-                ld      a7,(10*8)(tp)
-                ld      a6,(9*8)(tp)
-                ld      a5,(8*8)(tp)
-                ld      a4,(7*8)(tp)
-                ld      a3,(6*8)(tp)
-                ld      a2,(5*8)(tp)
-                ld      a1,(4*8)(tp)
-                ld      a0,(3*8)(tp)
-        #endif
+        ld      t6,(-35*8)(sp)
+        ld      t5,(-34*8)(sp)
+        ld      t4,(-33*8)(sp)
+        ld      t3,(-32*8)(sp)
+        ld      s11,(-31*8)(sp)
+        ld      s10,(-30*8)(sp)
+        ld      s9,(-29*8)(sp)
+        ld      s8,(-28*8)(sp)
+        ld      s7,(-27*8)(sp)
+        ld      s6,(-26*8)(sp)
+        ld      s5,(-25*8)(sp)
+        ld      s4,(-24*8)(sp)
+        ld      s3,(-23*8)(sp)
+        ld      s2,(-22*8)(sp)
 
-        ld      tp,(-7*8)(sp)
-        ld      gp,(-6*8)(sp)
-        ld      ra,(-4*8)(sp)
-        ld      sp,(-5*8)(sp)
+        ld      s1,(-13*8)(sp)
+        ld      s0,(-12*8)(sp)
+        ld      t2,(-11*8)(sp)
+        ld      t1,(-10*8)(sp)
+        ld      t0,(-9*8)(sp)
+
+        /* Store kernel gp and tp. */
+        sd      tp,(-1*8)(sp)
+        sd      gp,(-0*8)(sp)
+
+        ld      tp,(-8*8)(sp)
+        ld      gp,(-7*8)(sp)
+        ld      ra,(-5*8)(sp)
+
+        csrrw   sp,mscratch,sp
+        bnez    sp,4f
+        csrr    sp,mscratch
+        addi    sp,sp,36*8
+        csrw    mscratch,zero
+4:
         mret
+
+sys_to_sched:
+        /* Swap to core stack */
+        amoswap.d  sp,sp,(tp)
+        call    Sched
+        amoswap.d  sp,sp,(tp)
+        j       __exception_exit
 
 trap_recv_yield:
         /* CompareAndSwap(state,PROC_RUNNING, PROC_WAITING) */
@@ -346,9 +358,8 @@ trap_recv_yield:
         li      t2,1
         li      t3,2
         casw    t0,t1,t2,t3,__recv_fail
-        /* Swap to core stack */
-        amoswap.d  sp,sp,(tp)
+        
         /* Reschedule */
-        j       __sched
+        j       sys_to_sched 
 __recv_fail:  /* CAS fail */
         ret
