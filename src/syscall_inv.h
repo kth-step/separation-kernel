@@ -240,6 +240,19 @@ static inline uint64_t ts_split(const CapTimeSlice ts, Cap *parent, Cap *child0,
                            (ts_child1.tsid << 8) | (uint8_t)current->pid, parent);
 }
 
+#if TIME_SLOT_LOANING_SIMPLE != 0
+        static inline bool syscall_loan_time(uint64_t pid) {
+                // TODO: do we want to give the user the option not to yield? 
+                return SchedTryLoanTime(pid) && syscall_yield();
+        }
+        
+        static bool syscall_return_loaned_time() {
+                SchedReturnTime();
+                // TODO: do we want to give the user the option not to yield? 
+                return syscall_yield();
+        }
+#endif
+
 uint64_t SyscallTimeSlice(const CapTimeSlice ts, Cap *cap, uint64_t a1,
                           uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5,
                           uint64_t a6, uint64_t a7) {

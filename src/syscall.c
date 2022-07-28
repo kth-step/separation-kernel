@@ -51,6 +51,16 @@ uint64_t SyscallNoCap(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4,
                 case SYSNR_YIELD:
                         /* Stop current user process execution and return to scheduler */
                         return syscall_yield();
+                #if TIME_SLOT_LOANING_SIMPLE != 0
+                        case SYSNR_LOAN_TIME:
+                                /* Try to loan all of a process' time to another process. 
+                                   Fails if that other process is already loaning time from another process.
+                                   If successfull it performs a yield. */
+                                return syscall_loan_time(a1);
+                        case SYSNR_RETURN_LOANED_TIME:
+                                /* Returns the time the current process has been loaned be another process. Also performs a yield afterwards. */
+                                return syscall_return_loaned_time();
+                #endif
                 default:
                         return -1;
         }

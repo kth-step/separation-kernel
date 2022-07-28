@@ -8,6 +8,7 @@
 #include "timer.h"
 
 #define IPC_DEBUG 0
+
 #if IPC_DEBUG != 0
     volatile uint64_t ipc_counter1 = 0;
     volatile uint64_t ipc_counter2 = 0;
@@ -15,6 +16,7 @@
 volatile int round_counter = 0;
 
 void ipc_benchmark_main(uint64_t pid) {
+    #if TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
     printf("\n");
     while (1) {
         #if IPC_DEBUG != 0
@@ -83,4 +85,49 @@ void ipc_benchmark_main(uint64_t pid) {
             }
         }
     }
+    #else
+    // This will probably not work for TIME_SLOT_LOANING, but rather only for TIME_SLOT_LOANING_SIMPLE
+    printf("\n");
+    while (1) {
+        #if IPC_DEBUG != 0
+            printf("Pid: %lu\n", pid);
+        #endif
+        if (pid == 0) {
+            uint64_t start_time = read_time();
+            /* Caps for boot: pmp, memory, channels, time for each hart, supervisor for each proc, sender.
+               First empty capslot in cap_table is thus: 3 + N_CORES + N_PROC + 1 */
+            if (S3K_LOAN_TIME(pid+1) < 1) {
+                printf("Failed loan time, pid: %lu\n", pid);
+                continue;
+            }
+            uint64_t end_time = read_time();
+            printf("\nValue=%lu\n", end_time-start_time);
+            round_counter++;
+        
+            #if IPC_DEBUG != 0
+                ipc_counter2++;
+                printf("Counter on first proc: %lu\n", ipc_counter2);
+            #endif
+        } else if (pid == N_PROC - 1) {
+            #if IPC_DEBUG != 0
+                ipc_counter1++;
+                printf("Counter on last proc:  %lu\n", ipc_counter1);
+            #endif
+            if (S3K_RETURN_LOANED_TIME() < 1) {
+                printf("Failed return time, pid: %lu\n", pid);
+                continue;
+            }
+        }
+        else {
+            if (S3K_LOAN_TIME(pid+1) < 1) {
+                printf("Failed loan time, pid: %lu\n", pid);
+                continue;
+            }
+            if (S3K_RETURN_LOANED_TIME() < 1) {
+                printf("Failed return time, pid: %lu\n", pid);
+                continue;
+            }
+        }
+    }
+    #endif
 }

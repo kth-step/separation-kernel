@@ -73,6 +73,19 @@ void InitSched() {
         ts_id_statuses_init();
 }
 
+// When do we want this? Do we want to shift the tsid down when using it?
+/*static inline uint64_t sched_get_tsid(uint64_t s, uintptr_t hartid) {
+        return ((s >> (hartid * 16)) & 0xFF00); 
+}*/
+
+static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
+        return ((s >> (hartid * 16)) & 0xFF);
+}
+
+static inline int sched_is_invalid_pid(int8_t pid) {
+        return pid < 0;
+}
+
 #if TIME_SLOT_LOANING != 0
         void InitTimeSlotInstanceRoots() {
                 for (int q = 0; q < N_QUANTUM; q++) {
@@ -138,30 +151,46 @@ void InitSched() {
                 if (head == NULL) return *(root->pidp);
                 else return head->pid;
         }
+
+#elif TIME_SLOT_LOANING_SIMPLE != 0
+        static uint64_t sched_get_time_slot_pid(uint64_t s, uint64_t hartid) {
+                const uint64_t sched_pid = sched_get_pid(s, hartid);
+                uint64_t current_pid = processes[sched_pid].time_receiver;
+                /* The first check prevents getting stuck in a circular lookup */
+                while (current_pid != sched_pid && current_pid != processes[current_pid].time_receiver) {
+                        current_pid = processes[current_pid].time_receiver;
+                }
+                //printf("\nsched_get_time_slot_pid pid: %lu\n", current_pid);
+                return current_pid;
+        }
+
+        bool SchedTryLoanTime(uint64_t pid) {
+                /* Only successfull if receiver is not already loaning time from another process */
+                if (__sync_bool_compare_and_swap(&(processes[pid].time_giver), pid, current->pid)) {
+                        current->time_receiver = pid;
+                        return true;
+                }
+                return false;
+        }
+
+        void SchedReturnTime() {
+                processes[current->time_giver].time_receiver = current->time_giver;
+                current->time_giver = current->pid;
+        }
+
 #endif
-
-// When do we want this? Do we want to shift the tsid down when using it?
-/*static inline uint64_t sched_get_tsid(uint64_t s, uintptr_t hartid) {
-        return ((s >> (hartid * 16)) & 0xFF00); 
-}*/
-
-static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
-        return ((s >> (hartid * 16)) & 0xFF);
-}
-
-static inline int sched_is_invalid_pid(int8_t pid) {
-        return pid < 0;
-}
 
 #if PERFORMANCE_SCHEDULING == 0
 static inline int sched_has_priority(uint64_t quantum, uint64_t pid,
                                      uintptr_t hartid) {
         for (size_t i = 0; i < hartid; i++) {
                 /* If the pid is same, there is hart with higher priortiy */
-                #if TIME_SLOT_LOANING == 0
-                        uint64_t other_pid = sched_get_pid(schedule[quantum], i); /* Process ID. */
-                #else
+                #if TIME_SLOT_LOANING != 0
                         uint64_t other_pid = sched_get_time_slot_pid(quantum, i);
+                #elif TIME_SLOT_LOANING_SIMPLE != 0
+                        uint64_t other_pid = sched_get_time_slot_pid(schedule[quantum], i);
+                #else
+                        uint64_t other_pid = sched_get_pid(schedule[quantum], i); /* Process ID. */
                 #endif
                 if (pid == other_pid)
                         return 0;
@@ -192,10 +221,12 @@ static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         /* Get the current quantum schedule */
         __sync_synchronize();
         uint64_t s = schedule[q];
-        #if TIME_SLOT_LOANING == 0
-                uint64_t pid = sched_get_pid(s, hartid); /* Process ID. */
-        #else 
+        #if TIME_SLOT_LOANING != 0
                 uint64_t pid = sched_get_time_slot_pid(q, hartid); /* Process ID. */
+        #elif TIME_SLOT_LOANING_SIMPLE != 0
+                uint64_t pid = sched_get_time_slot_pid(s, hartid); /* Process ID. */
+        #else 
+                uint64_t pid = sched_get_pid(s, hartid); /* Process ID. */
         #endif
         /* If msb is 1, return 0 */
         if (pid & 0x80)

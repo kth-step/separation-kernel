@@ -33,12 +33,18 @@
 
 #define MAX_FUEL 255
 
-#define SCHEDULE_BENCHMARK 0
 /* Currently 1 round = 1 quantum, and the duration consequently assumes a process is only scheduled for one quantum. */
 #define BENCHMARK_DURATION (TICKS_PER_SECOND*1)
-#define BENCHMARK_ROUNDS 1000
+#define BENCHMARK_ROUNDS 1000UL
 
 #define PERFORMANCE_SCHEDULING 0
+
+#define SCHEDULE_BENCHMARK 0
 #define IPC_BENCHMARK 1
+
 #define TIME_SLOT_LOANING 0
+/* Simple solution that only allows a process to loan its time to 1 other process at a time, and it must loan all of its time.
+   Furthermore, a process can only loan time from one other process at a time. */
+#define TIME_SLOT_LOANING_SIMPLE 1
+
 #define CRYPTO_APP 0

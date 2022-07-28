@@ -78,6 +78,16 @@ static inline uint64_t S3K_YIELD(void) {
         return S3K_SYSCALL1(SYSNR_YIELD, 0);
 }
 
+#if TIME_SLOT_LOANING_SIMPLE != 0
+        static inline uint64_t S3K_LOAN_TIME(uint64_t pid) {
+                return S3K_SYSCALL2(SYSNR_LOAN_TIME, 0, pid);
+        }
+        
+        static inline uint64_t S3K_RETURN_LOANED_TIME(void) {
+                return S3K_SYSCALL1(SYSNR_RETURN_LOANED_TIME, 0);
+        }
+#endif
+
 static inline uint64_t S3K_READ_CAP(uint64_t cid, uint64_t data[2]) {
         register int64_t a0 __asm__("a0");
         register uint64_t a1 __asm__("a1");

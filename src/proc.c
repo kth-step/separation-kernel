@@ -41,13 +41,15 @@ static void proc_init_boot_proc(Proc *boot);
 
 #if IPC_BENCHMARK != 0
 void ProcIpcInit() {
-        uint64_t dummy_msg[4];
-
         processes[0].pc = (uintptr_t)ipc_benchmark;
+        #if TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
+        uint64_t dummy_msg[4];
         /* We just make all our receivers and senders children of the root channel for simplicity */
         cap_set(&processes[0].cap_table[3 + N_CORES + N_PROC], cap_serialize_sender(cap_mk_sender(1)));
         CapAppend(&processes[0].cap_table[3 + N_CORES + N_PROC], &processes[0].cap_table[2]);
+        #endif
         for (int i = 1; i < N_PROC; i++) {
+                #if TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
                 Proc * p = &processes[i];
                 p->args[1] = 3; // Where to place caps
                 p->args[2] = 1; // How many caps
@@ -57,11 +59,11 @@ void ProcIpcInit() {
                 cap_set(&processes[i].cap_table[2], cap_serialize_sender(cap_mk_sender(i+1)));
                 CapAppend(&processes[i].cap_table[2], &processes[0].cap_table[2]);
 
-                processes[i].pc = (uintptr_t)ipc_benchmark;
-
                 processes[i].listen_channel = i;
                 channels[i] = &processes[i];
                 processes[i].state = PROC_WAITING;
+                #endif
+                processes[i].pc = (uintptr_t)ipc_benchmark;
         }
 }
 #endif
@@ -101,6 +103,10 @@ void ProcReset(int pid) {
         }
         proc->pc = 0;
         proc->listen_channel = -1;
+        #if TIME_SLOT_LOANING_SIMPLE != 0
+                proc->time_giver = pid;
+                proc->time_receiver = pid;
+        #endif
         /* Set process to HALTED. */
         //proc->state = PROC_HALTED;
 

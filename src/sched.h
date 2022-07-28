@@ -101,4 +101,7 @@ void InitSched();
 
 #if TIME_SLOT_LOANING != 0
         void InitTimeSlotInstanceRoots();
+#elif TIME_SLOT_LOANING_SIMPLE != 0
+        bool SchedTryLoanTime(uint64_t pid);
+        void SchedReturnTime();
 #endif
