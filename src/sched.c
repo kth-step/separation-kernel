@@ -10,9 +10,12 @@
 #include "stack.h"
 
 #if SCHEDULE_BENCHMARK == 1
-        extern void end_incremental_benchmark();
         extern void incremental_benchmark_step();
+        extern void end_incremental_benchmark();
         static int round_counter = 0;
+#elif IPC_BENCHMARK != 0
+        extern void end_incremental_benchmark();
+        extern volatile int round_counter;
 #endif
 
 /** The schedule.
@@ -266,7 +269,7 @@ void Sched(void) {
         /* Here the core tries to fetch a process to run */
         while (1) {
                 /* Get the start of next time slice. */
-                #if SCHEDULE_BENCHMARK == 0
+                #if SCHEDULE_BENCHMARK == 0 && IPC_BENCHMARK == 0
                         uint64_t time = (read_time() / TICKS) + 1;
                 #else
                         uint64_t time_ticks = read_time();
@@ -284,6 +287,8 @@ void Sched(void) {
                         #if SCHEDULE_BENCHMARK != 0
                                 incremental_benchmark_step();
                                 if (++round_counter >= BENCHMARK_ROUNDS) end_incremental_benchmark(time_ticks);
+                        #elif IPC_BENCHMARK != 0
+                                if (round_counter >= BENCHMARK_ROUNDS) end_incremental_benchmark(time_ticks);
                         #endif
                         /* Returns to AsmSwitchToProc. */
                         return;

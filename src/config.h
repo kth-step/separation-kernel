@@ -36,7 +36,7 @@
 #define SCHEDULE_BENCHMARK 0
 /* Currently 1 round = 1 quantum, and the duration consequently assumes a process is only scheduled for one quantum. */
 #define BENCHMARK_DURATION (TICKS_PER_SECOND*1)
-#define BENCHMARK_ROUNDS (BENCHMARK_DURATION / TICKS)
+#define BENCHMARK_ROUNDS 1000
 
 #define PERFORMANCE_SCHEDULING 0
 #define IPC_BENCHMARK 1
