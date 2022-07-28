@@ -62,7 +62,7 @@ void sched_get_proc(uint64_t hartid, uint64_t time, Proc **proc,
         uint64_t pid = sched_pid(sched_slice, hartid);
 
         /* Check if slot is invalid/inactive */
-        if (pid & 0x80)
+        if (pid == 0xFF)
                 return;
 
         /* Check if some other thread preempts */
@@ -190,7 +190,7 @@ bool SchedUpdate(const Cap cap, const Cap new_cap, CapNode *cn) {
         /* Desired value */
         uint64_t desired = SCHED_SLICE_OFFSET(new_depth << 8 | new_pid, hartid);
         /* Mask so we match on desired entry */
-        uint64_t mask = SCHED_SLICE_OFFSET(0xFFFF, hartid);
+        uint64_t mask = SCHED_SLICE_OFFSET(0xFFFFUL, hartid);
         return sched_update(begin, end, mask, expected, desired, cn);
 }
 
@@ -205,8 +205,8 @@ bool SchedDelete(const Cap cap, CapNode *cn) {
         /* Expected value */
         uint64_t expected = SCHED_SLICE_OFFSET(depth << 8 | pid, hartid);
         /* Desired value, set pid to invalid/inactive */
-        uint64_t desired = SCHED_SLICE_OFFSET(0x0080, hartid);
+        uint64_t desired = SCHED_SLICE_OFFSET(0xFFFFUL, hartid);
         /* Mask so we match on desired entry */
-        uint64_t mask = SCHED_SLICE_OFFSET(0xFFFF, hartid);
+        uint64_t mask = SCHED_SLICE_OFFSET(0xFFFFUL, hartid);
         return sched_update(begin, end, mask, expected, desired, cn);
 }
