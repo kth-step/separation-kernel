@@ -148,7 +148,7 @@ bool SchedRevoke(const Cap cap, CapNode *cn) {
         uint64_t depth = cap_time_get_depth(cap);
         uint64_t pid = cap_time_get_pid(cap);
 
-        uint64_t mask = SCHED_SLICE_OFFSET(0xFFFF, hartid);
+        uint64_t mask = SCHED_SLICE_OFFSET(0xFFFFUL, hartid);
         uint64_t desired = SCHED_SLICE_OFFSET(depth << 8 | pid, hartid);
 
         lock_acquire(&lock);
