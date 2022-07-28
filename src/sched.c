@@ -217,7 +217,8 @@ static void release_current(void) {
         /* If current == 0, we have nothing to release */
         if (current) {
                 /* Release the process */
-                current->state = PROC_SUSPENDED;
+                if (current->state != PROC_WAITING)
+                        current->state = PROC_SUSPENDED;
                 __sync_synchronize();
                 if (current->halt)
                         __sync_val_compare_and_swap(

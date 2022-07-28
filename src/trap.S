@@ -139,6 +139,9 @@ __syscall:
         /* Store user pc */
         sd      t3,(-4*8)(sp)
 
+        /* To be able to restore sp if going directly to scheduling from syscall */
+        sd      sp,(12*8)(tp)
+
         /* Fix sp and enable preemption */
         addi    sp,sp,-36*8
         csrwi   mstatus,8
@@ -346,6 +349,13 @@ __exception_exit:
         mret
 
 sys_to_sched:
+        /* Fix sp and disable preemption */
+        // TODO: do we want to disable preemption here or after sched?
+        csrwi   mstatus,0
+        ld      sp,(12*8)(tp)
+        /* Make sure the syscall returns true since it doesn't return normally */
+        li      a0,1
+        sd      a0,(3*8)(tp)
         /* Swap to core stack */
         amoswap.d  sp,sp,(tp)
         call    Sched

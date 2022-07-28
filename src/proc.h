@@ -52,6 +52,8 @@ struct proc {
         uintptr_t args[8];
         uintptr_t pc;
 
+        uintptr_t pre_syscall_sp;
+
         /* The pmp configurations are stored in these capabilities */
         /* pmp_table[i].data[1] = pmpicfg | pmpaddri */
         Cap pmp_table[8];

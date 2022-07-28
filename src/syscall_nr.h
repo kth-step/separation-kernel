@@ -1,6 +1,9 @@
 #pragma once
 
+#define SYSNR_GET_FIRST_PMP 0
 #define SYSNR_GET_PID 1
+#define SYSNR_UNLOAD_PMP 2
+#define SYSNR_YIELD 3
 
 #define SYSNR_READ_CAP 0
 #define SYSNR_MOVE_CAP 1

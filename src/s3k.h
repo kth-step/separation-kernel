@@ -74,6 +74,10 @@ static inline uint64_t S3K_GET_PID(void) {
         return S3K_SYSCALL1(SYSNR_GET_PID, 0);
 }
 
+static inline uint64_t S3K_YIELD(void) {
+        return S3K_SYSCALL1(SYSNR_YIELD, 0);
+}
+
 static inline uint64_t S3K_READ_CAP(uint64_t cid, uint64_t data[2]) {
         register int64_t a0 __asm__("a0");
         register uint64_t a1 __asm__("a1");

@@ -66,6 +66,11 @@ static bool syscall_interprocess_move(Cap *src, Cap *dest, uint64_t old_pid, uin
         return succ;
 }
 
+static bool syscall_yield() {
+        sys_to_sched();
+        /* We never return here, but sys_to_sched will set the return value to true */
+}
+
 /*** MEMORY SLICE HANDLE ***/
 static inline uint64_t ms_slice(const CapMemorySlice ms, Cap *parent,
                                 Cap *child, uint64_t begin, uint64_t end,
@@ -380,6 +385,7 @@ uint64_t sn_recv_delete_ts(uint64_t channel, Cap * cap_ts) {
                 if (!ret) 
                         return ret;
                 sys_to_sched();
+                /* We never return here, but sys_to_sched will set the return value to true */
         } else {
                 current->listen_channel = -1;
         }

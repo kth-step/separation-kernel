@@ -39,15 +39,18 @@ uint64_t SyscallCap(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
 uint64_t SyscallNoCap(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4,
                       uint64_t a5, uint64_t a6, uint64_t a7) {
         switch (a7) {
-                case 0:
+                case SYSNR_GET_FIRST_PMP:
                         /* Get the first PMP */
                         return cap_get_arr(curr_get_cap(0), &current->args[1]);
-                case 1:
+                case SYSNR_GET_PID:
                         /* Get the Process ID */
                         return current->pid;
-                case 2:
+                case SYSNR_UNLOAD_PMP:
                         /* Unload PMP entry at a1, but not entry 0 */
                         return (a1 > 0) ? ProcUnloadPmp(current, a1) : 0;
+                case SYSNR_YIELD:
+                        /* Stop current user process execution and return to scheduler */
+                        return syscall_yield();
                 default:
                         return -1;
         }
