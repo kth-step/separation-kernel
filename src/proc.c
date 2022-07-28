@@ -49,13 +49,13 @@ void ProcIpcInit() {
         CapAppend(&processes[0].cap_table[3 + N_CORES + N_PROC], &processes[0].cap_table[2]);
         for (int i = 1; i < N_PROC; i++) {
                 Proc * p = &processes[i];
-                p->args[1] = 2; // Where to place caps
+                p->args[1] = 3; // Where to place caps
                 p->args[2] = 1; // How many caps
                 p->args[3] = (uintptr_t)dummy_msg;
-                cap_set(&processes[i].cap_table[0], cap_serialize_receiver(cap_mk_receiver(i)));
-                CapAppend(&processes[i].cap_table[0], &processes[0].cap_table[2]);
-                cap_set(&processes[i].cap_table[1], cap_serialize_sender(cap_mk_sender(i+1)));
+                cap_set(&processes[i].cap_table[1], cap_serialize_receiver(cap_mk_receiver(i)));
                 CapAppend(&processes[i].cap_table[1], &processes[0].cap_table[2]);
+                cap_set(&processes[i].cap_table[2], cap_serialize_sender(cap_mk_sender(i+1)));
+                CapAppend(&processes[i].cap_table[2], &processes[0].cap_table[2]);
 
                 processes[i].pc = (uintptr_t)ipc_benchmark;
 
@@ -195,7 +195,6 @@ void ProcInitProcesses(void) {
         for (int i = 0; i < N_PROC; i++) {
                 processes[i].ksp[-4] = processes[i].pc;
         }
-        
 }
 
 void ProcHalt(Proc *proc) {

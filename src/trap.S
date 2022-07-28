@@ -108,7 +108,7 @@ __exception_handler:
         #sd      t0,(-2*8)(sp)
 
         /* Load kernel gp and tp */
-        ld      gp,(0*8)(sp) /* points to kernel global data */
+        ld      gp,(-3*8)(sp) /* points to kernel global data */
         ld      tp,(-1*8)(sp) /* points to current pcb */
         
         /* Save user a0-a7 in proc struct. */
@@ -193,7 +193,7 @@ __timer_handler_machine:
         csrr    sp,mscratch
         addi    sp,sp,-36*8
         /* Store kernel gp, tp */
-        sd      gp,(0*8)(sp)
+        sd      gp,(-3*8)(sp)
         sd      tp,(-1*8)(sp)
 
         sd      zero,(-6*8)(sp)
@@ -245,7 +245,7 @@ __timer_handler_machine:
         sd      t0,(-2*8)(sp)
 
         /* Load kernel gp and tp */
-        ld      gp,(0*8)(sp) /* points to kernel global data */
+        ld      gp,(-3*8)(sp) /* points to kernel global data */
         ld      tp,(-1*8)(sp) /* points to current pcb */
 
         #if SCHEDULE_BENCHMARK == 1
@@ -301,7 +301,7 @@ __exception_exit:
         csrw    mepc,t1
 
         /* Store kernel gp, tp */
-        sd      gp,(0*8)(sp)
+        sd      gp,(-3*8)(sp)
         sd      tp,(-1*8)(sp)
 
         /* Load mstatus */
@@ -334,7 +334,7 @@ __exception_exit:
 
         /* Store kernel gp and tp. */
         sd      tp,(-1*8)(sp)
-        sd      gp,(-0*8)(sp)
+        sd      gp,(-3*8)(sp)
 
         ld      tp,(-8*8)(sp)
         ld      gp,(-7*8)(sp)

@@ -1,11 +1,12 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
+#include <stdint.h>
 #include <stdio.h>
 
 #include "config.h"
 
-void print_relevant_config() {
+static void print_relevant_config() {
     printf( "N_CORES=%d\n"
             "N_PROC=%d\n"
             "N_CAPS=%d\n"
@@ -24,7 +25,7 @@ void print_relevant_config() {
             , SCHEDULE_BENCHMARK, BENCHMARK_DURATION, BENCHMARK_ROUNDS, PERFORMANCE_SCHEDULING, CRYPTO_APP, TIME_SLOT_LOANING);
 }
 
-void print_all_config() {
+static void print_all_config() {
     print_relevant_config();
     printf( "LOG_STACK_SIZE=%d\n"
             "USER_MEMORY_BEGIN=0x%lx\n"
@@ -33,4 +34,16 @@ void print_all_config() {
             "N_CHANNELS=%d\n"
             "MAX_FUEL=%d\n"
             , LOG_STACK_SIZE, USER_MEMORY_BEGIN, USER_MEMORY_END, BOOT_PMP_LENGTH, N_CHANNELS, MAX_FUEL);
+}
+
+static void print_sched(uint64_t schedule[]) {
+    printf("\nSchedule:\n");
+    for (size_t i = 0; i < N_QUANTUM; i++) {
+        printf("%04lx %04lx %04lx %04lx\n", 
+               (schedule[i] >> (16*3)) & 0xFFFF, 
+               (schedule[i] >> (16*1)) & 0xFFFF, 
+               (schedule[i] >> (16*2)) & 0xFFFF, 
+               (schedule[i] >> (16*0)) & 0xFFFF);
+    }    
+    printf("\n");
 }
