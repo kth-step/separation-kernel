@@ -4,6 +4,7 @@
 #include "preemption.h"
 #include "proc_state.h"
 #include "s3k_consts.h"
+#include "utils.h"
 
 void syscall_supervisor_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
@@ -155,46 +156,28 @@ void syscall_supervisor_take_cap(registers_t* regs, cap_node_t* cn, cap_t cap, p
         preemption_disable();
 }
 
+typedef void (*handler_t)(registers_t*, cap_node_t*, cap_t, proc_t*);
+
+const handler_t handlers[] = {syscall_supervisor_suspend,   syscall_supervisor_resume,   syscall_supervisor_get_state, syscall_supervisor_read_reg,
+                              syscall_supervisor_write_reg, syscall_supervisor_read_cap, syscall_supervisor_give_cap,  syscall_supervisor_take_cap};
+
 void syscall_supervisor_invoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
-        uint64_t pid = regs->a2;
-        if (pid < cap_supervisor_get_free(cap) || pid >= cap_supervisor_get_end(cap)) {
-                preemption_enable();
-                regs->a0 = S3K_ERROR;
-                regs->pc += 4;
-                preemption_disable();
-                return;
-        }
-        proc_t* supervisee = &processes[pid];
-        switch (regs->a1) {
-                case 0:
-                        syscall_supervisor_suspend(regs, cn, cap, supervisee);
-                        break;
-                case 1:
-                        syscall_supervisor_resume(regs, cn, cap, supervisee);
-                        break;
-                case 2:
-                        syscall_supervisor_get_state(regs, cn, cap, supervisee);
-                        break;
-                case 3:
-                        syscall_supervisor_read_reg(regs, cn, cap, supervisee);
-                        break;
-                case 4:
-                        syscall_supervisor_write_reg(regs, cn, cap, supervisee);
-                        break;
-                case 5:
-                        syscall_supervisor_read_cap(regs, cn, cap, supervisee);
-                        break;
-                case 6:
-                        syscall_supervisor_give_cap(regs, cn, cap, supervisee);
-                        break;
-                case 7:
-                        syscall_supervisor_take_cap(regs, cn, cap, supervisee);
-                        break;
-                default:
+        if (regs->a1 < ARRAY_SIZE(handlers)) {
+                uint64_t pid = regs->a2;
+                if (pid < cap_supervisor_get_free(cap) || pid >= cap_supervisor_get_end(cap)) {
                         preemption_enable();
-                        regs->a0 = S3K_UNIMPLEMENTED;
+                        regs->a0 = S3K_ERROR;
                         regs->pc += 4;
                         preemption_disable();
+                        return;
+                }
+                proc_t* supervisee = &processes[pid];
+                handlers[regs->a1](regs, cn, cap, supervisee);
+        } else {
+                preemption_enable();
+                regs->a0 = S3K_UNIMPLEMENTED;
+                regs->pc += 4;
+                preemption_disable();
         }
 }
