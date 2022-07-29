@@ -19,10 +19,9 @@
         bnez    \tmp,42b
 .endm
 
-.section .text.entry
-.balign 16
 .option push
 .option norvc   /* Prevent compressed instructions */
+.align 8
 AsmTrapEntry:
         /* Interrupts */
         j       __exception_handler  /*  0: User software interrupt */
@@ -248,7 +247,7 @@ __timer_handler_machine:
         ld      gp,(-3*8)(sp) /* points to kernel global data */
         ld      tp,(-1*8)(sp) /* points to current pcb */
 
-        #if SCHEDULE_BENCHMARK == 1
+        #if SCHEDULE_BENCHMARK != 0
                 /* To allow usage of current->args[] vector */
                 sd      a0,(3*8)(tp)
                 sd      a1,(4*8)(tp)
@@ -282,7 +281,9 @@ AsmResumeProc:
         ld      a2,(-16*8)(sp)
         ld      a1,(-15*8)(sp)
         ld      a0,(-14*8)(sp)
+        #if SCHEDULE_BENCHMARK == 0 // In schedule benchmark we want to use the args from current->args
         j       3f
+        #endif
 __exception_exit:
         /* To allow usage of current->args[] vector */
         ld      a7,(10*8)(tp)
@@ -307,6 +308,8 @@ __exception_exit:
         /* Load mstatus */
         ld      t0,(-2*8)(sp)
         csrw    mstatus,t0
+        li      t1,0x1800
+        and     t0,t0,t1
 
         ld      t0,(-6*8)(sp)
         csrw    mscratch,t0

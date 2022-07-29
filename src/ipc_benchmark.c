@@ -14,6 +14,7 @@
     volatile uint64_t ipc_counter2 = 0;
 #endif
 volatile int round_counter = 0;
+uint64_t values[N_CORES][BENCHMARK_ROUNDS];
 
 void ipc_benchmark_main(uint64_t pid) {
     #if TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
@@ -40,8 +41,10 @@ void ipc_benchmark_main(uint64_t pid) {
                 continue;
             }
             uint64_t end_time = read_time();
-            printf("\nValue=%lu\n", end_time-start_time);
-            round_counter++;
+            //printf("\nValue=%lu\n", end_time-start_time);
+            //round_counter++;
+            // TODO: if we want to support multicore testing this needs changing
+            values[0][round_counter++] = end_time-start_time;
         
             #if IPC_DEBUG != 0
                 ipc_counter2++;
@@ -101,8 +104,10 @@ void ipc_benchmark_main(uint64_t pid) {
                 continue;
             }
             uint64_t end_time = read_time();
-            printf("\nValue=%lu\n", end_time-start_time);
-            round_counter++;
+            //printf("\nValue=%lu\n", end_time-start_time);
+            //round_counter++;
+            // TODO: if we want to support multicore testing this needs changing
+            values[0][round_counter++] = end_time-start_time;
         
             #if IPC_DEBUG != 0
                 ipc_counter2++;

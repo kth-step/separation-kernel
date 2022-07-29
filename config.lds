@@ -3,11 +3,14 @@ OUTPUT_ARCH("riscv")
 
 ENTRY(_start)
 
+clint = 0x2000000;
 mtimecmp = 0x2004000;
 mtime = 0x200bff8;
+uart0 = 0x10010000;
+uart1 = 0x10011000;
 
 MEMORY { 
-	RAM(rwx) : ORIGIN = 0x80000000, LENGTH = 2000M
+        RAM (rwx) : ORIGIN = 0x80000000, LENGTH = 0x80000000
 }
 
 SECTIONS {
@@ -17,13 +20,21 @@ SECTIONS {
 		*(.text.*) 
 	} >RAM
 	
-	.data : {
-		. = ALIGN(4096);
-		__global_pointer$ = . + 0x800;
+        .data : ALIGN(8) {
+		__global_pointer$ = . + 0x7bc;
 		*(.sdata) 
 		*(.sdata.*) 
 		*(.srodata) 
 		*(.srodata.*) 
+        } >RAM
+	.bss : ALIGN(8) {
+                PROVIDE(_sbss = .);
+		*(.sbss) 
+		*(.sbss.*) 
+                . = ALIGN(8);
+                PROVIDE(_esbss = .);
+	} >RAM
+	.data : ALIGN(8) {
 		*(.data) 
 		*(.data.*) 
 		*(.rdata) 
@@ -32,15 +43,15 @@ SECTIONS {
 		*(.rodata.*) 
 	} >RAM
 	
-	.bss : {
-		. = ALIGN(4096);
+	.bss : ALIGN(8) {
+                PROVIDE(_bss = .);
 		*(.bss) 
-		. = ALIGN(4096);
-		*(.bss.user_data) 
 		*(.bss.*) 
                 *(COMMON)
+                . = ALIGN(8);
+                PROVIDE(_ebss = .);
 	} >RAM
-        _heap = ALIGN(4096);
-        _eheap = ORIGIN(RAM) + LENGTH(RAM);
+        PROVIDE(_heap = ALIGN(4096));
+        PROVIDE(_eheap = _heap + 0x8000);
 }
 

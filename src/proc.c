@@ -184,9 +184,7 @@ void ProcInitProcesses(void) {
                 ProcReset(i);
         /*** Boot process ***/
         proc_init_boot_proc(&processes[0]);
-        #if SCHEDULE_BENCHMARK != 0
-                processes[0].pc = (uintptr_t)benchmark_code;
-        #endif
+        
         #if IPC_BENCHMARK != 0 
                 ProcIpcInit();
         #endif
@@ -197,8 +195,11 @@ void ProcInitProcesses(void) {
         #if TIME_SLOT_LOANING != 0
                 InitTimeSlotInstanceRoots();
         #endif
-        /* The assembly trap handeling tries to restore the PC from the stack */
         for (int i = 0; i < N_PROC; i++) {
+                #if SCHEDULE_BENCHMARK != 0
+                        processes[i].pc = (uintptr_t)benchmark_code;
+                #endif
+                /* The assembly trap handeling tries to restore the PC from the stack */
                 processes[i].ksp[-4] = processes[i].pc;
         }
 }

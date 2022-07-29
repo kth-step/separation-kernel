@@ -7,15 +7,18 @@
 #include "config.h"
 #include "csr.h"
 #include "lock.h"
+#include "proc.h"
 #include "stack.h"
 
-#if SCHEDULE_BENCHMARK == 1
-        extern void incremental_benchmark_step();
-        extern void end_incremental_benchmark();
-        static int round_counter = 0;
+#if SCHEDULE_BENCHMARK != 0
+        extern void end_benchmark(uint64_t duration_recorded, uint64_t values[N_CORES][BENCHMARK_ROUNDS]);
+        static int round_counter[N_CORES];
+        static uint64_t values[N_CORES][BENCHMARK_ROUNDS];
 #elif IPC_BENCHMARK != 0
-        extern void end_incremental_benchmark();
+        extern void end_benchmark(uint64_t duration_recorded, uint64_t values[N_CORES][BENCHMARK_ROUNDS]);
+        // TODO: if we want to support multicore testing the round counter needs changing
         extern volatile int round_counter;
+        extern uint64_t values[N_CORES][BENCHMARK_ROUNDS];
 #endif
 
 /** The schedule.
@@ -59,6 +62,11 @@ void ts_id_statuses_init() {
 }
 
 void InitSched() {
+        #if SCHEDULE_BENCHMARK != 0
+        for (int i = 0; i < N_CORES; i++) {
+                round_counter[i] = 0;
+        }
+        #endif
         for (int i = 0; i < N_QUANTUM; i++) {
                 #if CRYPTO_APP != 0
                         if (i % 2 == 0) {
@@ -66,6 +74,8 @@ void InitSched() {
                         } else {
                                 schedule[i] = 0x0000000100020000;
                         }
+                #elif SCHEDULE_BENCHMARK != 0
+                        schedule[i] = 0x0003000200010000;
                 #else
                         schedule[i] = 0;
                 #endif
@@ -137,7 +147,7 @@ static inline int sched_is_invalid_pid(int8_t pid) {
 
         int ReleaseCurrentTimeSlot() {
                 uint64_t q = (read_time() / TICKS) % N_QUANTUM;
-                uint64_t hartid = read_csr(mhartid);
+                uint64_t hartid = read_csr(mhartid); // TODO: get software hartid
                 TimeSlotInstance * curr = time_slot_instance_roots[q][hartid].head;
                 if (curr == NULL) return 0;
                 time_slot_instance_roots[q][hartid].head = curr->loaner;
@@ -180,7 +190,7 @@ static inline int sched_is_invalid_pid(int8_t pid) {
 
 #endif
 
-#if PERFORMANCE_SCHEDULING == 0
+#if PERFORMANCE_SCHEDULING == 0 && N_CORES != 1
 static inline int sched_has_priority(uint64_t quantum, uint64_t pid,
                                      uintptr_t hartid) {
         for (size_t i = 0; i < hartid; i++) {
@@ -231,7 +241,7 @@ static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         /* If msb is 1, return 0 */
         if (pid & 0x80)
                 return 0;
-        #if PERFORMANCE_SCHEDULING == 0
+        #if (PERFORMANCE_SCHEDULING == 0 && N_CORES != 1)
                 /* Check that no other hart with higher priority schedules this pid */
                 if (!sched_has_priority(q, pid, hartid))
                         return 0;
@@ -292,7 +302,7 @@ void Sched(void) {
         release_current();
 
         /* The hart/core id */
-        uintptr_t hartid = read_csr(mhartid);
+        uintptr_t hartid = get_software_hartid();
 
         /* Process to run and number of time slices to run for */
         Proc *proc;
@@ -316,10 +326,19 @@ void Sched(void) {
                                 wait(time);
                         #endif
                         #if SCHEDULE_BENCHMARK != 0
-                                incremental_benchmark_step();
-                                if (++round_counter >= BENCHMARK_ROUNDS) end_incremental_benchmark(time_ticks);
+                                values[hartid][round_counter[hartid]] = current->args[0];
+                                current->args[0] = 0;
+                                if (++(round_counter[hartid]) >= BENCHMARK_ROUNDS) {
+                                        if (hartid == 0)
+                                                end_benchmark(time_ticks, values);
+                                        else {
+                                                while (1)
+                                                        ;
+                                        }
+                                }
                         #elif IPC_BENCHMARK != 0
-                                if (round_counter >= BENCHMARK_ROUNDS) end_incremental_benchmark(time_ticks);
+                                // TODO: if we want to support multicore testing this needs changing
+                                if (round_counter >= BENCHMARK_ROUNDS) end_benchmark(time_ticks, values);
                         #endif
                         /* Returns to AsmSwitchToProc. */
                         return;

@@ -9,7 +9,7 @@ static inline uintptr_t try_acquire_lock(Lock *l) {
 }
 
 static inline void acquire_lock(Lock *l) {
-        while (!__sync_lock_test_and_set(l, 1))
+        while (__sync_lock_test_and_set(l, 1))
                 ;
 }
 
