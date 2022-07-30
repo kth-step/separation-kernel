@@ -57,7 +57,7 @@ static bool syscall_interprocess_move(Cap *src, Cap *dest, uint64_t old_pid, uin
                 // TODO: add pids to caps and update it here
                 CapTimeSlice ts = cap_deserialize_time_slice(cd);
                 succ = CapMove(dest, src) &&
-                       SchedUpdate(ts.begin, ts.end, ts.hartid, (ts.tsid << 8) | (uint8_t)old_pid,
+                       SchedUpdateAssumeNoPreemption(ts.begin, ts.end, ts.hartid, (ts.tsid << 8) | (uint8_t)old_pid,
                                    (ts.tsid << 8) | (uint8_t)new_pid, dest);
         } else {
                 succ = CapMove(dest, src);
@@ -467,6 +467,9 @@ uint64_t sn_send(uint64_t channel) {
         uint64_t cid_last = cid_src + n;
         /* Number of capabilities sent */
         current->args[1] = 0;
+        /* We need to diable preemption here, otherwise it's possible to give away all our time and then be descheduled before reaching
+           the line where we set our receiver to suspended, letting it get scheduled. */
+        clear_csr(mstatus, 8);
         while (cid_src < N_CAPS && cid_src < cid_last && cid_dest < N_CAPS) {
                 Cap *src = &current->cap_table[cid_src];
                 Cap *dest = &receiver->cap_table[cid_dest];
@@ -492,8 +495,11 @@ uint64_t sn_send(uint64_t channel) {
         recv[2] = send[2];
         recv[3] = send[3];
 
+        /* Ensure the the receiver can see the messages before allowing it to be scheduled, in case it's on another hart. */
+        __sync_synchronize();
         /* Sets the receiver to suspended */
         receiver->state = PROC_SUSPENDED;
+        set_csr(mstatus, 8);
         return current->args[0];
 }
 

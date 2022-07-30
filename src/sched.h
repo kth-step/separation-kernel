@@ -90,6 +90,9 @@ void Sched(void);
 bool SchedUpdate(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected,
                  uint16_t desired, Cap * c);
 
+bool SchedUpdateAssumeNoPreemption(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected,
+                 uint16_t desired, Cap * c);
+
 bool SchedRevoke(uint64_t begin, uint64_t end, uint8_t hartid,
                  uint16_t desired, Cap * c);
 

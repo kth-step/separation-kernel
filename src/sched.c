@@ -355,19 +355,9 @@ void Sched(void) {
 }
 
 static inline bool sched_update(uint64_t begin, uint64_t end, uint8_t hartid,
-                                uint16_t expected, uint16_t desired, Cap * c) {
-        uint64_t mask = 0xFFFF << (hartid * 16);
-        uint64_t expected64 = expected << (hartid * 16);
-        uint64_t desired64 = desired << (hartid * 16);
-        
-        const uint8_t previous_tsid = (expected & 0xFF00) >> 8;
-        const uint8_t new_tsid = (desired & 0xFF00) >> 8;
-        const uint8_t new_pid = desired & 0xFF;
-        
-        /* Disable preemption 
-           This is needed since we might remove our own scheduling, and if we are descheduled before
-           completing this function then we might still hold the lock without any chance of being scheduled again. */
-        clear_csr(mstatus, 8);
+                                uint64_t expected64, uint64_t desired64, Cap * c,
+                                uint64_t mask, const uint8_t previous_tsid,
+                                const uint8_t new_tsid, const uint8_t new_pid) {
         /* Try acquire lock */
         while (!try_acquire_lock(&lock)) {
                 /* If failed acquire lock, enable preemption temporary */
@@ -410,18 +400,47 @@ static inline bool sched_update(uint64_t begin, uint64_t end, uint8_t hartid,
                         ts_id_statuses[hartid][new_tsid].pid = new_pid; 
                 }
         }
-        /* Release lock and enable preemption */
+        /* Release lock */
         release_lock(&lock);
-        set_csr(mstatus, 8);
         return is_updated;
+}
+
+bool SchedUpdateAssumeNoPreemption(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected,
+                 uint16_t desired, Cap * c) {
+        uint64_t mask = 0xFFFF << (hartid * 16);
+        uint64_t expected64 = expected << (hartid * 16);
+        uint64_t desired64 = desired << (hartid * 16);
+        
+        const uint8_t previous_tsid = (expected & 0xFF00) >> 8;
+        const uint8_t new_tsid = (desired & 0xFF00) >> 8;
+        const uint8_t new_pid = desired & 0xFF;
+        if (begin > end)
+                return sched_update(end, begin, hartid, expected64, desired64, c, mask, previous_tsid, new_tsid, new_pid);
+        else
+                return sched_update(begin, end, hartid, expected64, desired64, c, mask, previous_tsid, new_tsid, new_pid);
 }
 
 bool SchedUpdate(uint64_t begin, uint64_t end, uint8_t hartid, uint16_t expected,
                  uint16_t desired, Cap * c) {
+        uint64_t mask = 0xFFFF << (hartid * 16);
+        uint64_t expected64 = expected << (hartid * 16);
+        uint64_t desired64 = desired << (hartid * 16);
+        
+        const uint8_t previous_tsid = (expected & 0xFF00) >> 8;
+        const uint8_t new_tsid = (desired & 0xFF00) >> 8;
+        const uint8_t new_pid = desired & 0xFF;
+        /* Disable preemption 
+           This is needed since we might remove our own scheduling, and if we are descheduled before
+           completing this function then we might still hold the lock without any chance of being scheduled again. */
+        bool ret = false;
+        clear_csr(mstatus, 8);
         if (begin > end)
-                return sched_update(end, begin, hartid, expected, desired, c);
+                ret = sched_update(end, begin, hartid, expected64, desired64, c, mask, previous_tsid, new_tsid, new_pid);
         else
-                return sched_update(begin, end, hartid, expected, desired, c);
+                ret = sched_update(begin, end, hartid, expected64, desired64, c, mask, previous_tsid, new_tsid, new_pid);
+        /* Enable preemption */
+        set_csr(mstatus, 8);
+        return ret;
 }
 
 
