@@ -380,7 +380,6 @@ uint64_t sn_recv(uint64_t channel) {
 
 uint64_t sn_recv_delete_ts(uint64_t channel, Cap * cap_ts) {
         current->listen_channel = channel;
-        current->args[0] = false;
         CapTimeSlice ts = cap_deserialize_time_slice(cap_get(cap_ts));
         
         if (__sync_bool_compare_and_swap(&channels[channel], NULL, current)) {
@@ -397,13 +396,14 @@ uint64_t sn_recv_delete_ts(uint64_t channel, Cap * cap_ts) {
                 set_csr(mstatus, 8);
                 if (!ret) 
                         return ret;
-                sys_to_sched();
-                /* We never return here, but sys_to_sched will set the return value to true */
+                /* We just wait to receive a message, sender does all the job */
+                syscall_yield();
+                /* We never return here, but yield will set the return value to true */
         } else {
                 current->listen_channel = -1;
         }
-        /* We just wait to receive a message, sender does all the job */
-        return current->args[0];
+        /* If we get here we failed to claim the channel */
+        return false;
 }
 
 /*** RECEIVER HANDLER ***/

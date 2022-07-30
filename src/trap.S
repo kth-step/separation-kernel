@@ -58,6 +58,13 @@ __exception_trampoline:
 .option pop
 
 __exception_handler:
+        /* Ensure preemption is disabled.
+           We assume we can only get here from user code; if we don't then we have 
+           encountered an exception in the kernel and we don't support recovery from that. 
+           Thus, it's fine if we overwrite the value of mie in mstatus and assume the only other
+           situation where it is relevant, timer interrupt, doesn't rely on it being preserved
+           between different timer interrupts. */
+        csrci   mstatus,8
         /* Load kernel process sp, store user sp. */
         csrrw   sp,mscratch,sp
 #ifdef DEBUG
@@ -143,18 +150,18 @@ __syscall:
 
         /* Fix sp and enable preemption */
         addi    sp,sp,-36*8
-        csrwi   mstatus,8
+        csrsi   mstatus,8
 
         call    SyscallHandler
 
         /* Fix sp and disable preemption */
-        csrwi   mstatus,0
+        csrci   mstatus,8
         addi    sp,sp,36*8
 
         j       __exception_exit
 
 __exception:
-        j       __hang
+        j       __exception_handler_unimplemented_hang
         la      ra,__exception_trampoline
         /* Set a0 to mcause */
         mv      a0,t1
@@ -169,19 +176,21 @@ __exception:
         sd      t3,(-4*8)(sp)
 
         addi    sp,sp,-36*8
-        csrwi   mstatus,8
+        csrsi   mstatus,8
 
         /* Jump to trampoline */
         add     ra,ra,t1
         jalr    ra,0(ra)
 
         /* Fix sp and disable preemption */
-        csrwi   mstatus,0
+        csrci   mstatus,8
         addi    sp,sp,36*8
         j       __exception_exit
 
 __hang: 
         j       __hang
+__exception_handler_unimplemented_hang: 
+        j       __exception_handler_unimplemented_hang
 __mhang: 
         j       __mhang
 
@@ -307,9 +316,12 @@ __exception_exit:
 
         /* Load mstatus */
         ld      t0,(-2*8)(sp)
+        /* In exception handeling we have ensured that preemption is disabled in the stored mstatus.
+           If preemption is enabled in mstatus it must have been stored from a timer interrupt,
+           meaning we are returning from such, and it's not possible for a timer interrupt to be
+           interrupted by another timer interrupt. Thus, it's fine to just load mstatus, even though it might 
+           enable preemption already. */
         csrw    mstatus,t0
-        li      t1,0x1800
-        and     t0,t0,t1
 
         ld      t0,(-6*8)(sp)
         csrw    mscratch,t0
@@ -354,11 +366,12 @@ __exception_exit:
 sys_to_sched:
         /* Fix sp and disable preemption */
         // TODO: do we want to disable preemption here or after sched?
-        csrwi   mstatus,0
+        csrci   mstatus,8
         ld      sp,(12*8)(tp)
         /* Make sure the syscall returns true since it doesn't return normally */
         li      a0,1
         sd      a0,(3*8)(tp)
+        sd      a0,(-14*8)(sp)
         /* Swap to core stack */
         amoswap.d  sp,sp,(tp)
         call    Sched
