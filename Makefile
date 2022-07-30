@@ -9,12 +9,13 @@ S_SRCS=$(wildcard src/*.S)
 C_SRCS=$(wildcard src/*.c)
 C_HDRS=$(wildcard src/*.h)
 
-S_SRCS+=$(wildcard crypto-app/*.S)
-C_SRCS+=$(wildcard crypto-app/*.c)
-C_HDRS+=$(wildcard crypto-app/*.h)
-
-C_SRCS+= crypto-app/wolfssl/aes.c
-C_SRCS:=$(filter-out crypto-app/test.c, $(C_SRCS))
+# Removing these speed up compile time, and we don't use them here anyway
+#S_SRCS+=$(wildcard crypto-app/*.S)
+#C_SRCS+=$(wildcard crypto-app/*.c)
+#C_HDRS+=$(wildcard crypto-app/*.h)
+#
+#C_SRCS+= crypto-app/wolfssl/aes.c
+#C_SRCS:=$(filter-out crypto-app/test.c, $(C_SRCS))
 
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
 DA=$(BUILD_DIR)/$(PROGRAM).da

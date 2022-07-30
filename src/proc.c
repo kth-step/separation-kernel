@@ -21,9 +21,11 @@
 extern void user_code();
 
 /* Benchmarking */
-extern void crypto_decrypt_code();
-extern void cypher_provider_code();
-extern void plaintext_consumer_code();
+#if CRYPTO_APP != 0
+        extern void crypto_decrypt_code();
+        extern void cypher_provider_code();
+        extern void plaintext_consumer_code();
+#endif
 extern void benchmark_code();
 
 /* Defined in proc.h */
@@ -31,6 +33,7 @@ Proc processes[N_PROC];
 
 static void proc_init_boot_proc(Proc *boot);
 
+#if CRYPTO_APP != 0
 void ProcCryptoAppInit() {
         if (N_PROC < 3) {
                 return;
@@ -40,6 +43,7 @@ void ProcCryptoAppInit() {
         processes[1].pc = (uintptr_t)cypher_provider_code;
         processes[2].pc = (uintptr_t)plaintext_consumer_code;
 }
+#endif
 
 /* Initializes one process. */
 void ProcReset(int pid) {
@@ -51,6 +55,8 @@ void ProcReset(int pid) {
         proc->ksp = &proc_stack[pid][STACK_SIZE / 8];
         for (int i = 0; i < STACK_SIZE / 8; i++)
                 proc_stack[pid][i] = 0;
+        /* The assembly trap handeling assumes the user stack pointer is not 0, and that it is found on the kernel stack */
+        proc->ksp[-6] = 1;
         /* Zero the capability table. */
         proc->cap_table = cap_tables[pid];
         for (int i = 0; i < N_CAPS; ++i) {
@@ -142,6 +148,10 @@ void ProcInitProcesses(void) {
         processes[0].pc = (uintptr_t)benchmark_code;
         //ProcCryptoAppInit();
         //InitSched();
+        for (int i = 0; i < N_PROC; i++) {
+                /* The assembly trap handeling tries to restore the PC from the stack */
+                processes[i].ksp[-4] = processes[i].pc;
+        }
 }
 
 void ProcHalt(Proc *proc) {

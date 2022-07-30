@@ -45,11 +45,11 @@ static inline int sched_is_invalid_pid(int8_t pid) {
 #if N_CORES != 1
 /* The loop in this function affects the running time of the scheduling, 
 so we force its worst time execution when establishing time needed for scheduling. */
-static inline int sched_has_priority(uint64_t s, uint64_t pid,
+static inline int sched_has_priority(uint64_t quantum, uint64_t pid,
                                      uintptr_t hartid) {
         for (size_t i = 0; i < N_CORES - 1; i++) {
                 /* If the pid is same, there is hart with higher priortiy */
-                uint64_t other_pid = sched_get_pid(s, i); /* Process ID. */
+                uint64_t other_pid = sched_get_pid(schedule[quantum], i); /* Process ID. */
                 if (pid == other_pid)
                         /* We keep the if-statement to keep the comparison operation, but we don't care about the outcome. */
                         dummy_counter = 1;
@@ -91,7 +91,7 @@ static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
                 return 0;
         /* Check that no other hart with higher priority schedules this pid */
         #if N_CORES != 1
-                if (!sched_has_priority(s, pid, hartid))
+                if (!sched_has_priority(q, pid, hartid))
                         return 0;
         #endif
         /* Set process */
@@ -104,7 +104,8 @@ static void release_current(void) {
         /* If current == 0, we have nothing to release */
         if (current) {
                 /* Release the process */
-                current->state = PROC_SUSPENDED;
+                if (current->state != PROC_WAITING)
+                        current->state = PROC_SUSPENDED;
                 __sync_synchronize();
                 if (current->halt)
                         __sync_val_compare_and_swap(

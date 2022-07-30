@@ -17,7 +17,13 @@ typedef struct proc Proc;
  */
 typedef enum proc_state ProcState;
 
-enum proc_state { PROC_HALTED, PROC_SUSPENDED, PROC_RUNNING, PROC_BLOCKED };
+enum proc_state {
+        PROC_HALTED,
+        PROC_RUNNING,
+        PROC_WAITING,
+        PROC_RECEIVING,
+        PROC_SUSPENDED
+};
 
 struct proc {
         /** Kernel stack pointer.
@@ -45,6 +51,8 @@ struct proc {
          */
         uintptr_t args[8];
         uintptr_t pc;
+
+        uintptr_t pre_syscall_sp;
 
         /* The pmp configurations are stored in these capabilities */
         /* pmp_table[i].data[1] = pmpicfg | pmpaddri */
