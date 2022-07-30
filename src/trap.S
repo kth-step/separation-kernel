@@ -370,13 +370,11 @@ sys_to_sched:
         ld      sp,(12*8)(tp)
         /* Make sure the syscall returns true since it doesn't return normally */
         li      a0,1
-        sd      a0,(3*8)(tp)
         sd      a0,(-14*8)(sp)
         /* Swap to core stack */
         amoswap.d  sp,sp,(tp)
         call    Sched
-        amoswap.d  sp,sp,(tp)
-        j       __exception_exit
+        j       AsmResumeProc
 
 trap_recv_yield:
         /* CompareAndSwap(state,PROC_RUNNING, PROC_WAITING) */
