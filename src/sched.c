@@ -34,6 +34,10 @@ void InitSched() {
         }
 }
 
+static inline uint64_t sched_get_tsid(uint64_t s, uintptr_t hartid) {
+        return ((s >> (hartid * 16)) & 0xFF00) >> 8; 
+}
+
 static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
         return ((s >> (hartid * 16)) & 0xFF);
 }
@@ -42,6 +46,33 @@ static inline int sched_is_invalid_pid(int8_t pid) {
         return pid < 0;
 }
 
+#if TIME_SLOT_LOANING_SIMPLE != 0
+        static uint64_t sched_get_time_slot_pid(uint64_t s, uint64_t hartid) {
+                const uint64_t sched_pid = sched_get_pid(s, hartid);
+                uint64_t current_pid = processes[sched_pid].time_receiver;
+                /* The first check prevents getting stuck in a circular lookup */
+                while (current_pid != sched_pid && current_pid != processes[current_pid].time_receiver) {
+                        current_pid = processes[current_pid].time_receiver;
+                }
+                return current_pid;
+        }
+
+        bool SchedTryLoanTime(uint64_t pid) {
+                /* Only successfull if receiver is not already loaning time from another process */
+                if (__sync_bool_compare_and_swap(&(processes[pid].time_giver), pid, current->pid)) {
+                        current->time_receiver = pid;
+                        return true;
+                }
+                return false;
+        }
+
+        void SchedReturnTime() {
+                processes[current->time_giver].time_receiver = current->time_giver;
+                current->time_giver = current->pid;
+        }
+
+#endif
+
 #if N_CORES != 1
 /* The loop in this function affects the running time of the scheduling, 
 so we force its worst time execution when establishing time needed for scheduling. */
@@ -49,7 +80,11 @@ static inline int sched_has_priority(uint64_t quantum, uint64_t pid,
                                      uintptr_t hartid) {
         for (size_t i = 0; i < N_CORES - 1; i++) {
                 /* If the pid is same, there is hart with higher priortiy */
-                uint64_t other_pid = sched_get_pid(schedule[quantum], i); /* Process ID. */
+                #if TIME_SLOT_LOANING_SIMPLE != 0
+                        uint64_t other_pid = sched_get_time_slot_pid(schedule[quantum], i);
+                #else
+                        uint64_t other_pid = sched_get_pid(schedule[quantum], i); /* Process ID. */
+                #endif
                 if (pid == other_pid)
                         /* We keep the if-statement to keep the comparison operation, but we don't care about the outcome. */
                         dummy_counter = 1;
@@ -64,15 +99,29 @@ so we force its worst time execution when establishing time needed for schedulin
 static inline uint64_t sched_get_length(uint64_t s, uint64_t q,
                                         uintptr_t hartid) {
         uint64_t length = 1;
-        uint64_t mask = 0xFFFFUL << (hartid * 8);
+        #if TIME_SLOT_LOANING_SIMPLE != 0
+                uint64_t pid = sched_get_time_slot_pid(s, hartid);
+                uint64_t tsid = sched_get_tsid(s,hartid);
+        #else
+                uint64_t mask = 0xFFFFUL << (hartid * 16);
+        #endif
         for (uint64_t qi = 0 + 1; qi < N_QUANTUM; qi++) {
                 /* If next timeslice has the same pid and tsid, then add to
                  * lenght */
                 __sync_synchronize();
                 uint64_t si = schedule[qi];
-                if ((s ^ si) & mask)
-                        /* We keep the if-statement to keep the comparison operation, but we don't care about the outcome. */
-                        dummy_counter = 1;
+                #if TIME_SLOT_LOANING_SIMPLE != 0
+                        uint64_t next_pid = sched_get_time_slot_pid(si, hartid);
+                        uint64_t next_tsid = sched_get_tsid(si,hartid);
+                        if (pid != next_pid || tsid != next_tsid) {
+                                /* We keep the if-statement to keep the comparison operation, but we don't care about the outcome. */
+                                dummy_counter = 1;
+                        }
+                #else
+                        if ((s ^ si) & mask)
+                                /* We keep the if-statement to keep the comparison operation, but we don't care about the outcome. */
+                                dummy_counter = 1;
+                #endif  
                 // length++; We want to rerun scheduling as often as possible for more data points, so we don't want to increase length.
                 dummy_counter++;
         }
@@ -85,7 +134,11 @@ static int sched_get_proc(uintptr_t hartid, uint64_t time, Proc **proc) {
         /* Get the current quantum schedule */
         __sync_synchronize();
         uint64_t s = schedule[q];
-        uint64_t pid = sched_get_pid(s, hartid); /* Process ID. */
+        #if TIME_SLOT_LOANING_SIMPLE != 0
+                uint64_t pid = sched_get_time_slot_pid(s, hartid); /* Process ID. */
+        #else 
+                uint64_t pid = sched_get_pid(s, hartid); /* Process ID. */
+        #endif
         /* If msb is 1, return 0 */
         if (pid & 0x80)
                 return 0;

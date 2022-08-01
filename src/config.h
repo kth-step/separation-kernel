@@ -7,13 +7,13 @@
 
 #if QEMU_DEBUGGING == 0
     /* Number of cores when running on the board. */
-    #define N_CORES 4
+    #define N_CORES 1
 #else
     /* Number of cores when running in QEMU. */
     #define N_CORES 2
 #endif
 /* Number of processes. */
-#define N_PROC 4
+#define N_PROC 2
 /* Number of capabilities per process */
 #define N_CAPS 256
 /* Number of PMP registers in hardware */
@@ -24,7 +24,7 @@
 #define TICKS_PER_SECOND 1000000UL
 
 /* Number of time slices in a major frame. */
-#define N_QUANTUM 256
+#define N_QUANTUM 1
 /* Number of ticks per quantum. */
 #define TICKS 2000UL
 /* Number of slack ticks (buffer) for scheduler. */
@@ -60,3 +60,6 @@ break something you depend on. */
    because we need to discard the boot round for slack, and because we quit before measuring in the last round for instrumentation.
    Therefore we explicitly add + 1 to remind us of this. */
 #define SLACK_TEST_ROUNDS (1000000 + 1)
+
+#define TIME_SLOT_LOANING_SIMPLE 0
+#define WORST_CASE_TIME_LOANING 0

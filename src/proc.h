@@ -67,6 +67,14 @@ struct proc {
         /* If listen_channel != -1, the process is waiting for a message from
          * the channel */
         int listen_channel;
+        #if TIME_SLOT_LOANING_SIMPLE != 0
+                /* The processes loaning its time to this process. 
+                   If it equals the pid of this prcoesses then no other process is giving its time to this process. */
+                uintptr_t time_giver; 
+                /* The processes that this processes is receiving its time to. 
+                   If it equals the pid of this prcoesses then this process is not loaning its time to another process. */
+                uintptr_t time_receiver;
+        #endif
 };
 
 /** Processes

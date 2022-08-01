@@ -9,8 +9,12 @@
 _start:
         csrr    t0,mhartid
         li      t1,N_CORES
+/* Hang unused cores. In QEMU core IDs start from index 0, while on the board they start from 1 */
+#if QEMU_DEBUGGING != 0
+        bge     t0,t1,__hang
+#else
         bgt     t0,t1,__hang
-
+#endif
         li      x1,0
         li      x2,0
         li      x3,0

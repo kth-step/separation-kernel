@@ -68,6 +68,17 @@ void ProcReset(int pid) {
         }
         proc->pc = 0;
         proc->listen_channel = -1;
+
+        #if TIME_SLOT_LOANING_SIMPLE != 0 && WORST_CASE_TIME_LOANING != 0
+                /* We force the worst case lookup by making a cycle including all processes */
+                proc->time_giver = pid > 0 ? (pid - 1) : N_PROC - 1;
+                proc->time_receiver = (pid + 1) % N_PROC;
+        #elif TIME_SLOT_LOANING_SIMPLE != 0
+                /* We force the worst case lookup by making a cycle including all processes */
+                proc->time_giver = pid;
+                proc->time_receiver = pid;
+        #endif
+
         /* Set process to HALTED. */
         proc->state = PROC_HALTED;
 
