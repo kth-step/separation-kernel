@@ -27,12 +27,12 @@ uint64_t sched_entry(uint64_t s, uint64_t hartid)
 {
         kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
         s >>= ((hartid)-MIN_HARTID) * 16;
-        return s & 0xFFFF;
+        return s & 0xFFFFull;
 }
 
 uint64_t sched_pid(uint64_t s, uint64_t hartid)
 {
-        return sched_entry(s, hartid) & 0xFF;
+        return sched_entry(s, hartid) & 0xFFull;
 }
 
 void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* length)
@@ -50,7 +50,7 @@ void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* len
         uint64_t pid = sched_pid(sched_slice, hartid);
 
         /* Check if slot is invalid/inactive */
-        if (pid == 0xFF)
+        if (pid == 0xFFull)
                 return;
 
         /* Check if some other thread preempts */
@@ -122,9 +122,9 @@ bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end,
 {
         kassert(begin < end);
         kassert(end <= N_QUANTUM);
-        kassert((expected_depth & 0xFF) == expected_depth);
-        kassert((desired_pid & 0xFF) == desired_pid);
-        kassert((desired_depth & 0xFF) == desired_depth);
+        kassert((expected_depth & 0xFFull) == expected_depth);
+        kassert((desired_pid & 0xFFull) == desired_pid);
+        kassert((desired_depth & 0xFFull) == desired_depth);
 
         lock_acquire(&lock);
         if (cap_node_is_deleted(cn)) {
@@ -139,8 +139,8 @@ bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end,
         uint64_t desired = SCHED_SLICE_OFFSET(desired_depth << 8 | desired_pid, hartid);
 
         /* Mask so we match on desired entry */
-        uint64_t mask_desired = ~SCHED_SLICE_OFFSET(0xFFFF, hartid);
-        uint64_t mask_expected = SCHED_SLICE_OFFSET(0xFF00, hartid);
+        uint64_t mask_desired = ~SCHED_SLICE_OFFSET(0xFFFFull, hartid);
+        uint64_t mask_expected = SCHED_SLICE_OFFSET(0xFF00ull, hartid);
 
         for (int i = begin; i < end; ++i) {
                 uint64_t expected_s = schedule[i];
