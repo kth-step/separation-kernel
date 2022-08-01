@@ -83,10 +83,9 @@ void InitSched() {
         ts_id_statuses_init();
 }
 
-// When do we want this? Do we want to shift the tsid down when using it?
-/*static inline uint64_t sched_get_tsid(uint64_t s, uintptr_t hartid) {
-        return ((s >> (hartid * 16)) & 0xFF00); 
-}*/
+static inline uint64_t sched_get_tsid(uint64_t s, uintptr_t hartid) {
+        return ((s >> (hartid * 16)) & 0xFF00) >> 8; 
+}
 
 static inline uint64_t sched_get_pid(uint64_t s, uintptr_t hartid) {
         return ((s >> (hartid * 16)) & 0xFF);
@@ -170,7 +169,6 @@ static inline int sched_is_invalid_pid(int8_t pid) {
                 while (current_pid != sched_pid && current_pid != processes[current_pid].time_receiver) {
                         current_pid = processes[current_pid].time_receiver;
                 }
-                //printf("\nsched_get_time_slot_pid pid: %lu\n", current_pid);
                 return current_pid;
         }
 
@@ -212,14 +210,27 @@ static inline int sched_has_priority(uint64_t quantum, uint64_t pid,
 static inline uint64_t sched_get_length(uint64_t s, uint64_t q,
                                         uintptr_t hartid) {
         uint64_t length = 1;
-        uint64_t mask = 0xFFFFUL << (hartid * 16);
+        #if TIME_SLOT_LOANING_SIMPLE != 0
+                uint64_t pid = sched_get_time_slot_pid(s, hartid);
+                uint64_t tsid = sched_get_tsid(s,hartid);
+        #else
+                uint64_t mask = 0xFFFFUL << (hartid * 16);
+        #endif
         for (uint64_t qi = q + 1; qi < N_QUANTUM; qi++) {
                 /* If next timeslice has the same pid and tsid, then add to
                  * lenght */
                 __sync_synchronize();
                 uint64_t si = schedule[qi];
-                if ((s ^ si) & mask)
-                        break;
+                #if TIME_SLOT_LOANING_SIMPLE != 0
+                        uint64_t next_pid = sched_get_time_slot_pid(si, hartid);
+                        uint64_t next_tsid = sched_get_tsid(si,hartid);
+                        if (pid != next_pid || tsid != next_tsid) {
+                                break;
+                        }
+                #else
+                        if ((s ^ si) & mask)
+                                break;
+                #endif
                 length++;
         }
         return length;
