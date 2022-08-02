@@ -7,7 +7,7 @@
 #include "s3k.h"
 #include "timer.h"
 
-#define IPC_DEBUG 0
+#define IPC_DEBUG 1
 
 #if IPC_DEBUG != 0
     volatile uint64_t ipc_counter1 = 0;
@@ -50,7 +50,12 @@ void ipc_benchmark_main(uint64_t pid) {
                 ipc_counter2++;
                 printf("Counter on first proc: %lu\n", ipc_counter2);
             #endif
-        } else if (pid == N_PROC - 1) {
+        }
+        #if ONLY_2_PROC_IPC != 0
+        else if (pid == 1) {
+        #else 
+        else if (pid == N_PROC - 1) {
+        #endif
             #if IPC_DEBUG != 0
                 ipc_counter1++;
                 printf("Counter on last proc:  %lu\n", ipc_counter1);
@@ -113,7 +118,12 @@ void ipc_benchmark_main(uint64_t pid) {
                 ipc_counter2++;
                 printf("Counter on first proc: %lu\n", ipc_counter2);
             #endif
-        } else if (pid == N_PROC - 1) {
+        } 
+        #if ONLY_2_PROC_IPC != 0
+        else if (pid == 1) {
+        #else 
+        else if (pid == N_PROC - 1) {
+        #endif
             #if IPC_DEBUG != 0
                 ipc_counter1++;
                 printf("Counter on last proc:  %lu\n", ipc_counter1);

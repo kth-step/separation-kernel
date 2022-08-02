@@ -16,6 +16,7 @@ void print_relevant_config() {
             "STACK_SIZE=%d\n"
             "SCHEDULE_BENCHMARK=%d\n"
             "IPC_BENCHMARK=%d\n"
+            "ONLY_2_PROC_IPC=%d\n"
             #if BENCHMARK_DURATION != 0
                 "BENCHMARK_DURATION=%lu\n"
             #endif
@@ -25,7 +26,7 @@ void print_relevant_config() {
             "TIME_SLOT_LOANING_SIMPLE=%d\n"
             "CRYPTO_APP=%d\n"
             "QEMU_DEBUGGING=%d\n"
-            , N_CORES, N_PROC, N_CAPS, TICKS_PER_SECOND, N_QUANTUM, TICKS, SLACK_TICKS, STACK_SIZE, SCHEDULE_BENCHMARK, IPC_BENCHMARK
+            , N_CORES, N_PROC, N_CAPS, TICKS_PER_SECOND, N_QUANTUM, TICKS, SLACK_TICKS, STACK_SIZE, SCHEDULE_BENCHMARK, IPC_BENCHMARK, ONLY_2_PROC_IPC
             #if BENCHMARK_DURATION != 0
                 , BENCHMARK_DURATION 
             #endif

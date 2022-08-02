@@ -7,13 +7,13 @@
 
 #if QEMU_DEBUGGING == 0
     /* Number of cores when running on the board. */
-    #define N_CORES 4
+    #define N_CORES 1//4
 #else
     /* Number of cores when running in QEMU. */
-    #define N_CORES 1//2 ////// TEMP 
+    #define N_CORES 2
 #endif 
 /* Number of processes. */
-#define N_PROC 4
+#define N_PROC 128
 /* Number of capabilities per process */
 #define N_CAPS 256
 /* Number of PMP registers in hardware */
@@ -29,11 +29,11 @@
 #endif
 
 /* Number of time slices in a major frame. */
-#define N_QUANTUM 256
+#define N_QUANTUM 1 
 /* Number of ticks per quantum. */
-#define TICKS 2000UL
+#define TICKS 9UL
 /* Number of slack ticks (buffer) for scheduler. */
-#define SLACK_TICKS 200UL
+#define SLACK_TICKS 8UL
 
 /* Stack size. */
 #define STACK_SIZE (1024*2)
@@ -57,8 +57,9 @@
     #define MAX_HARTID (N_PROC - 1)
 #endif
 
-#define SCHEDULE_BENCHMARK 1
-#define IPC_BENCHMARK 0
+#define SCHEDULE_BENCHMARK 0
+#define IPC_BENCHMARK 1
+#define ONLY_2_PROC_IPC 1
 
 /* Currently 1 round = 1 quantum, and the duration consequently assumes a process is only scheduled for one quantum. */
 #define BENCHMARK_DURATION (TICKS_PER_SECOND*0)
@@ -71,6 +72,6 @@
 #define TIME_SLOT_LOANING 0
 /* Simple solution that only allows a process to loan its time to 1 other process at a time, and it must loan all of its time.
    Furthermore, a process can only loan time from one other process at a time. */
-#define TIME_SLOT_LOANING_SIMPLE 0
+#define TIME_SLOT_LOANING_SIMPLE 1
 
 #define CRYPTO_APP 0
