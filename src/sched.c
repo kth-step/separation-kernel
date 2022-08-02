@@ -182,8 +182,9 @@ static inline int sched_is_invalid_pid(int8_t pid) {
         }
 
         void SchedReturnTime() {
-                processes[current->time_giver].time_receiver = current->time_giver;
+                uint64_t temp = current->time_giver;
                 current->time_giver = current->pid;
+                processes[temp].time_receiver = temp;
         }
 
 #endif
