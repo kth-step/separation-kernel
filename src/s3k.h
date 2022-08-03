@@ -197,39 +197,31 @@ static inline uint64_t s3k_supervisor_take_cap(uint64_t sup_cid, uint64_t pid, u
         return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, pid, 7, src, dest);
 }
 
-static inline void s3k_dump_cap(char* buf, int n, cap_t cap)
+static inline int s3k_dump_cap(char* buf, int n, cap_t cap)
 {
         switch (cap_get_type(cap)) {
         case CAP_TYPE_MEMORY:
-                s3k_snprintf(buf, n, "MEMORY{begin=0x%lx,end=0x%lx,rwx=%ld,free=0x%lx,pmp=%ld}",
+                return snprintf(buf, n, "MEMORY{begin=0x%lx,end=0x%lx,rwx=%ld,free=0x%lx,pmp=%ld}",
                              cap_memory_get_begin(cap), cap_memory_get_free(cap), cap_memory_get_end(cap),
                              cap_memory_get_rwx(cap), cap_memory_get_pmp(cap));
-                break;
         case CAP_TYPE_PMP:
-                s3k_snprintf(buf, n, "PMP{addr=0x%lx,rwx=%ld}", cap_pmp_get_addr(cap), " rwx=%ld",
-                             cap_pmp_get_rwx(cap));
-                break;
+                return snprintf(buf, n, "PMP{addr=0x%lx,rwx=%ld}", cap_pmp_get_addr(cap), cap_pmp_get_rwx(cap));
         case CAP_TYPE_TIME:
-                s3k_snprintf(buf, n, "TIME{hartid=%ld,begin=%ld,end=%ld,free=%ld,depth=%ld}", cap_time_get_hartid(cap),
+                return snprintf(buf, n, "TIME{hartid=%ld,begin=%ld,end=%ld,free=%ld,depth=%ld}", cap_time_get_hartid(cap),
                              cap_time_get_begin(cap), cap_time_get_end(cap), cap_time_get_free(cap),
                              cap_time_get_depth(cap));
-                break;
         case CAP_TYPE_CHANNELS:
-                s3k_snprintf(buf, n, "CHANNELS{begin=%ld,end=%ld,free=%ld}", cap_channels_get_begin(cap),
+                return snprintf(buf, n, "CHANNELS{begin=%ld,end=%ld,free=%ld}", cap_channels_get_begin(cap),
                              cap_channels_get_end(cap), cap_channels_get_free(cap));
-                break;
         case CAP_TYPE_RECEIVER:
-                s3k_snprintf(buf, n, "RECEIVER{channel=%ld}", cap_receiver_get_channel(cap));
-                break;
+                return snprintf(buf, n, "RECEIVER{channel=%ld}", cap_receiver_get_channel(cap));
         case CAP_TYPE_SENDER:
-                s3k_snprintf(buf, n, "SENDER{channel=%ld}", cap_sender_get_channel(cap));
-                break;
+                return snprintf(buf, n, "SENDER{channel=%ld}", cap_sender_get_channel(cap));
         case CAP_TYPE_SUPERVISOR:
-                s3k_snprintf(buf, n, "SUPERVISOR{begin=%ld,end=%ld,free=%ld}", cap_supervisor_get_begin(cap),
+                return snprintf(buf, n, "SUPERVISOR{begin=%ld,end=%ld,free=%ld}", cap_supervisor_get_begin(cap),
                              cap_supervisor_get_end(cap), cap_supervisor_get_free(cap));
-                break;
         default:
-                s3k_snprintf(buf, n, "INVALID");
-                break;
+                *buf = '\0';
+                return 0;
         }
 }

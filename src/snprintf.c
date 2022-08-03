@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-char* outputStr(char* buf, char* ebuf, const char* s)
+static inline char* outputStr(char* buf, char* ebuf, const char* s)
 {
         while (buf != ebuf && *s != '\0') {
                 *buf++ = *s++;
@@ -75,7 +75,7 @@ static inline char* output32(char* buf, char* ebuf, int n, bool sig, int base, c
         return outputStr(buf, ebuf, c);
 }
 
-void s3k_snvprintf(char* buf, size_t n, const char* format, va_list args)
+int vsnprintf(char* buf, size_t n, const char* format, va_list args)
 {
         if (n == 0)
                 return;
@@ -125,11 +125,12 @@ void s3k_snvprintf(char* buf, size_t n, const char* format, va_list args)
                 }
         }
         *buf = '\0';
+        return (ebuf - buf);
 }
 
-void s3k_snprintf(char* buf, size_t n, const char* format, ...)
+int snprintf(char* buf, size_t n, const char* format, ...)
 {
         va_list args;
         va_start(args, format);
-        s3k_snvprintf(buf, n, format, args);
+        return vsnprintf(buf, n, format, args);
 }

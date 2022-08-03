@@ -4,9 +4,9 @@
 
 void print_info()
 {
-        kprint("===================================================\n");
-        kprint("S3K Information\n");
-        kprint("---------------------------------------------------\n");
+        kprintf("===================================================\n");
+        kprintf("S3K Information\n");
+        kprintf("---------------------------------------------------\n");
         kprintf("Platform:                     %s\n", PLATFORM_NAME);
         kprintf("Hart count:                   %d\n", N_CORES);
         kprintf("Usable harts:                 %d-%d\n", MIN_HARTID, MAX_HARTID);
@@ -16,5 +16,5 @@ void print_info()
         kprintf("Max quanta per major frame:   %d\n", N_QUANTUM);
         kprintf("Slack/scheduler ticks:        %d\n", SCHEDULER_TICKS);
         kprintf("Ticks per second:             %d\n", TICKS_PER_SECOND);
-        kprint("===================================================\n");
+        kprintf("===================================================\n");
 }

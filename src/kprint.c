@@ -4,20 +4,21 @@
 #include "platform.h"
 #include "snprintf.h"
 
-void kprint(const char* s)
+int kprintf(const char* format, ...)
 {
         static lock_t lock = INIT_LOCK;
+        va_list args;
+        char buf[256];
+        char *b = buf;
+        int i;
+
         lock_acquire(&lock);
-        while (*s != '\0')
-                uart_putchar(*s++);
+        va_start(args, format);
+        i = vsnprintf(buf, 256, format, args);
+        while (*b != '\0') {
+                uart_putchar(*b++);
+        }
         lock_release(&lock);
+        return i;
 }
 
-void kprintf(const char* format, ...)
-{
-        va_list args;
-        va_start(args, format);
-        char buf[256];
-        s3k_snvprintf(buf, 256, format, args);
-        kprint(buf);
-}
