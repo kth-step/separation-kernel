@@ -78,7 +78,7 @@ static inline char* output32(char* buf, char* ebuf, int n, bool sig, int base, c
 int vsnprintf(char* buf, size_t n, const char* format, va_list args)
 {
         if (n == 0)
-                return;
+                return 0;
         char* ebuf = buf + n - 1;
         for (const char* f = format; *f != '\0' && buf != ebuf; ++f) {
                 if (*f != '%') {

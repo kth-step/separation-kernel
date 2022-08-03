@@ -202,24 +202,24 @@ static inline int s3k_dump_cap(char* buf, int n, cap_t cap)
         switch (cap_get_type(cap)) {
         case CAP_TYPE_MEMORY:
                 return snprintf(buf, n, "MEMORY{begin=0x%lx,end=0x%lx,rwx=%ld,free=0x%lx,pmp=%ld}",
-                             cap_memory_get_begin(cap), cap_memory_get_free(cap), cap_memory_get_end(cap),
-                             cap_memory_get_rwx(cap), cap_memory_get_pmp(cap));
+                                cap_memory_get_begin(cap), cap_memory_get_end(cap), cap_memory_get_rwx(cap),
+                                cap_memory_get_free(cap), cap_memory_get_pmp(cap));
         case CAP_TYPE_PMP:
                 return snprintf(buf, n, "PMP{addr=0x%lx,rwx=%ld}", cap_pmp_get_addr(cap), cap_pmp_get_rwx(cap));
         case CAP_TYPE_TIME:
-                return snprintf(buf, n, "TIME{hartid=%ld,begin=%ld,end=%ld,free=%ld,depth=%ld}", cap_time_get_hartid(cap),
-                             cap_time_get_begin(cap), cap_time_get_end(cap), cap_time_get_free(cap),
-                             cap_time_get_depth(cap));
+                return snprintf(buf, n, "TIME{hartid=%ld,begin=%ld,end=%ld,free=%ld,depth=%ld}",
+                                cap_time_get_hartid(cap), cap_time_get_begin(cap), cap_time_get_end(cap),
+                                cap_time_get_free(cap), cap_time_get_depth(cap));
         case CAP_TYPE_CHANNELS:
                 return snprintf(buf, n, "CHANNELS{begin=%ld,end=%ld,free=%ld}", cap_channels_get_begin(cap),
-                             cap_channels_get_end(cap), cap_channels_get_free(cap));
+                                cap_channels_get_end(cap), cap_channels_get_free(cap));
         case CAP_TYPE_RECEIVER:
                 return snprintf(buf, n, "RECEIVER{channel=%ld}", cap_receiver_get_channel(cap));
         case CAP_TYPE_SENDER:
                 return snprintf(buf, n, "SENDER{channel=%ld}", cap_sender_get_channel(cap));
         case CAP_TYPE_SUPERVISOR:
                 return snprintf(buf, n, "SUPERVISOR{begin=%ld,end=%ld,free=%ld}", cap_supervisor_get_begin(cap),
-                             cap_supervisor_get_end(cap), cap_supervisor_get_free(cap));
+                                cap_supervisor_get_end(cap), cap_supervisor_get_free(cap));
         default:
                 *buf = '\0';
                 return 0;

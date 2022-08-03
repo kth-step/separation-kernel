@@ -48,14 +48,6 @@ void main_supervisor(uint64_t pid, uint64_t begin, uint64_t end)
         kprintf("Message %d,%d,%d,%d\n", msg[0], msg[1], msg[2], msg[3]);
         s3k_yield();
         dump_cap("supervisor");
-        for (int i = 0; i < N_QUANTUM; i += 2) {
-                cap_t new_time = cap_mk_time(2, i, i + 2, i, i);
-                kprintf("Derive time %d\n", s3k_derive_cap(5, 30 + i / 2, new_time));
-        }
-        int i = 0;
-        while (1) {
-                kprintf("supervisor\t%d, %d\n", i++, read_time());
-        }
 }
 
 void main_uart(uint64_t pid, uint64_t begin, uint64_t end)
@@ -68,9 +60,6 @@ void main_uart(uint64_t pid, uint64_t begin, uint64_t end)
         kprintf("Send message to supervisor %d\n", s3k_send(1, msg, 2, 0));
         dump_cap("uart\t");
         s3k_revoke_cap(0);
-        int i = 0;
-        while (1)
-                kprintf("uart\t\t%d, %d\n", i++, read_time());
 }
 
 void main_app1(uint64_t pid, uint64_t begin, uint64_t end)
