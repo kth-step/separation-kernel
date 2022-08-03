@@ -25,7 +25,8 @@ bool cap_node_try_delete(cap_node_t* node, cap_node_t* prev);
 bool cap_node_try_insert(cap_t cap, cap_node_t* node, cap_node_t* parent);
 
 /* Delete all children of node */
-void cap_node_revoke(cap_node_t* node);
+void cap_node_revoke(cap_node_t* node, cap_t cap);
+void cap_node_revoke_time(cap_node_t* node, cap_t cap);
 
 /* Delete node */
 bool cap_node_delete(cap_node_t* node);
@@ -45,8 +46,7 @@ static inline cap_t cap_node_get_cap(cap_node_t* cn);
 /* Check if a node has been deleted */
 bool cap_node_is_deleted(cap_node_t* cn)
 {
-        // Check if prev is NULL ?
-        return cn->next == NULL;
+        return cn->prev == NULL;
 }
 
 cap_t cap_node_get_cap(cap_node_t* cn)

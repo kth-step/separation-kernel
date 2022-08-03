@@ -48,7 +48,6 @@ caps:
   - name: sender 
     fields:
       - channel 2
-      - yield 1
       - grant 1
     asserts:
       - 'channel < N_CHANNELS'
@@ -149,7 +148,7 @@ can_derive:
     child: sender
     relations:
       - 'p:channel == c:channel'
-      - 'c:yield == 1 || c:yield == 0'
+      - 'c:grant == 1 || c:grant == 0'
   - parent: supervisor
     child: supervisor
     relations:

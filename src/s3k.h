@@ -6,9 +6,10 @@
 
 #include "s3k_cap.h"
 #include "s3k_consts.h"
+#include "snprintf.h"
 
-static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5,
-                                   uint64_t arg6)
+static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0, uint64_t arg1, uint64_t arg2,
+                                   uint64_t arg3, uint64_t arg4, uint64_t arg5, uint64_t arg6)
 {
         register uint64_t a0 __asm__("a0") = arg0;
         register uint64_t a1 __asm__("a1") = arg1;
@@ -19,42 +20,43 @@ static inline uint64_t S3K_SYSCALL(uint64_t argc, uint64_t sysnr, uint64_t arg0,
         register uint64_t a6 __asm__("a6") = arg6;
         register uint64_t a7 __asm__("a7") = sysnr;
         switch (argc) {
-                case 0:
-                        asm volatile("ecall" : "=r"(a0) : "r"(a7));
-                        break;
-                case 1:
-                        asm volatile("ecall" : "+r"(a0) : "r"(a7));
-                        break;
-                case 2:
-                        asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a7));
-                        break;
-                case 3:
-                        asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a7));
-                        break;
-                case 4:
-                        asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a7));
-                        break;
-                case 5:
-                        asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a7));
-                        break;
-                case 6:
-                        asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a7));
-                        break;
-                case 7:
-                        asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6), "r"(a7));
-                        break;
-                case 8:
-                        asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6), "r"(a7), "r"(a7));
-                        break;
-                default:
-                        while (1)
-                                ;
+        case 0:
+                asm volatile("ecall" : "=r"(a0) : "r"(a7));
+                break;
+        case 1:
+                asm volatile("ecall" : "+r"(a0) : "r"(a7));
+                break;
+        case 2:
+                asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a7));
+                break;
+        case 3:
+                asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a7));
+                break;
+        case 4:
+                asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a7));
+                break;
+        case 5:
+                asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a7));
+                break;
+        case 6:
+                asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a7));
+                break;
+        case 7:
+                asm volatile("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6), "r"(a7));
+                break;
+        case 8:
+                asm volatile("ecall"
+                             : "+r"(a0)
+                             : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6), "r"(a7), "r"(a7));
+                break;
+        default:
+                while (1)
+                        ;
         }
         return a0;
 }
 
-#define S3K_SYSCALL8(a0, a1, a2, a3, a4, a5, a6, a7) S3K_SYSCALL(8, sysnr, a0, a1, a2, a3, a4, a5, a6)
-#define S3K_SYSCALL7(a0, a1, a2, a3, a4, a5, a6) S3K_SYSCALL(7, sysnr, a0, a1, a2, a3, a4, a5, a6)
+#define S3K_SYSCALL7(sysnr, a0, a1, a2, a3, a4, a5, a6) S3K_SYSCALL(7, sysnr, a0, a1, a2, a3, a4, a5, a6)
 #define S3K_SYSCALL6(sysnr, a0, a1, a2, a3, a4, a5) S3K_SYSCALL(6, sysnr, a0, a1, a2, a3, a4, a5, 0)
 #define S3K_SYSCALL5(sysnr, a0, a1, a2, a3, a4) S3K_SYSCALL(5, sysnr, a0, a1, a2, a3, a4, 0, 0)
 #define S3K_SYSCALL4(sysnr, a0, a1, a2, a3) S3K_SYSCALL(4, sysnr, a0, a1, a2, a3, 0, 0, 0)
@@ -104,17 +106,21 @@ static inline uint64_t s3k_derive_cap(uint64_t src, uint64_t dest, cap_t cap)
         return S3K_SYSCALL4(S3K_SYSNR_DERIVE_CAP, src, dest, cap.word0, cap.word1);
 }
 
-static inline uint64_t s3k_receive(uint64_t cid, uint64_t msg[4])
+static inline uint64_t s3k_receive(uint64_t cid, uint64_t msg[4], uint64_t dest, uint64_t flags)
 {
         register uint64_t a0 __asm__("a0");
         register uint64_t a1 __asm__("a1");
         register uint64_t a2 __asm__("a2");
         register uint64_t a3 __asm__("a3");
         register uint64_t a4 __asm__("a4");
+        register uint64_t a5 __asm__("a5");
+        register uint64_t a6 __asm__("a6");
         register uint64_t a7 __asm__("a7");
         a0 = cid;
+        a5 = dest;
+        a6 = flags;
         a7 = S3K_SYSNR_INVOKE_CAP;
-        __asm__("ecall" : "+r"(a0), "=r"(a1), "=r"(a2), "=r"(a3), "=r"(a4) : "r"(a7));
+        __asm__("ecall" : "+r"(a0), "=r"(a1), "=r"(a2), "=r"(a3), "=r"(a4) : "r"(a5), "r"(a6), "r"(a7));
         msg[0] = a1;
         msg[1] = a2;
         msg[2] = a3;
@@ -122,32 +128,19 @@ static inline uint64_t s3k_receive(uint64_t cid, uint64_t msg[4])
         return a0;
 }
 
-static inline uint64_t s3k_send(uint64_t cid, uint64_t msg[4])
+static inline uint64_t s3k_send(uint64_t cid, uint64_t msg[4], uint64_t src, uint64_t flags)
 {
-        register uint64_t a0 __asm__("a0");
-        register uint64_t a1 __asm__("a1");
-        register uint64_t a2 __asm__("a2");
-        register uint64_t a3 __asm__("a3");
-        register uint64_t a4 __asm__("a4");
-        register uint64_t a7 __asm__("a7");
-        a0 = cid;
-        a1 = msg[0];
-        a2 = msg[1];
-        a3 = msg[2];
-        a4 = msg[3];
-        a7 = S3K_SYSNR_INVOKE_CAP;
-        __asm__("ecall" : "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a7));
-        return a0;
+        return S3K_SYSCALL7(S3K_SYSNR_INVOKE_CAP, cid, msg[0], msg[1], msg[2], msg[3], src, flags);
 }
 
 static inline uint64_t s3k_supervisor_suspend(uint64_t sup_cid, uint64_t pid)
 {
-        return S3K_SYSCALL3(S3K_SYSNR_INVOKE_CAP, sup_cid, 0, pid);
+        return S3K_SYSCALL3(S3K_SYSNR_INVOKE_CAP, sup_cid, pid, 0);
 }
 
 static inline uint64_t s3k_supervisor_resume(uint64_t sup_cid, uint64_t pid)
 {
-        return S3K_SYSCALL3(S3K_SYSNR_INVOKE_CAP, sup_cid, 1, pid);
+        return S3K_SYSCALL3(S3K_SYSNR_INVOKE_CAP, sup_cid, pid, 1);
 }
 
 static inline uint64_t s3k_supervisor_get_state(uint64_t sup_cid, uint64_t pid)
@@ -157,8 +150,8 @@ static inline uint64_t s3k_supervisor_get_state(uint64_t sup_cid, uint64_t pid)
         register uint64_t a2 __asm__("a2");
         register uint64_t a7 __asm__("a7");
         a0 = sup_cid;
-        a1 = 5;
-        a2 = pid;
+        a1 = pid;
+        a2 = 5;
         a7 = S3K_SYSNR_INVOKE_CAP;
         __asm__ volatile("ecall" : "+r"(a0), "+r"(a1) : "r"(a2), "r"(a7));
         if (a0 != S3K_OK)
@@ -168,12 +161,12 @@ static inline uint64_t s3k_supervisor_get_state(uint64_t sup_cid, uint64_t pid)
 
 static inline uint64_t s3k_supervisor_read_reg(uint64_t sup_cid, uint64_t pid, uint64_t reg_nr)
 {
-        return S3K_SYSCALL4(S3K_SYSNR_INVOKE_CAP, sup_cid, 3, pid, reg_nr);
+        return S3K_SYSCALL4(S3K_SYSNR_INVOKE_CAP, sup_cid, pid, 3, reg_nr);
 }
 
 static inline uint64_t s3k_supervisor_write_reg(uint64_t sup_cid, uint64_t pid, uint64_t reg_nr, uint64_t val)
 {
-        return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, 4, pid, reg_nr, val);
+        return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, pid, 4, reg_nr, val);
 }
 
 static inline cap_t s3k_supervisor_read_cap(uint64_t sup_cid, uint64_t pid, uint64_t cid)
@@ -184,8 +177,8 @@ static inline cap_t s3k_supervisor_read_cap(uint64_t sup_cid, uint64_t pid, uint
         register uint64_t a3 __asm__("a3");
         register uint64_t a7 __asm__("a7");
         a0 = sup_cid;
-        a1 = 5;
-        a2 = pid;
+        a1 = pid;
+        a2 = 5;
         a3 = cid;
         a7 = S3K_SYSNR_INVOKE_CAP;
         __asm__ volatile("ecall" : "+r"(a0), "+r"(a1), "+r"(a2) : "r"(a3), "r"(a7));
@@ -196,14 +189,47 @@ static inline cap_t s3k_supervisor_read_cap(uint64_t sup_cid, uint64_t pid, uint
 
 static inline uint64_t s3k_supervisor_give_cap(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest)
 {
-        return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, 6, pid, src, dest);
+        return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, pid, 6, src, dest);
 }
 
 static inline uint64_t s3k_supervisor_take_cap(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest)
 {
-        return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, 7, pid, src, dest);
+        return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, pid, 7, src, dest);
 }
 
 static inline void s3k_dump_cap(char* buf, int n, cap_t cap)
-{ /* enum cap_type type = cap_get_type(cap); */
+{
+        switch (cap_get_type(cap)) {
+        case CAP_TYPE_MEMORY:
+                s3k_snprintf(buf, n, "MEMORY{begin=0x%lx,end=0x%lx,rwx=%ld,free=0x%lx,pmp=%ld}",
+                             cap_memory_get_begin(cap), cap_memory_get_free(cap), cap_memory_get_end(cap),
+                             cap_memory_get_rwx(cap), cap_memory_get_pmp(cap));
+                break;
+        case CAP_TYPE_PMP:
+                s3k_snprintf(buf, n, "PMP{addr=0x%lx,rwx=%ld}", cap_pmp_get_addr(cap), " rwx=%ld",
+                             cap_pmp_get_rwx(cap));
+                break;
+        case CAP_TYPE_TIME:
+                s3k_snprintf(buf, n, "TIME{hartid=%ld,begin=%ld,end=%ld,free=%ld,depth=%ld}", cap_time_get_hartid(cap),
+                             cap_time_get_begin(cap), cap_time_get_end(cap), cap_time_get_free(cap),
+                             cap_time_get_depth(cap));
+                break;
+        case CAP_TYPE_CHANNELS:
+                s3k_snprintf(buf, n, "CHANNELS{begin=%ld,end=%ld,free=%ld}", cap_channels_get_begin(cap),
+                             cap_channels_get_end(cap), cap_channels_get_free(cap));
+                break;
+        case CAP_TYPE_RECEIVER:
+                s3k_snprintf(buf, n, "RECEIVER{channel=%ld}", cap_receiver_get_channel(cap));
+                break;
+        case CAP_TYPE_SENDER:
+                s3k_snprintf(buf, n, "SENDER{channel=%ld}", cap_sender_get_channel(cap));
+                break;
+        case CAP_TYPE_SUPERVISOR:
+                s3k_snprintf(buf, n, "SUPERVISOR{begin=%ld,end=%ld,free=%ld}", cap_supervisor_get_begin(cap),
+                             cap_supervisor_get_end(cap), cap_supervisor_get_free(cap));
+                break;
+        default:
+                s3k_snprintf(buf, n, "INVALID");
+                break;
+        }
 }

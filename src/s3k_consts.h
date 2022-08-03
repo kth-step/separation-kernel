@@ -1,13 +1,9 @@
 #pragma once
 
-typedef enum s3k_error S3KError;
-typedef enum s3k_sysnr S3KSysnr;
-typedef enum s3k_sysnr_nocap S3KSysnrNoCap;
-
-enum s3k_error {
+typedef enum s3k_error {
         /* No error */
         S3K_OK,
-        /* */
+        /* Unspecified error */
         S3K_ERROR,
         /* Capability missing */
         S3K_EMPTY,
@@ -23,19 +19,18 @@ enum s3k_error {
         S3K_NO_RECEIVER,
         /* */
         S3K_UNIMPLEMENTED = 0xFF
-};
+} s3k_error_t;
 
-enum s3k_sysnr {
-        S3K_SYSNR_GET_PID = -1,
-        S3K_SYSNR_WRITE_REGISTER = -2,
-        S3K_SYSNR_READ_REGISTER = -3,
-        S3K_SYSNR_YIELD = -4,
-
-        S3K_SYSNR_READ_CAP = 0,
+typedef enum s3k_sysnr {
+        S3K_SYSNR_READ_CAP,
         S3K_SYSNR_MOVE_CAP,
         S3K_SYSNR_DELETE_CAP,
         S3K_SYSNR_REVOKE_CAP,
         S3K_SYSNR_DERIVE_CAP,
         S3K_SYSNR_INVOKE_CAP,
-        NUM_OF_CAP_SYSNR
-};
+        S3K_SYSNR_GET_PID,
+        S3K_SYSNR_WRITE_REGISTER,
+        S3K_SYSNR_READ_REGISTER,
+        S3K_SYSNR_YIELD,
+        NUM_OF_SYSNR
+} s3k_sysnr_t;

@@ -8,107 +8,118 @@
 #include "proc.h"
 #include "s3k_consts.h"
 #include "syscall_ipc.h"
-#include "syscall_memory.h"
 #include "syscall_supervisor.h"
 #include "syscall_time.h"
 #include "trap.h"
 #include "utils.h"
 
 /* Function declarations */
-static void syscall_handle_0(registers_t* regs);
+static void syscall_get_pid(registers_t* regs);
+static void syscall_read_reg(registers_t* regs);
+static void syscall_write_reg(registers_t* regs);
+static void syscall_yield(registers_t* regs);
 static void syscall_unimplemented(registers_t* regs, cap_node_t* cn, cap_t cap);
 static void syscall_read_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
 static void syscall_move_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
 static void syscall_delete_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
+static void syscall_revoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
+static void syscall_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
 
-typedef void (*handler_t)(registers_t*, cap_node_t*, cap_t);
+typedef void (*cap_handler_t)(registers_t*, cap_node_t*, cap_t);
+typedef void (*handler_t)(registers_t*);
 
-static handler_t cap_handlers[NUM_OF_CAP_TYPES][NUM_OF_CAP_SYSNR] = {
+static const handler_t handlers[NUM_OF_SYSNR - S3K_SYSNR_GET_PID] = {syscall_get_pid, syscall_read_reg,
+                                                                     syscall_write_reg, syscall_yield};
+
+static const cap_handler_t cap_handlers[NUM_OF_CAP_TYPES][8] = {
     /* EMPTY */
     [CAP_TYPE_EMPTY] =
         {
-            [S3K_SYSNR_READ_CAP] = syscall_read_cap,
+            syscall_read_cap,
+            syscall_unimplemented,
+            syscall_unimplemented,
+            syscall_unimplemented,
+            syscall_unimplemented,
+            syscall_unimplemented,
         },
     /* MEMORY */
     [CAP_TYPE_MEMORY] =
         {
-            [S3K_SYSNR_READ_CAP] = syscall_read_cap,
-            [S3K_SYSNR_MOVE_CAP] = syscall_move_cap,
-            [S3K_SYSNR_DELETE_CAP] = syscall_delete_cap,
-            [S3K_SYSNR_REVOKE_CAP] = syscall_memory_revoke_cap,
-            [S3K_SYSNR_DERIVE_CAP] = syscall_memory_derive_cap,
+            syscall_read_cap,
+            syscall_move_cap,
+            syscall_delete_cap,
+            syscall_revoke_cap,
+            syscall_derive_cap,
+            syscall_unimplemented,
         },
     [CAP_TYPE_PMP] =
         {
-            [S3K_SYSNR_READ_CAP] = syscall_read_cap,
-            [S3K_SYSNR_MOVE_CAP] = syscall_move_cap,
-            [S3K_SYSNR_DELETE_CAP] = syscall_delete_cap,
+            syscall_read_cap,
+            syscall_move_cap,
+            syscall_delete_cap,
+            syscall_unimplemented,
+            syscall_unimplemented,
+            syscall_unimplemented,
         },
     /* TIME */
     [CAP_TYPE_TIME] =
         {
-            [S3K_SYSNR_READ_CAP] = syscall_read_cap,
-            [S3K_SYSNR_MOVE_CAP] = syscall_move_cap,
-            [S3K_SYSNR_DELETE_CAP] = syscall_time_delete_cap,
-            [S3K_SYSNR_REVOKE_CAP] = syscall_time_revoke_cap,
-            [S3K_SYSNR_DERIVE_CAP] = syscall_time_derive_cap,
+            syscall_read_cap,
+            syscall_move_cap,
+            syscall_time_delete_cap,
+            syscall_time_revoke_cap,
+            syscall_time_derive_cap,
+            syscall_unimplemented,
         },
     /* IPC */
     [CAP_TYPE_CHANNELS] =
         {
-            [S3K_SYSNR_READ_CAP] = syscall_read_cap,
-            [S3K_SYSNR_MOVE_CAP] = syscall_move_cap,
-            [S3K_SYSNR_DELETE_CAP] = syscall_delete_cap,
-            [S3K_SYSNR_REVOKE_CAP] = syscall_channels_revoke_cap,
-            [S3K_SYSNR_DERIVE_CAP] = syscall_channels_derive_cap,
+            syscall_read_cap,
+            syscall_move_cap,
+            syscall_delete_cap,
+            syscall_revoke_cap,
+            syscall_derive_cap,
+            syscall_unimplemented,
         },
     [CAP_TYPE_RECEIVER] =
         {
-            [S3K_SYSNR_READ_CAP] = syscall_read_cap,
-            [S3K_SYSNR_MOVE_CAP] = syscall_move_cap,
-            [S3K_SYSNR_DELETE_CAP] = syscall_delete_cap,
-            [S3K_SYSNR_REVOKE_CAP] = syscall_receiver_revoke_cap,
-            [S3K_SYSNR_DERIVE_CAP] = syscall_receiver_derive_cap,
-            [S3K_SYSNR_INVOKE_CAP] = syscall_receiver_invoke_cap,
+            syscall_read_cap,
+            syscall_move_cap,
+            syscall_delete_cap,
+            syscall_revoke_cap,
+            syscall_derive_cap,
+            syscall_receiver_invoke_cap,
         },
     [CAP_TYPE_SENDER] =
         {
-            [S3K_SYSNR_READ_CAP] = syscall_read_cap,
-            [S3K_SYSNR_MOVE_CAP] = syscall_move_cap,
-            [S3K_SYSNR_DELETE_CAP] = syscall_delete_cap,
-            [S3K_SYSNR_INVOKE_CAP] = syscall_sender_invoke_cap,
+            syscall_read_cap,
+            syscall_move_cap,
+            syscall_delete_cap,
+            syscall_unimplemented,
+            syscall_unimplemented,
+            syscall_sender_invoke_cap,
         },
     /* SUPERVISOR */
     [CAP_TYPE_SUPERVISOR] =
         {
-            [S3K_SYSNR_READ_CAP] = syscall_read_cap,
-            [S3K_SYSNR_MOVE_CAP] = syscall_move_cap,
-            [S3K_SYSNR_DELETE_CAP] = syscall_delete_cap,
-            [S3K_SYSNR_REVOKE_CAP] = syscall_supervisor_revoke_cap,
-            [S3K_SYSNR_DERIVE_CAP] = syscall_supervisor_derive_cap,
-            [S3K_SYSNR_INVOKE_CAP] = syscall_supervisor_invoke_cap,
+            syscall_read_cap,
+            syscall_move_cap,
+            syscall_delete_cap,
+            syscall_revoke_cap,
+            syscall_derive_cap,
+            syscall_supervisor_invoke_cap,
         },
 };
 
-void syscall_init(void)
-{
-        for (int i = 0; i < NUM_OF_CAP_TYPES; ++i) {
-                for (int j = 0; j < NUM_OF_CAP_SYSNR; ++j) {
-                        if (cap_handlers[i][j] == NULL)
-                                cap_handlers[i][j] = syscall_unimplemented;
-                }
-        }
-}
-
 void syscall_handler(registers_t* regs)
 {
-        int64_t syscall_nr = regs->a7;
-        if (syscall_nr < 0) {
-                syscall_handle_0(regs);
-        } else if (syscall_nr < NUM_OF_CAP_SYSNR) {
+        uint64_t syscall_nr = regs->a7;
+        if (syscall_nr < S3K_SYSNR_GET_PID) {
                 cap_node_t* cn = proc_get_cap_node(current, regs->a0);
                 cap_t cap = cap_node_get_cap(cn);
                 cap_handlers[cap_get_type(cap)][syscall_nr](regs, cn, cap);
+        } else if (syscall_nr < NUM_OF_SYSNR) {
+                handlers[syscall_nr - S3K_SYSNR_GET_PID](regs);
         } else {
                 exception_handler(regs, 8, 0);
         }
@@ -119,8 +130,6 @@ void syscall_unimplemented(registers_t* regs, cap_node_t* cn, cap_t cap)
         preemption_disable();
         regs->a0 = S3K_UNIMPLEMENTED;
         regs->pc += 4;
-        kprint("UNIMPLEMENTED\n");
-        preemption_disable();
 }
 
 void syscall_read_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
@@ -129,57 +138,131 @@ void syscall_read_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
         regs->a0 = cap.word0;
         regs->a1 = cap.word1;
         regs->pc += 4;
-        preemption_enable();
 }
 
 void syscall_move_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
-        preemption_disable();
         cap_node_t* cndest = proc_get_cap_node(current, regs->a1);
+        preemption_disable();
         if (!cap_node_is_deleted(cndest)) {
                 regs->a0 = S3K_COLLISION;
+                regs->pc += 4;
         } else {
-                regs->a0 = cap_node_move(cn, cndest) ? S3K_OK : S3K_ERROR;
+                cap_node_move(cn, cndest);
+                regs->a0 = S3K_OK;
+                regs->pc += 4;
         }
+}
+
+void syscall_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
+{
+        cap_node_t* newcn = proc_get_cap_node(current, regs->a1);
+        cap_t newcap = (cap_t){regs->a2, regs->a3};
+
+        if (!cap_node_is_deleted(newcn)) {
+                preemption_disable();
+                regs->a0 = S3K_COLLISION;
+                regs->pc += 4;
+        } else if (!cap_can_derive(cap, newcap)) {
+                preemption_disable();
+                regs->a0 = S3K_ILLEGAL_DERIVATION;
+                regs->pc += 4;
+        } else {
+                switch (cap_get_type(newcap)) {
+                case CAP_TYPE_MEMORY:
+                        cap_memory_set_free(&cap, cap_memory_get_end(newcap));
+                        break;
+                case CAP_TYPE_PMP:
+                        cap_memory_set_pmp(&cap, 1);
+                        break;
+                case CAP_TYPE_SUPERVISOR:
+                        cap_supervisor_set_free(&cap, cap_supervisor_get_end(newcap));
+                        break;
+                case CAP_TYPE_CHANNELS:
+                        cap_channels_set_free(&cap, cap_channels_get_end(newcap));
+                        break;
+                case CAP_TYPE_RECEIVER:
+                        cap_channels_set_free(&cap, cap_receiver_get_channel(newcap) + 1);
+                        break;
+                case CAP_TYPE_SENDER:
+                        break;
+                default:
+                        kassert(0);
+                        break;
+                }
+
+                preemption_disable();
+                cap_node_update(cap, cn);
+                cap_node_insert(newcap, newcn, cn);
+                regs->a0 = S3K_OK;
+                regs->pc += 4;
+        }
+}
+
+void syscall_revoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
+{
+        kassert(cap_get_type(cap) == CAP_TYPE_MEMORY);
+
+        cap_node_revoke(cn, cap);
+
+        switch (cap_get_type(cap)) {
+        case CAP_TYPE_MEMORY:
+                cap_memory_set_free(&cap, cap_memory_get_begin(cap));
+                cap_memory_set_pmp(&cap, 0);
+                break;
+        case CAP_TYPE_SUPERVISOR:
+                cap_supervisor_set_free(&cap, cap_supervisor_get_begin(cap));
+                break;
+        case CAP_TYPE_CHANNELS:
+                cap_channels_set_free(&cap, cap_channels_get_begin(cap));
+                break;
+        case CAP_TYPE_RECEIVER:
+                break;
+        default:
+                kassert(0);
+                break;
+        }
+
+        preemption_disable();
+        cap_node_update(cap, cn);
+        regs->a0 = S3K_OK;
         regs->pc += 4;
-        preemption_enable();
 }
 
 void syscall_delete_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
         preemption_disable();
-        regs->a0 = cap_node_delete(cn) ? S3K_OK : S3K_ERROR;
+        cap_node_delete(cn);
+        regs->a0 = S3K_OK;
         regs->pc += 4;
-        preemption_enable();
 }
 
-void syscall_handle_0(registers_t* regs)
+void syscall_get_pid(registers_t* regs)
 {
         preemption_disable();
-        switch (regs->a7) {
-                case S3K_SYSNR_GET_PID:
-                        /* Get the process ID */
-                        regs->a0 = current->pid;
-                        regs->pc += 4;
-                        break;
-                case S3K_SYSNR_READ_REGISTER:
-                        regs->a0 = proc_read_register(current, regs->a0);
-                        regs->pc += 4;
-                        break;
-                case S3K_SYSNR_WRITE_REGISTER:
-                        break;
-                        regs->a0 = proc_write_register(current, regs->a0, regs->a1);
-                        regs->pc += 4;
-                        break;
-                case S3K_SYSNR_YIELD:
-                        regs->timeout = read_timeout(read_csr(mhartid));
-                        regs->pc += 4;
-                        trap_yield();
-                        break;
-                default:
-                        regs->a0 = S3K_UNIMPLEMENTED;
-                        regs->pc += 4;
-                        break;
-        }
-        preemption_enable();
+        /* Get the process ID */
+        regs->a0 = current->pid;
+        regs->pc += 4;
+}
+
+void syscall_read_reg(registers_t* regs)
+{
+        preemption_disable();
+        regs->a0 = proc_read_register(current, regs->a0);
+        regs->pc += 4;
+}
+
+void syscall_write_reg(registers_t* regs)
+{
+        preemption_disable();
+        regs->a0 = proc_write_register(current, regs->a0, regs->a1);
+        regs->pc += 4;
+}
+
+void syscall_yield(registers_t* regs)
+{
+        preemption_disable();
+        regs->timeout = read_timeout(read_csr(mhartid));
+        regs->pc += 4;
+        trap_yield();
 }

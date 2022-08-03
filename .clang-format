@@ -1,7 +1,7 @@
 Language: Cpp
 BasedOnStyle: Google
 
-ColumnLimit: 160
+ColumnLimit: 120
 IndentWidth: 8
 DerivePointerAlignment: false
 PointerAlignment: Left
@@ -10,5 +10,6 @@ AllowShortFunctionsOnASingleLine: None
 AllowShortEnumsOnASingleLine: false
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
+IndentCaseLabels: false
 BreakBeforeBraces: Linux
 SeparateDefinitionBlocks: Always

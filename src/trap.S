@@ -55,8 +55,11 @@ trampoline:
         add     ra,ra,t0
         /* Jump to handler */
         jalr    ra,(ra)
+        /* Enable preemption */
+        csrw    mstatus,8
 
 trap_resume_proc:
+        /* Disable preemption */
         csrw    mstatus,0
         
         /* Set mscratch to proc tp */

@@ -1,24 +1,25 @@
 #pragma once
+#include "atomic.h"
 
-typedef volatile int Lock;
+typedef struct lock {
+        volatile int now_serving;
+        volatile int next_ticket;
+} lock_t;
 
-static inline void lock_acquire(Lock* lock);
-static inline int lock_try_acquire(Lock* lock);
-static inline void lock_release(Lock* lock);
+#define INIT_LOCK ((lock_t){0, 0})
 
-void lock_acquire(Lock* lock)
+static inline void lock_acquire(lock_t* lock);
+static inline void lock_release(lock_t* lock);
+
+void lock_acquire(lock_t* lock)
 {
-        while (!__sync_bool_compare_and_swap(lock, 0, 1))
+        int ticket = fetch_and_add(&lock->next_ticket, 1);
+        while (ticket != lock->now_serving)
                 ;
 }
 
-int lock_try_acquire(Lock* lock)
+void lock_release(lock_t* lock)
 {
-        return __sync_bool_compare_and_swap(lock, 0, 1);
-}
-
-static inline void lock_release(Lock* lock)
-{
-        __sync_synchronize();
-        *lock = 0;
+        synchronize();
+        lock->now_serving++;
 }

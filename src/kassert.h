@@ -4,11 +4,12 @@
 #include "kprint.h"
 #include "platform.h"
 
-#define kassert(val)                                                                                                       \
-        ({                                                                                                                 \
-                while (!(val)) {                                                                                           \
-                        kprintf("Assert '%s' failed at %s:%d in function %s\r\n", #val, __FILE__, __LINE__, __FUNCTION__); \
-                }                                                                                                          \
+#define kassert(val)                                                                                        \
+        ({                                                                                                  \
+                while (!(val)) {                                                                            \
+                        kprintf("Assert '%s' failed at %s:%d in function %s\r\n", #val, __FILE__, __LINE__, \
+                                __FUNCTION__);                                                              \
+                }                                                                                           \
         })
 #else
 #define kassert(val)                             \

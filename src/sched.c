@@ -11,7 +11,7 @@
 #define SCHED_SLICE_OFFSET(sched_slice, hartid) ((sched_slice) << ((hartid)-MIN_HARTID) * 16)
 
 static uint64_t schedule[N_QUANTUM];
-Lock lock = 0;
+lock_t lock = INIT_LOCK;
 
 /* Returns pid and depth on an sched_slice for a hart */
 static inline uint64_t sched_entry(uint64_t sched_slice, uint64_t hartid);
@@ -45,7 +45,7 @@ void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* len
         /* Calculate the current quantum */
         uint64_t quantum = time % N_QUANTUM;
         /* Get the current quantum schedule */
-        __sync_synchronize();
+        synchronize();
         uint64_t sched_slice = schedule[quantum];
         uint64_t pid = sched_pid(sched_slice, hartid);
 
@@ -63,7 +63,8 @@ void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* len
 
         /* Calculate the length of the same time slice */
         uint64_t quantum_end = quantum + 1;
-        while (quantum_end < N_QUANTUM && sched_entry(sched_slice, hartid) == sched_entry(schedule[quantum_end], hartid))
+        while (quantum_end < N_QUANTUM &&
+               sched_entry(sched_slice, hartid) == sched_entry(schedule[quantum_end], hartid))
                 quantum_end++;
 
         /* Set proc and length */
@@ -118,19 +119,14 @@ void sched(void)
         sched_start();
 }
 
-bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end, uint64_t expected_depth, uint64_t desired_pid, uint64_t desired_depth)
+bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end, uint64_t expected_depth,
+                  uint64_t desired_pid, uint64_t desired_depth)
 {
         kassert(begin < end);
         kassert(end <= N_QUANTUM);
         kassert((expected_depth & 0xFFull) == expected_depth);
         kassert((desired_pid & 0xFFull) == desired_pid);
         kassert((desired_depth & 0xFFull) == desired_depth);
-
-        lock_acquire(&lock);
-        if (cap_node_is_deleted(cn)) {
-                lock_release(&lock);
-                return false;
-        }
 
         /* Expected value */
         uint64_t expected = SCHED_SLICE_OFFSET(expected_depth << 8, hartid);
@@ -142,12 +138,15 @@ bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end,
         uint64_t mask_desired = ~SCHED_SLICE_OFFSET(0xFFFFull, hartid);
         uint64_t mask_expected = SCHED_SLICE_OFFSET(0xFF00ull, hartid);
 
+        lock_acquire(&lock);
+        if (cap_node_is_deleted(cn)) {
+                lock_release(&lock);
+                return false;
+        }
+
         for (int i = begin; i < end; ++i) {
-                uint64_t expected_s = schedule[i];
-                if ((expected_s & mask_expected) != expected)
-                        continue;
-                uint64_t desired_s = (expected_s & mask_desired) | desired;
-                schedule[i] = desired_s;
+                if ((schedule[i] & mask_expected) == expected)
+                        schedule[i] = (schedule[i] & mask_desired) | desired;
         }
         lock_release(&lock);
         return true;

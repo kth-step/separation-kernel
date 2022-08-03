@@ -18,10 +18,10 @@
 
 /* Number of ticks per quantum. */
 /* TICKS_PER_SECOND defined in platform.h */
-#define TICKS (TICKS_PER_SECOND / N_QUANTUM)
+#define TICKS (TICKS_PER_SECOND / N_QUANTUM / 60)
 
 /* Number of scheduler ticks. */
-#define SCHEDULER_TICKS 5000
+#define SCHEDULER_TICKS 2000
 
 /* Beginning and end of the user processes' memory region.
  * Used for setting up initial memory of the boot process. */
