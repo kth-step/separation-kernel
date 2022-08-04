@@ -42,14 +42,19 @@ void cypher_provider_main(uint64_t addr_begin, uint64_t addr_end, uint64_t * rea
 }
 
 static int __provide() {
-    char * cypher_start = (char *)(_addr_begin + *_ready_output + message_size_byte_width);
-    *(uint64_t *)(_addr_begin + *_ready_output) = message_len;
+    uint64_t rdy_output = *_ready_output;
+    char * cypher_start = (char *)(_addr_begin + rdy_output + message_size_byte_width);
+    *(uint64_t *)(_addr_begin + rdy_output) = message_len;
     char cypher[message_len];
     int ret = encrypt_message(&plaintext[(counter * message_len) % plaintext_len], cypher, message_len);
 
     if ((uint64_t)cypher_start + message_len > _addr_end) {
-        uint64_t first_len = (uint64_t)cypher_start + message_len - _addr_end;
+        /* Stop execution when we reach address end. 
+           While we have a solution to wrap around, currently the producer produce too fast meaning it overwrites
+           values the consumer has not yet consumed, and this creates issues. */
+        while(1);
 
+        uint64_t first_len = (uint64_t)cypher_start + message_len - _addr_end;
         for (int i = 0; i < first_len; i++) {
             *(cypher_start + i) = cypher[i];
         }
@@ -57,23 +62,25 @@ static int __provide() {
             *(((char *)_addr_begin) + i) = cypher[i + first_len];
         }
         // If we get here some part of the message must have been placed at the end of the region, before wrapping back to the beginning.
-        // Since the message length segment is always the first part of the message, it must have been placed before wrapping back (if it wouldn't have fit before wrapping we would ahve just wrapped
-        // immediately instead of splitting the message; see the end of this function), hence we don't have to consider it here.
-        *_ready_output = message_len - first_len;
+        // Since the message length segment is always the first part of the message, it must have been placed before wrapping back 
+        // (if it wouldn't have fit before wrapping we would have just wrapped immediately instead of splitting the message; see the end of this function), 
+        // hence we don't have to consider it here.
+        rdy_output = message_len - first_len;
     } else {
         for (int i = 0; i < message_len; i++) {
             *(cypher_start + i) = cypher[i];
         }
-        *_ready_output += message_len + message_size_byte_width;
+        rdy_output += message_len + message_size_byte_width;
     }
 
-    if ((_addr_begin + *_ready_output + message_size_byte_width) > _addr_end) {
+    if ((_addr_begin + rdy_output + message_size_byte_width) > _addr_end) {
         // There won't be enough space left to use for the initial size segment; wrap ready tracker back to 0. 
-        *_ready_output = 0;
+        rdy_output = 0;
     }
     counter += 1;
     if (counter == plaintext_len)
         counter = 0;
 
+    *_ready_output = rdy_output;
     return ret;
 }

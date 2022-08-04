@@ -102,15 +102,16 @@ static int __decrypt() {
         // Nothing to decrypt
         return 2;
     }
+    uint64_t rdy_output = *_dec_ready_output;
     // Ready output implicitly keeps track of how many bytes of input we have consumed, hence it's used to offset the begin address.
-    uint64_t cypher_len = *(uint64_t *)(_dec_r_addr_begin + *_dec_ready_output);
+    uint64_t cypher_len = *(uint64_t *)(_dec_r_addr_begin + rdy_output);
     if (cypher_len % block_size != 0) {
         // Cypher must be multiple of block size
         return -2;
     }
-    char * cypher_start = (char *)(_dec_r_addr_begin + *_dec_ready_output + message_size_byte_width);
-    char * plaintext_start = (char *)(_dec_w_addr_begin + *_dec_ready_output + message_size_byte_width);
-    *(uint64_t *)(_dec_w_addr_begin + *_dec_ready_output) = cypher_len;
+    char * cypher_start = (char *)(_dec_r_addr_begin + rdy_output + message_size_byte_width);
+    char * plaintext_start = (char *)(_dec_w_addr_begin + rdy_output + message_size_byte_width);
+    *(uint64_t *)(_dec_w_addr_begin + rdy_output) = cypher_len;
     char cypher[cypher_len];
     char plaintext[cypher_len];
     int ret;
@@ -135,7 +136,7 @@ static int __decrypt() {
         // If we get here some part of the message must have been placed at the end of the region, before wrapping back to the beginning.
         // Since the message length segment is always the first part of the message, it must have been placed before wrapping back (if it wouldn't have fit before wrapping we would ahve just wrapped
         // immediately instead of splitting the message; see the end of this function), hence we don't have to consider it here.
-        *_dec_ready_output = cypher_len - first_len;
+        rdy_output = cypher_len - first_len;
     } else {
         for (int i = 0; i < cypher_len; i++) {
             cypher[i] = *(cypher_start + i);
@@ -144,13 +145,14 @@ static int __decrypt() {
         for (int i = 0; i < cypher_len; i++) {
             *(plaintext_start + i) = plaintext[i];
         }
-        *_dec_ready_output += cypher_len + message_size_byte_width;
+        rdy_output += cypher_len + message_size_byte_width;
     }
 
-    if ((_dec_w_addr_begin + *_dec_ready_output + message_size_byte_width) > _dec_w_addr_end) {
+    if ((_dec_w_addr_begin + rdy_output + message_size_byte_width) > _dec_w_addr_end) {
         // There won't be enough space left to use for the initial size segment; wrap ready tracker back to 0. 
-        *_dec_ready_output = 0;
+        rdy_output = 0;
     }
 
+    *_dec_ready_output = rdy_output;
     return ret;
 }

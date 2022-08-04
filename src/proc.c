@@ -32,6 +32,7 @@ extern void user_code();
         extern void crypto_decrypt_code();
         extern void cypher_provider_code();
         extern void plaintext_consumer_code();
+        char crypto_memory_area[CRYPTO_MEMORY_SIZE];
 #endif
 
 /* Defined in proc.h */
@@ -77,6 +78,10 @@ void ProcCryptoAppInit() {
         processes[0].pc = (uintptr_t)crypto_decrypt_code;
         processes[1].pc = (uintptr_t)cypher_provider_code;
         processes[2].pc = (uintptr_t)plaintext_consumer_code;
+        for (int i = 0; i < CRYPTO_MEMORY_SIZE; i++) {
+                crypto_memory_area[i] = 0;
+        }
+        
 }
 #endif
 

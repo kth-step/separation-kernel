@@ -38,19 +38,24 @@ plaintext_consumer_code:
         mv      sp,a2
 
         // Prepare user data
-        li      a0,0x90000000
-
+        /* Load some constants we will use */
         li      t0,2
         li      t1,8
+        li      t2,CRYPTO_MEMORY_SIZE
 
-        li      t2,0xa0000000
+        /* Load the beginning of the memory area */
+        la      a0,crypto_memory_area
+        /* Get the end of the memory area */
+        add     t3,a0,t2
 
-        sub     a4,t2,t1
-        sub     a5,t2,t1
+        /* Load end - 8 bytes into arguments */
+        sub     a4,t3,t1
+        sub     a5,t3,t1
 
-        sub     t3,t2,a0
-        div     t3,t3,t0 
+        /* Get middle of memory area */
+        div     t3,t2,t0 
         add     t2,a0,t3
+        /* Add middle of memory area as argument, and middle - 8 bytes as arguments */
         addi    a3,t2,0
         sub     a1,t2,t1
         sub     a2,t2,t1
