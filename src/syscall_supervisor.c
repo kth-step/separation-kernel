@@ -6,21 +6,24 @@
 #include "s3k_consts.h"
 #include "utils.h"
 
-static void syscall_supervisor_suspend(registers_t* regs, cap_node_t* cn, cap_t cap, proc_t* supervisee)
+static void syscall_supervisor_suspend(registers_t* regs, cap_node_t* cn, cap_t cap,
+                                       proc_t* supervisee)
 {
         preemption_disable();
         regs->a0 = proc_supervisor_suspend(supervisee);
         regs->pc += 4;
 }
 
-static void syscall_supervisor_resume(registers_t* regs, cap_node_t* cn, cap_t cap, proc_t* supervisee)
+static void syscall_supervisor_resume(registers_t* regs, cap_node_t* cn, cap_t cap,
+                                      proc_t* supervisee)
 {
         preemption_disable();
         regs->a0 = proc_supervisor_resume(supervisee);
         regs->pc += 4;
 }
 
-static void syscall_supervisor_get_state(registers_t* regs, cap_node_t* cn, cap_t cap, proc_t* supervisee)
+static void syscall_supervisor_get_state(registers_t* regs, cap_node_t* cn, cap_t cap,
+                                         proc_t* supervisee)
 {
         preemption_disable();
         regs->a0 = S3K_OK;
@@ -28,7 +31,8 @@ static void syscall_supervisor_get_state(registers_t* regs, cap_node_t* cn, cap_
         regs->pc += 4;
 }
 
-static void syscall_supervisor_read_reg(registers_t* regs, cap_node_t* cn, cap_t cap, proc_t* supervisee)
+static void syscall_supervisor_read_reg(registers_t* regs, cap_node_t* cn, cap_t cap,
+                                        proc_t* supervisee)
 {
         preemption_disable();
         if (proc_supervisor_acquire(supervisee)) {
@@ -41,7 +45,8 @@ static void syscall_supervisor_read_reg(registers_t* regs, cap_node_t* cn, cap_t
         regs->pc += 4;
 }
 
-static void syscall_supervisor_write_reg(registers_t* regs, cap_node_t* cn, cap_t cap, proc_t* supervisee)
+static void syscall_supervisor_write_reg(registers_t* regs, cap_node_t* cn, cap_t cap,
+                                         proc_t* supervisee)
 {
         preemption_disable();
         if (proc_supervisor_acquire(supervisee)) {
@@ -54,7 +59,8 @@ static void syscall_supervisor_write_reg(registers_t* regs, cap_node_t* cn, cap_
         regs->pc += 4;
 }
 
-static void syscall_supervisor_read_cap(registers_t* regs, cap_node_t* cn, cap_t cap, proc_t* supervisee)
+static void syscall_supervisor_read_cap(registers_t* regs, cap_node_t* cn, cap_t cap,
+                                        proc_t* supervisee)
 {
         preemption_disable();
         if (proc_supervisor_acquire(supervisee)) {
@@ -69,7 +75,8 @@ static void syscall_supervisor_read_cap(registers_t* regs, cap_node_t* cn, cap_t
         regs->pc += 4;
 }
 
-static void syscall_supervisor_give_cap(registers_t* regs, cap_node_t* cn, cap_t cap, proc_t* supervisee)
+static void syscall_supervisor_give_cap(registers_t* regs, cap_node_t* cn, cap_t cap,
+                                        proc_t* supervisee)
 {
         preemption_disable();
         if (proc_supervisor_acquire(supervisee)) {
@@ -82,7 +89,8 @@ static void syscall_supervisor_give_cap(registers_t* regs, cap_node_t* cn, cap_t
         }
 }
 
-static void syscall_supervisor_take_cap(registers_t* regs, cap_node_t* cn, cap_t cap, proc_t* supervisee)
+static void syscall_supervisor_take_cap(registers_t* regs, cap_node_t* cn, cap_t cap,
+                                        proc_t* supervisee)
 {
         preemption_disable();
         if (proc_supervisor_acquire(supervisee)) {

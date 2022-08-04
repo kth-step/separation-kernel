@@ -14,5 +14,5 @@
 void sched(void);
 void sched_start(void);
 
-bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end, uint64_t depth_expected,
-                  uint64_t pid_desired, uint64_t depth_desired);
+bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end,
+                  uint64_t depth_expected, uint64_t pid_desired, uint64_t depth_desired);

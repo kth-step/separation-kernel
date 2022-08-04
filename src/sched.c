@@ -119,8 +119,8 @@ void sched(void)
         sched_start();
 }
 
-bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end, uint64_t expected_depth,
-                  uint64_t desired_pid, uint64_t desired_depth)
+bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end,
+                  uint64_t expected_depth, uint64_t desired_pid, uint64_t desired_depth)
 {
         kassert(begin < end);
         kassert(end <= N_QUANTUM);

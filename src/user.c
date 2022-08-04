@@ -25,7 +25,6 @@ void dump_cap(char* name)
         lock_release(&lock);
 }
 
-
 void main_supervisor(uint64_t pid, uint64_t begin, uint64_t end)
 {
         dump_cap("supervisor");

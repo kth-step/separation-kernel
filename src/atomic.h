@@ -8,8 +8,8 @@
 #define fetch_and_add(ptr, val) __sync_fetch_and_add(ptr, val)
 
 #ifndef BUILTIN_ATOMIC
-// the builtin atomic compare_and_swap/set always uses registers a0 and a1 as temporary registers, selects the temporary
-// registers dynamically, reducing the amount of stack usage.
+// the builtin atomic compare_and_swap/set always uses registers a0 and a1 as temporary registers,
+// selects the temporary registers dynamically, reducing the amount of stack usage.
 #define compare_and_swap(ptr, expected, desired)                      \
         ({                                                            \
                 register uint64_t tmp0, tmp1;                         \
@@ -37,7 +37,8 @@
                 }                                                     \
                 (typeof(*ptr))tmp0;                                   \
         })
-#define compare_and_set(ptr, expected, desired) (compare_and_swap(ptr, expected, desired) == expected)
+#define compare_and_set(ptr, expected, desired) \
+        (compare_and_swap(ptr, expected, desired) == expected)
 #else
 #define compare_and_set(ptr, expected, desired) __sync_bool_compare_and_swap(ptr, expected, desired)
 #define compare_and_swap(ptr, expected, desired) __sync_val_compare_and_swap(ptr, expected, desired)
@@ -64,8 +65,8 @@ static inline void* marked_pointer_get(marked_pointer_t* mptr, int* mark)
         return (void*)(data & ~1ull);
 }
 
-static inline bool marked_pointer_compare_and_set(marked_pointer_t* ptr, void* old_ptr, void* new_ptr, int old_mark,
-                                                  int new_mark)
+static inline bool marked_pointer_compare_and_set(marked_pointer_t* ptr, void* old_ptr,
+                                                  void* new_ptr, int old_mark, int new_mark)
 {
         uint64_t old_data = (uint64_t)old_ptr | old_mark;
         uint64_t new_data = (uint64_t)new_ptr | new_mark;

@@ -28,8 +28,8 @@ static void syscall_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
 typedef void (*cap_handler_t)(registers_t*, cap_node_t*, cap_t);
 typedef void (*handler_t)(registers_t*);
 
-static const handler_t handlers[NUM_OF_SYSNR - S3K_SYSNR_GET_PID] = {syscall_get_pid, syscall_read_reg,
-                                                                     syscall_write_reg, syscall_yield};
+static const handler_t handlers[NUM_OF_SYSNR - S3K_SYSNR_GET_PID] = {
+    syscall_get_pid, syscall_read_reg, syscall_write_reg, syscall_yield};
 
 static const cap_handler_t cap_handlers[NUM_OF_CAP_TYPES][8] = {
     /* EMPTY */

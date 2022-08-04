@@ -4,7 +4,8 @@
 #include "syscall_supervisor.h"
 #include "syscall_time.h"
 
-static inline uint64_t interprocess_move(proc_t* psrc, proc_t* pdest, uint64_t cidsrc, uint64_t ciddest)
+static inline uint64_t interprocess_move(proc_t* psrc, proc_t* pdest, uint64_t cidsrc,
+                                         uint64_t ciddest)
 {
         cap_node_t* cnsrc = proc_get_cap_node(psrc, cidsrc);
         cap_node_t* cndest = proc_get_cap_node(pdest, ciddest);

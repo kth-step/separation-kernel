@@ -6,8 +6,8 @@ void syscall_time_delete_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
 void syscall_time_revoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
 void syscall_time_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap);
 
-static inline uint64_t time_interprocess_move(cap_t cap, proc_t* psrc, proc_t* pdest, cap_node_t* cnsrc,
-                                              cap_node_t* cndest)
+static inline uint64_t time_interprocess_move(cap_t cap, proc_t* psrc, proc_t* pdest,
+                                              cap_node_t* cnsrc, cap_node_t* cndest)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_TIME);
 

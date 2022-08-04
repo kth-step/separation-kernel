@@ -13,7 +13,8 @@ static inline char* outputStr(char* buf, char* ebuf, const char* s)
         return buf;
 }
 
-static inline char* output64(char* buf, char* ebuf, long long n, int sig, int base, char padding, int padd_width)
+static inline char* output64(char* buf, char* ebuf, long long n, int sig, int base, char padding,
+                             int padd_width)
 {
         char buff[32];
         buff[31] = '\0';
@@ -44,7 +45,8 @@ static inline char* output64(char* buf, char* ebuf, long long n, int sig, int ba
         return outputStr(buf, ebuf, c);
 }
 
-static inline char* output32(char* buf, char* ebuf, int n, bool sig, int base, char padding, int padd_width)
+static inline char* output32(char* buf, char* ebuf, int n, bool sig, int base, char padding,
+                             int padd_width)
 {
         char buff[16];
         buff[15] = '\0';
@@ -100,7 +102,8 @@ int vsnprintf(char* buf, size_t n, const char* format, va_list args)
                 if (*f == 'd') {
                         buf = output32(buf, ebuf, va_arg(args, int), true, 10, padding, padd_width);
                 } else if (*f == 'u') {
-                        buf = output32(buf, ebuf, va_arg(args, int), false, 10, padding, padd_width);
+                        buf =
+                            output32(buf, ebuf, va_arg(args, int), false, 10, padding, padd_width);
                 } else if (*f == 'x') {
                         buf = output32(buf, ebuf, va_arg(args, int), false, 1, padding, padd_width);
                 } else if (*f == 's') {
@@ -112,11 +115,14 @@ int vsnprintf(char* buf, size_t n, const char* format, va_list args)
                 } else if (*f == 'l') {
                         f++;
                         if (*f == 'd') {
-                                buf = output64(buf, ebuf, va_arg(args, long long), true, 10, padding, padd_width);
+                                buf = output64(buf, ebuf, va_arg(args, long long), true, 10,
+                                               padding, padd_width);
                         } else if (*f == 'u') {
-                                buf = output64(buf, ebuf, va_arg(args, long long), false, 10, padding, padd_width);
+                                buf = output64(buf, ebuf, va_arg(args, long long), false, 10,
+                                               padding, padd_width);
                         } else if (*f == 'x') {
-                                buf = output64(buf, ebuf, va_arg(args, long long), false, 16, padding, padd_width);
+                                buf = output64(buf, ebuf, va_arg(args, long long), false, 16,
+                                               padding, padd_width);
                         } else {
                                 __builtin_unreachable();
                         }

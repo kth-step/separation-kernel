@@ -23,7 +23,8 @@ static inline proc_t* get_listener(uint64_t channel)
         return listeners[channel];
 }
 
-static inline void pass_message(proc_t* sender, proc_t* receiver, uint64_t src, uint64_t dest, uint64_t can_grant)
+static inline void pass_message(proc_t* sender, proc_t* receiver, uint64_t src, uint64_t dest,
+                                uint64_t can_grant)
 {
         if (src < N_CAPS && dest < N_CAPS && can_grant) {
                 interprocess_move(current, receiver, src, dest);
