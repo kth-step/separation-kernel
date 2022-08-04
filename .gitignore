@@ -3,3 +3,4 @@ build
 offsets.h
 remote/
 results/
+lib_aes.a

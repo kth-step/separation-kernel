@@ -9,11 +9,13 @@ S_SRCS=$(wildcard src/*.S)
 C_SRCS=$(wildcard src/*.c)
 C_HDRS=$(wildcard src/*.h)
 
+AES_PATH=crypto-app/wolfssl/
+AES_OBJ=$(AES_PATH)aes.o
+AES_LIB=$(AES_PATH)lib_aes.a
+
 S_SRCS+=$(wildcard crypto-app/*.S)
 C_SRCS+=$(wildcard crypto-app/*.c)
 C_HDRS+=$(wildcard crypto-app/*.h)
-
-C_SRCS+= crypto-app/wolfssl/aes.c
 C_SRCS:=$(filter-out crypto-app/test.c, $(C_SRCS))
 
 ELF=$(BUILD_DIR)/$(PROGRAM).elf
@@ -81,14 +83,20 @@ benchmark-board:
 
 # Build instructions
 
+$(AES_OBJ): $(AES_PATH)aes.c
+	@$(CC) $(CFLAGS) -o $@ $(AES_PATH)aes.c -c
+
+$(AES_LIB): $(AES_OBJ)
+	ar -vq $(AES_LIB) $(AES_OBJ)
+
 $(BUILD_DIR):
 	@mkdir -p $@
 
 $(ELF): Makefile config.mk | $(BUILD_DIR)
 
-$(BUILD_DIR)/%.elf: $(C_HDRS) $(C_SRCS) $(S_SRCS) config.lds
+$(BUILD_DIR)/%.elf: $(C_HDRS) $(C_SRCS) $(S_SRCS) config.lds $(AES_LIB)
 	@echo "Compiling ELF file:\t$(S_SRCS) $(C_SRCS) ==> $@ \n"
-	@$(CC) $(CFLAGS) -o $@ $(S_SRCS) $(C_SRCS)
+	@$(CC) $(CFLAGS) -o $@ $(S_SRCS) $(C_SRCS) $(AES_LIB)
 
 $(BUILD_DIR)/%.da: $(ELF)
 	@echo "Producing DA file:\t$^ ==> $@"
