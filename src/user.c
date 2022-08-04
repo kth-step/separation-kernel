@@ -6,6 +6,8 @@
 #include "lock.h"
 #include "s3k.h"
 
+extern void user_code();
+
 void dump_cap(char* name)
 {
         static lock_t lock = INIT_LOCK;
@@ -23,13 +25,9 @@ void dump_cap(char* name)
         lock_release(&lock);
 }
 
-void user_code();
-
-char buf[4096];
 
 void main_supervisor(uint64_t pid, uint64_t begin, uint64_t end)
 {
-        kprintf("pid=%d", pid);
         dump_cap("supervisor");
         // s3k_delete_cap(5);
         s3k_delete_cap(6);
@@ -52,30 +50,26 @@ void main_supervisor(uint64_t pid, uint64_t begin, uint64_t end)
 
 void main_uart(uint64_t pid, uint64_t begin, uint64_t end)
 {
-        kprintf("pid=%d", pid);
         dump_cap("uart");
         cap_t new_time = cap_mk_time(1, 8, 12, 8, 2);
         s3k_derive_cap(0, 2, new_time);
+        dump_cap("uart");
         uint64_t msg[4] = {0, 1, 2, 3};
         kprintf("Send message to supervisor %d\n", s3k_send(1, msg, 2, 0));
-        dump_cap("uart\t");
-        s3k_revoke_cap(0);
+        dump_cap("uart");
 }
 
 void main_app1(uint64_t pid, uint64_t begin, uint64_t end)
 {
-        kprintf("pid=%d", pid);
         dump_cap("app1");
 }
 
 void main_app2(uint64_t pid, uint64_t begin, uint64_t end)
 {
-        kprintf("pid=%d", pid);
         dump_cap("app2");
 }
 
 void main_crypt(uint64_t pid, uint64_t begin, uint64_t end)
 {
-        kprintf("pid=%d", pid);
         dump_cap("crypto");
 }

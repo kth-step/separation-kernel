@@ -18,7 +18,7 @@ static inline uint64_t time_interprocess_move(cap_t cap, proc_t* psrc, proc_t* p
 
         if (!cap_node_is_deleted(cndest))
                 return S3K_COLLISION;
-        return cap_node_move(cnsrc, cndest) && sched_update(cndest, hartid, begin, end, depth, pdest->pid, depth)
-                   ? S3K_OK
-                   : S3K_ERROR;
+        cap_node_move(cnsrc, cndest);
+        sched_update(cndest, hartid, begin, end, depth, pdest->pid, depth);
+        return S3K_OK;
 }

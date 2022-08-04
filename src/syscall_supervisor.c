@@ -99,6 +99,7 @@ static void syscall_supervisor_take_cap(registers_t* regs, cap_node_t* cn, cap_t
 void syscall_supervisor_invoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_SUPERVISOR);
+        kassert(regs == &current->regs);
         uint64_t pid = regs->a1;
         if (pid < cap_supervisor_get_free(cap) || pid >= cap_supervisor_get_end(cap)) {
                 preemption_disable();

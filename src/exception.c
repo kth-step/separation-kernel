@@ -4,6 +4,7 @@
 
 void exception_handler(registers_t* regs, uint64_t mcause, uint64_t mtval)
 {
+        kassert(regs == &current->regs);
         preemption_disable();
         /* Save pc, sp, a0, a1 to trap frame */
         regs->ppc = regs->pc;
@@ -15,7 +16,6 @@ void exception_handler(registers_t* regs, uint64_t mcause, uint64_t mtval)
         regs->sp = regs->tsp;
         regs->a0 = mcause;
         regs->a1 = mtval;
-        preemption_enable();
 }
 
 #define URET 0x0020000073
@@ -24,6 +24,7 @@ void exception_handler(registers_t* regs, uint64_t mcause, uint64_t mtval)
 
 void illegal_instruction_handler(registers_t* regs, uint64_t mcause, uint64_t mtval)
 {
+        kassert(regs == &current->regs);
         if (mtval == URET || mtval == SRET || mtval == MRET) {
                 /* Restore sp, pc, a0, a1 */
                 preemption_disable();
@@ -31,7 +32,6 @@ void illegal_instruction_handler(registers_t* regs, uint64_t mcause, uint64_t mt
                 regs->pc = regs->ppc;
                 regs->a0 = regs->pa0;
                 regs->a1 = regs->pa1;
-                preemption_enable();
         } else {
                 exception_handler(regs, mcause, mtval);
         }

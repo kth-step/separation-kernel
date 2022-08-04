@@ -51,6 +51,18 @@ caps:
       - grant 1
     asserts:
       - 'channel < N_CHANNELS'
+  - name: server 
+    fields:
+      - channel 2
+      - grant 1
+    asserts:
+      - 'channel < N_CHANNELS'
+  - name: client 
+    fields:
+      - channel 2
+      - grant 1
+    asserts:
+      - 'channel < N_CHANNELS'
   - name: supervisor
     fields:
       - begin 1
@@ -100,6 +112,20 @@ is_child:
     child: sender 
     relations:
       - 'p:channel == c:channel'
+  - parent: channels
+    child: server 
+    relations:
+      - 'p:begin <= c:channel'
+      - 'c:channel < p:end'
+  - parent: channels
+    child: client 
+    relations:
+      - 'p:begin <= c:channel'
+      - 'c:channel < p:end'
+  - parent: server 
+    child: client 
+    relations:
+      - 'p:channel == c:channel'
   - parent: supervisor
     child: supervisor
     relations:
@@ -146,6 +172,16 @@ can_derive:
       - 'c:channel < p:end'
   - parent: receiver 
     child: sender
+    relations:
+      - 'p:channel == c:channel'
+      - 'c:grant == 1 || c:grant == 0'
+  - parent: channels
+    child: server
+    relations:
+      - 'p:free <= c:channel'
+      - 'c:channel < p:end'
+  - parent: server
+    child: client
     relations:
       - 'p:channel == c:channel'
       - 'c:grant == 1 || c:grant == 0'

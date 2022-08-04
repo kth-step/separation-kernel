@@ -6,6 +6,7 @@
 void syscall_time_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_TIME);
+        kassert(regs == &current->regs);
 
         cap_node_t* newcn = proc_get_cap_node(current, regs->a1);
         cap_t newcap = (cap_t){regs->a2, regs->a3};
@@ -40,6 +41,7 @@ void syscall_time_derive_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 void syscall_time_revoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_TIME);
+        kassert(regs == &current->regs);
 
         /* Special revoke routine */
         cap_node_revoke_time(cn, cap);
@@ -59,6 +61,8 @@ void syscall_time_revoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 
 void syscall_time_delete_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
 {
+        kassert(cap_get_type(cap) == CAP_TYPE_TIME);
+        kassert(regs == &current->regs);
         uint64_t hartid = cap_time_get_hartid(cap);
         uint64_t begin = cap_time_get_begin(cap);
         uint64_t end = cap_time_get_end(cap);

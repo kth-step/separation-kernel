@@ -47,6 +47,7 @@ struct proc {
         uint64_t pid;
         uint64_t state;
         cap_node_t* cap_table;
+        proc_t *client;
 };
 
 extern proc_t processes[N_PROC];

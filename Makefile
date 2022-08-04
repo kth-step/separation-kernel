@@ -21,7 +21,7 @@ CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Ibsp/$(BSP)
 CFLAGS+=-Wall -fanalyzer 
 CFLAGS+=-MMD
-#CFLAGS+= -DNDEBUG
+CFLAGS+= -DNDEBUG
 
 # Commands
 .PHONY: all settings format clean size cloc qemu tags
