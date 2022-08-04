@@ -7,7 +7,7 @@
 #include "s3k.h"
 #include "timer.h"
 
-#define IPC_DEBUG 1
+#define IPC_DEBUG 0
 
 #if IPC_DEBUG != 0
     volatile uint64_t ipc_counter1 = 0;

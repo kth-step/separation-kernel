@@ -97,6 +97,50 @@ for hart, hart_vals in enumerate(values):
     for i in range(len(hart_vals)):
         output += str(hart_vals[i]) + "\n"
 
+with open("./src/config.h", "r") as f:
+    name = "./results/benchmark_results"
+    q = "-1"
+    c = "-1"
+    p = "-1"
+    perf = False
+    perf_sched = False
+    actual_2_ticks = False
+    ticks = -1
+    slack_ticks = -1
+
+    ipc = False
+    for line in f.readlines():
+        if "#define N_QUANTUM " in line:
+            q = line[len("#define N_QUANTUM "):-1]
+        if "    #define N_CORES " in line and is_qemu is False and c == "-1":
+            c = line[len("    #define N_CORES "):-1]
+        if "#define N_PROC " in line:
+            p = line[len("#define N_PROC "):-1]
+        if "#define TIME_SLOT_LOANING_SIMPLE 1" in line:
+            perf = True
+        if "#define PERFORMANCE_SCHEDULING 1" in line:
+            perf_sched = True
+        if "#define ONLY_2_PROC_IPC 1" in line:
+            actual_2_ticks = True
+        if "#define TICKS " in line:
+            ticks = int(line[len("#define TICKS "):-3])
+        if "#define SLACK_TICKS " in line:
+            slack_ticks = int(line[len("#define SLACK_TICKS "):-3])
+        if "#define IPC_BENCHMARK 1" in line:
+            ipc = True
+
+    if ipc:
+        name += "_performance" if perf else "_baseline"
+        name += "_" + q + "q_" + c + "c_" + p + "p"
+        if actual_2_ticks:
+            name += "_actual2p"
+        name += "_" + str(ticks-slack_ticks) + "tick"
+        if perf_sched:
+            name += "_perf_sched"
+        
+        output_file = name + ".txt"
+
+
 # Write output to file and end script #
 with open(output_file, "w") as f:
     f.write(output)

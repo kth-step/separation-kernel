@@ -7,7 +7,7 @@
 
 #if QEMU_DEBUGGING == 0
     /* Number of cores when running on the board. */
-    #define N_CORES 1//4
+    #define N_CORES 1
 #else
     /* Number of cores when running in QEMU. */
     #define N_CORES 2
@@ -29,11 +29,11 @@
 #endif
 
 /* Number of time slices in a major frame. */
-#define N_QUANTUM 1 
+#define N_QUANTUM 256
 /* Number of ticks per quantum. */
-#define TICKS 9UL
+#define TICKS 451UL
 /* Number of slack ticks (buffer) for scheduler. */
-#define SLACK_TICKS 8UL
+#define SLACK_TICKS 450UL
 
 /* Stack size. */
 #define STACK_SIZE (1024*2)
@@ -59,7 +59,7 @@
 
 #define SCHEDULE_BENCHMARK 0
 #define IPC_BENCHMARK 1
-#define ONLY_2_PROC_IPC 1
+#define ONLY_2_PROC_IPC 0 
 
 /* Currently 1 round = 1 quantum, and the duration consequently assumes a process is only scheduled for one quantum. */
 #define BENCHMARK_DURATION (TICKS_PER_SECOND*0)
