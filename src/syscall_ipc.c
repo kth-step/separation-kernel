@@ -35,61 +35,53 @@ static inline void pass_message(proc_t* sender, proc_t* receiver, uint64_t src, 
         receiver->regs.a4 = sender->regs.a4;
 }
 
-void syscall_receiver_invoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
+void syscall_receiver_invoke_cap(cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER);
-        kassert(regs = &current->regs);
 
         uint64_t channel = cap_receiver_get_channel(cap);
-        if (!set_listener(cn, current, channel)) {
-                preemption_disable();
-                regs->a0 = S3K_EMPTY;
-                regs->pc += 4;
-        } else {
-                preemption_disable();
-                if (proc_receiver_wait(current, channel)) {
-                        /* Process wait for message */
-                        trap_yield();
-                }
+        if (!set_listener(cn, current, channel))
+                trap_syscall_exit(S3K_EMPTY);
+        preemption_disable();
+        if (proc_receiver_wait(current, channel)) {
+                /* Process wait for message */
+                trap_yield();
         }
+        trap_syscall_exit(S3K_ERROR);
 }
 
-void syscall_sender_invoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
+void syscall_sender_invoke_cap(cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_SENDER);
-        kassert(regs = &current->regs);
 
         uint64_t channel = cap_sender_get_channel(cap);
         proc_t* receiver = get_listener(channel);
 
         preemption_disable();
-        if (receiver == NULL || !proc_sender_acquire(receiver, channel)) {
-                regs->a0 = S3K_NO_RECEIVER;
-                regs->pc += 4;
-        } else {
-                uint64_t src = regs->a5 & 0xFF;
-                uint64_t dest = receiver->regs.a5 & 0xFF;
-                uint64_t can_grant = cap_sender_get_grant(cap);
-                pass_message(current, receiver, src, dest, can_grant);
-                receiver->regs.a0 = S3K_OK;
-                receiver->regs.pc += 4;
-                proc_sender_release(receiver);
+        if (receiver == NULL || !proc_sender_acquire(receiver, channel))
+                trap_syscall_exit(S3K_NO_RECEIVER);
 
-                regs->a0 = S3K_OK;
-                regs->pc += 4;
-                if (regs->a6)
-                        trap_yield();
-        }
+        uint64_t src = current->regs.a5 & 0xFF;
+        uint64_t dest = receiver->regs.a5 & 0xFF;
+        uint64_t can_grant = cap_sender_get_grant(cap);
+        pass_message(current, receiver, src, dest, can_grant);
+        receiver->regs.a0 = S3K_OK;
+        receiver->regs.pc += 4;
+        proc_sender_release(receiver);
+
+        if (current->regs.a6)
+                trap_yield();
+        trap_syscall_exit(S3K_OK);
 }
 
-void syscall_server_invoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
+void syscall_server_invoke_cap(cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_SERVER);
-        kassert(regs == &current->regs);
+        trap_syscall_exit(S3K_UNIMPLEMENTED);
 }
 
-void syscall_client_invoke_cap(registers_t* regs, cap_node_t* cn, cap_t cap)
+void syscall_client_invoke_cap(cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_SERVER);
-        kassert(regs == &current->regs);
+        trap_syscall_exit(S3K_UNIMPLEMENTED);
 }

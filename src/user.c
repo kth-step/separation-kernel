@@ -35,11 +35,12 @@ void main_supervisor(uint64_t pid, uint64_t begin, uint64_t end)
         cap_t new_sender = cap_mk_sender(0, 1);
         s3k_derive_cap(2, 20, new_receiver);
         s3k_derive_cap(20, 21, new_sender);
+        dump_cap("supervisor");
         s3k_supervisor_give_cap(3, 1, 4, 0);
         s3k_supervisor_give_cap(3, 1, 21, 1);
         s3k_supervisor_write_reg(3, 1, 0, (uint64_t)(user_code));
         s3k_supervisor_write_reg(3, 1, 10, 1);
-        s3k_supervisor_resume(3, 1);
+        kprintf("Supervisor resume %d\n", s3k_supervisor_resume(3, 1));
         uint64_t msg[4];
         kprintf("Receive message %d\n", s3k_receive(20, msg, 10, 0));
         kprintf("Message %d,%d,%d,%d\n", msg[0], msg[1], msg[2], msg[3]);

@@ -101,7 +101,7 @@ def make_cap_functions(data):
     
 def make_translator(case):
     pairs = []
-    for rel in case['relations']:
+    for rel in case['conditions']:
         pairs += re.findall(r'\w:[a-z]+', rel)
     pairs = list(set(pairs))
     dic = dict()
@@ -112,27 +112,25 @@ def make_translator(case):
         if v == 'c':
             dic[pair] = f"cap_{case['child']}_get_{f}(c)"
     rels = []
-    for rel in case['relations']:
+    for rel in case['conditions']:
         for key, val in dic.items():
             rel = rel.replace(key, val) 
-        rels.append(rel)
-    case['relations'] = rels
+        rels.append("(" + rel + ")")
+    case['conditions'] = rels
         
 def make_pred_case(case):
     parent_type = f"CAP_TYPE_{case['parent'].upper()}"
     child_type = f"CAP_TYPE_{case['child'].upper()}"
     make_translator(case)
-    print(f"if (parent_type == {parent_type} && child_type == {child_type}) {{")
-    for rel in case['relations']:
-        print(f"b &= {rel};")
-    print("return b;}")
+    print(f"if (parent_type == {parent_type} && child_type == {child_type})")
+    print(f"return {'&&'.join(case['conditions'])};")
 
-def make_pred(name, cases):
+def make_pred(p):
+    name=p['name']
     print(f"static inline int cap_{name}(cap_t p, cap_t c) {{")
-    print("int b = 1;")
     print("cap_type_t parent_type = cap_get_type(p);")
     print("cap_type_t child_type = cap_get_type(c);")
-    for case in cases:
+    for case in p['cases']:
         make_pred_case(case)
     print("return 0;")
     print("}")
@@ -172,5 +170,5 @@ return (cap.word0 >> 56) & 0xff;
 for i in caps:
     make_cap_functions(i)
 
-make_pred('is_child', data['is_child'])
-make_pred('can_derive', data['can_derive'])
+for p in data['predicates']:
+    make_pred(p)

@@ -3,6 +3,9 @@
 .globl trap_entry
 .globl trap_resume_proc
 .globl trap_yield
+.globl trap_syscall_exit
+.globl trap_syscall_exit2
+.globl trap_syscall_exit3
 
 #include "config.h"
 #include "macros.S"
@@ -55,11 +58,10 @@ trampoline:
         add     ra,ra,t0
         /* Jump to handler */
         jalr    ra,(ra)
-        /* Enable preemption */
-        csrw    mstatus,8
 
 trap_resume_proc:
-        /* Disable preemption */
+        /* Enable then disable preemption */
+        csrw    mstatus,8
         csrw    mstatus,0
         
         /* Set mscratch to proc tp */
@@ -73,6 +75,16 @@ trap_resume_proc:
         csrrw   tp,mscratch,tp
 
         mret
+
+trap_syscall_exit:
+        csrw    mstatus,0
+trap_syscall_exit2:
+        sd      a0,(8*10)(tp)
+trap_syscall_exit3:
+        ld      a0,(0*10)(tp)
+        addi    a0,a0,4
+        sd      a0,(0*10)(tp)
+        j       trap_resume_proc
 
 trap_yield:
         la      ra,trap_resume_proc

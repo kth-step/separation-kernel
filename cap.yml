@@ -73,122 +73,144 @@ caps:
       - 'begin < end'
       - 'end <= N_PROC'
 
-is_child:
-  - parent: memory
-    child: memory  
-    relations:
-      - 'p:begin <= c:begin'
-      - 'c:end <= p:end'
-      - '(c:rwx & p:rwx) == c:rwx'
-  - parent: memory
-    child: pmp
-    relations:
-      - 'p:begin <= pmp_napot_begin(c:addr)'
-      - 'pmp_napot_end(c:addr) <= p:end'
-      - '(c:rwx & p:rwx) == c:rwx'
-  - parent: time
-    child: time
-    relations:
-      - 'p:begin <= c:begin'
-      - 'c:end <= p:end'
-      - 'p:hartid == c:hartid'
-      - 'p:depth < c:depth'
-  - parent: channels
-    child: channels
-    relations:
-      - 'p:begin <= c:begin'
-      - 'c:end <= p:end'
-  - parent: channels
-    child: receiver 
-    relations:
-      - 'p:begin <= c:channel'
-      - 'c:channel < p:end'
-  - parent: channels
-    child: sender
-    relations:
-      - 'p:begin <= c:channel'
-      - 'c:channel < p:end'
-  - parent: receiver 
-    child: sender 
-    relations:
-      - 'p:channel == c:channel'
-  - parent: channels
-    child: server 
-    relations:
-      - 'p:begin <= c:channel'
-      - 'c:channel < p:end'
-  - parent: channels
-    child: client 
-    relations:
-      - 'p:begin <= c:channel'
-      - 'c:channel < p:end'
-  - parent: server 
-    child: client 
-    relations:
-      - 'p:channel == c:channel'
-  - parent: supervisor
-    child: supervisor
-    relations:
-      - 'p:begin <= c:begin'
-      - 'c:end <= p:end'
-
-can_derive:
-  - parent: memory
-    child: memory  
-    relations:
-      - 'p:pmp == 0'
-      - 'c:pmp == 0'
-      - 'p:free <= c:begin'
-      - 'c:end <= p:end'
-      - '(c:rwx & p:rwx) == c:rwx'
-      - 'c:free == c:begin'
-      - 'c:begin < c:end'
-  - parent: memory
-    child: pmp
-    relations:
-      - 'p:free <= pmp_napot_begin(c:addr)'
-      - 'pmp_napot_end(c:addr) <= p:end'
-      - '(c:rwx & p:rwx) == c:rwx'
-  - parent: time
-    child: time
-    relations:
-      - 'p:free <= c:begin'
-      - 'c:end <= p:end'
-      - 'p:hartid == c:hartid'
-      - 'p:depth < c:depth'
-      - 'c:free == c:begin'
-      - 'c:begin < c:end'
-  - parent: channels
-    child: channels
-    relations:
-      - 'p:free <= c:begin'
-      - 'c:end <= p:end'
-      - 'c:free == c:begin'
-      - 'c:begin < c:end'
-  - parent: channels
-    child: receiver
-    relations:
-      - 'p:free <= c:channel'
-      - 'c:channel < p:end'
-  - parent: receiver 
-    child: sender
-    relations:
-      - 'p:channel == c:channel'
-      - 'c:grant == 1 || c:grant == 0'
-  - parent: channels
-    child: server
-    relations:
-      - 'p:free <= c:channel'
-      - 'c:channel < p:end'
-  - parent: server
-    child: client
-    relations:
-      - 'p:channel == c:channel'
-      - 'c:grant == 1 || c:grant == 0'
-  - parent: supervisor
-    child: supervisor
-    relations:
-      - 'p:free <= c:begin'
-      - 'c:end <= p:end'
-      - 'c:free == c:begin'
-      - 'c:begin < c:end'
+predicates:
+  - name: is_child_memory
+    cases:
+      - parent: memory
+        child: memory
+        conditions:
+        - 'p:begin <= c:begin'
+        - 'c:end <= p:end'
+        - '(c:rwx & p:rwx) == c:rwx'
+      - parent: memory
+        child: pmp
+        conditions:
+          - 'p:begin <= pmp_napot_begin(c:addr)'
+          - 'pmp_napot_end(c:addr) <= p:end'
+          - '(c:rwx & p:rwx) == c:rwx'
+  - name: is_child_time
+    cases:
+      - parent: time
+        child: time
+        conditions:
+          - 'p:begin <= c:begin'
+          - 'c:end <= p:end'
+          - 'p:hartid == c:hartid'
+          - 'p:depth < c:depth'
+  - name: is_child_channels
+    cases:
+      - parent: channels
+        child: channels
+        conditions:
+          - 'p:begin <= c:begin'
+          - 'c:end <= p:end'
+      - parent: channels
+        child: receiver 
+        conditions:
+          - 'p:begin <= c:channel'
+          - 'c:channel < p:end'
+      - parent: channels
+        child: sender
+        conditions:
+          - 'p:begin <= c:channel'
+          - 'c:channel < p:end'
+      - parent: channels
+        child: server 
+        conditions:
+          - 'p:begin <= c:channel'
+          - 'c:channel < p:end'
+      - parent: channels
+        child: client 
+        conditions:
+          - 'p:begin <= c:channel'
+          - 'c:channel < p:end'
+  - name: is_child_receiver
+    cases:
+      - parent: receiver 
+        child: sender 
+        conditions:
+          - 'p:channel == c:channel'
+  - name: is_child_server
+    cases:
+      - parent: server 
+        child: client 
+        conditions:
+          - 'p:channel == c:channel'
+  - name: is_child_supervisor
+    cases:
+      - parent: supervisor
+        child: supervisor
+        conditions:
+          - 'p:begin <= c:begin'
+          - 'c:end <= p:end'
+  - name: can_derive_memory
+    cases:
+      - parent: memory
+        child: memory  
+        conditions:
+          - 'p:pmp == 0'
+          - 'c:pmp == 0'
+          - 'p:free <= c:begin'
+          - 'c:end <= p:end'
+          - '(c:rwx & p:rwx) == c:rwx'
+          - 'c:free == c:begin'
+          - 'c:begin < c:end'
+      - parent: memory
+        child: pmp
+        conditions:
+          - 'p:free <= pmp_napot_begin(c:addr)'
+          - 'pmp_napot_end(c:addr) <= p:end'
+          - '(c:rwx & p:rwx) == c:rwx'
+  - name: can_derive_time
+    cases:
+      - parent: time
+        child: time
+        conditions:
+          - 'p:free <= c:begin'
+          - 'c:end <= p:end'
+          - 'p:hartid == c:hartid'
+          - 'p:depth < c:depth'
+          - 'c:free == c:begin'
+          - 'c:begin < c:end'
+  - name: can_derive_channels
+    cases:
+      - parent: channels
+        child: channels
+        conditions:
+          - 'p:free <= c:begin'
+          - 'c:end <= p:end'
+          - 'c:free == c:begin'
+          - 'c:begin < c:end'
+      - parent: channels
+        child: receiver
+        conditions:
+          - 'p:free <= c:channel'
+          - 'c:channel < p:end'
+      - parent: channels
+        child: server
+        conditions:
+          - 'p:free <= c:channel'
+          - 'c:channel < p:end'
+  - name: can_derive_receiver
+    cases:
+      - parent: receiver 
+        child: sender
+        conditions:
+          - 'p:channel == c:channel'
+          - 'c:grant == 1 || c:grant == 0'
+  - name: can_derive_server
+    cases:
+      - parent: server
+        child: client
+        conditions:
+          - 'p:channel == c:channel'
+          - 'c:grant == 1 || c:grant == 0'
+  - name: can_derive_supervisor
+    cases:
+      - parent: supervisor
+        child: supervisor
+        conditions:
+          - 'p:free <= c:begin'
+          - 'c:end <= p:end'
+          - 'c:free == c:begin'
+          - 'c:begin < c:end'
