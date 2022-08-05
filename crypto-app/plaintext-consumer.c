@@ -1,13 +1,22 @@
 // See LICENSE file for copyright and license details.
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 
 #include "crypto-app.h"
+#include "../src/timer.h"
 
 
 static uint64_t _addr_begin, _addr_end, * _ready_input;
-static uint64_t consumed_input;
+static uint64_t consumed_input = 0;
+extern const uint64_t plaintext_len;
+extern uint64_t begin_time;
+
+extern volatile int round_counter;
+extern uint64_t values[N_CORES][BENCHMARK_ROUNDS];
+extern int cypher_counter;
+extern bool soft_reset;
 
 static int __consume();
 
@@ -56,7 +65,16 @@ static int __consume() {
         // There won't be enough space left to use for the initial size segment; wrap ready tracker back to 0. 
         consumed_input = 0;
     }
-    printf("Message: %s\n", message);
+    if (consumed_input == plaintext_len) {
+        uint64_t end_time = read_time();
+        values[0][round_counter++] = end_time-begin_time;
+        consumed_input = 0;
+        cypher_counter = 0;
+        __sync_synchronize();
+        soft_reset = true;
+        while(1);
+    }
+    //printf("Message: %s\n", message);
 
     return 1;
 }

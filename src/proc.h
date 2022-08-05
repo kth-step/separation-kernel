@@ -97,6 +97,7 @@ void ProcInitProcesses(void);
 
 void ProcHalt(Proc *proc);
 void ProcReset(int pid);
+void ProcSoftResetAll(void);
 
 static inline bool ProcLoadPmp(Proc *proc, CapPmpEntry pe, Cap *cap,
                                uint64_t index) {

@@ -8,6 +8,7 @@
 #include "config.h"
 #include "sched.h"
 #include "stack.h"
+#include "timer.h"
 
 /** Initial stack offset.
  * The initialization of a process is a bit awkward, we basically
@@ -34,6 +35,8 @@ extern void user_code();
         extern void plaintext_consumer_code();
         char crypto_memory_area[CRYPTO_MEMORY_SIZE];
 #endif
+
+extern bool soft_reset;
 
 /* Defined in proc.h */
 Proc processes[N_PROC];
@@ -207,6 +210,34 @@ void ProcInitProcesses(void) {
                 /* The assembly trap handeling tries to restore the PC from the stack */
                 processes[i].ksp[-4] = processes[i].pc;
         }
+}
+
+void ProcSoftResetAll() {
+        /* Get beginning of next major frame*/
+        uint64_t next_round = (((read_time() / TICKS) / N_QUANTUM) + 1) * N_QUANTUM * TICKS;
+        while (read_time() < next_round)
+                ;
+        for (int i = 0; i < N_PROC; i++) {
+                ProcReset(i);
+        }
+        #if IPC_BENCHMARK != 0 
+                ProcIpcInit();
+        #endif
+        #if CRYPTO_APP != 0
+                ProcCryptoAppInit();
+        #endif
+        InitSched();
+        #if TIME_SLOT_LOANING != 0
+                InitTimeSlotInstanceRoots();
+        #endif
+        for (int i = 0; i < N_PROC; i++) {
+                #if SCHEDULE_BENCHMARK != 0
+                        processes[i].pc = (uintptr_t)benchmark_code;
+                #endif
+                /* The assembly trap handeling tries to restore the PC from the stack */
+                processes[i].ksp[-4] = processes[i].pc;
+        }
+        soft_reset = false;
 }
 
 void ProcHalt(Proc *proc) {

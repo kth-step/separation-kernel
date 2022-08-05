@@ -6,7 +6,11 @@
 #include "proc.h"
 
 void end_benchmark(uint64_t duration_recorded, uint64_t values[N_CORES][BENCHMARK_ROUNDS]) {
+        #if CRYPTO_APP != 0
+        for (int hart = 0; hart < 1; hart++) {
+        #else
         for (int hart = 0; hart < N_CORES; hart++) {
+        #endif
                 printf("Values from hart %d:\n", hart);
                 for (int i = 0; i < BENCHMARK_ROUNDS; i++) {
                         printf("Value=%lu\n", values[hart][i]);

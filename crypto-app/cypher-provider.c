@@ -4,6 +4,7 @@
 
 #include "crypto.h"
 #include "crypto-app.h"
+#include "../src/timer.h"
 
 const uint64_t plaintext_len = 160;
 char plaintext[] =  "A separation kernel is a type of"
@@ -14,11 +15,13 @@ char plaintext[] =  "A separation kernel is a type of"
 const uint64_t message_len = 32;
 static uint64_t _addr_begin, _addr_end, * _ready_output;
 
-static int counter = 0;
+int cypher_counter = 0;
+uint64_t begin_time;
 
 static int __provide();
 
 void cypher_provider_main(uint64_t addr_begin, uint64_t addr_end, uint64_t * ready_output) {
+    begin_time = read_time();
     _addr_begin = addr_begin; _addr_end = addr_end; _ready_output = ready_output;
     if (sizeof(plaintext) != plaintext_len) {
         printf("ERROR PLAINTEXT IS OF INCORRECT SIZE: ");
@@ -46,7 +49,7 @@ static int __provide() {
     char * cypher_start = (char *)(_addr_begin + rdy_output + message_size_byte_width);
     *(uint64_t *)(_addr_begin + rdy_output) = message_len;
     char cypher[message_len];
-    int ret = encrypt_message(&plaintext[(counter * message_len) % plaintext_len], cypher, message_len);
+    int ret = encrypt_message(&plaintext[(cypher_counter * message_len) % plaintext_len], cypher, message_len);
 
     if ((uint64_t)cypher_start + message_len > _addr_end) {
         /* Stop execution when we reach address end. 
@@ -77,9 +80,9 @@ static int __provide() {
         // There won't be enough space left to use for the initial size segment; wrap ready tracker back to 0. 
         rdy_output = 0;
     }
-    counter += 1;
-    if (counter == plaintext_len)
-        counter = 0;
+    cypher_counter += 1;
+    if (cypher_counter == plaintext_len)
+        cypher_counter = 0;
 
     *_ready_output = rdy_output;
     return ret;

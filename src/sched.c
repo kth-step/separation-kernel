@@ -17,9 +17,17 @@
 #elif IPC_BENCHMARK != 0
         extern void end_benchmark(uint64_t duration_recorded, uint64_t values[N_CORES][BENCHMARK_ROUNDS]);
         // TODO: if we want to support multicore testing the round counter needs changing
-        extern volatile int round_counter;
-        extern uint64_t values[N_CORES][BENCHMARK_ROUNDS];
+        volatile int round_counter = 0;
+        uint64_t values[N_CORES][BENCHMARK_ROUNDS];
+#elif CRYPTO_APP != 0
+        extern void end_benchmark(uint64_t duration_recorded, uint64_t values[N_CORES][BENCHMARK_ROUNDS]);
+        volatile int round_counter = 0;
+        uint64_t values[N_CORES][BENCHMARK_ROUNDS];
 #endif
+
+bool soft_reset = false;
+extern void boot_soft_reset(void);
+extern uint64_t boot_lock;
 
 /** The schedule.
  * Each 64-bit word describes the state of four cores:
@@ -315,6 +323,17 @@ void Sched(void) {
 
         /* The hart/core id */
         uintptr_t hartid = get_software_hartid();
+
+        if (soft_reset) {
+                boot_lock = 1;
+                if (hartid != 0) {
+                        boot_soft_reset();
+                } else {
+                        // TODO: if we want to support multicore testing this needs changing
+                        if (round_counter >= BENCHMARK_ROUNDS) end_benchmark(read_time(), values);
+                        boot_soft_reset();
+                }
+        }
 
         /* Process to run and number of time slices to run for */
         Proc *proc;

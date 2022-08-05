@@ -13,8 +13,8 @@
     volatile uint64_t ipc_counter1 = 0;
     volatile uint64_t ipc_counter2 = 0;
 #endif
-volatile int round_counter = 0;
-uint64_t values[N_CORES][BENCHMARK_ROUNDS];
+extern volatile int round_counter;
+extern uint64_t values[N_CORES][BENCHMARK_ROUNDS];
 
 void ipc_benchmark_main(uint64_t pid) {
     #if TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
