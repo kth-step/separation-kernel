@@ -21,7 +21,8 @@ struct cap_node {
 extern cap_node_t cap_tables[N_PROC][N_CAPS];
 
 /* Delete all children of node */
-static inline void cap_node_revoke(cap_node_t* node, cap_t parent, int (*cap_is_child)(cap_t parent, cap_t child));
+static inline void cap_node_revoke(cap_node_t* node, cap_t parent,
+                                   int (*cap_is_child)(cap_t parent, cap_t child));
 
 /* Delete node */
 static inline bool cap_node_delete(cap_node_t* node);
@@ -50,9 +51,8 @@ cap_t cap_node_get_cap(cap_node_t* cn)
 {
         cap_t cap = cn->cap;
         __sync_synchronize();
-        if (cap_node_is_deleted(cn)) {
-                return ((cap_t){0, 0});
-        }
+        if (cap_node_is_deleted(cn))
+                return NULL_CAP;
         return cap;
 }
 

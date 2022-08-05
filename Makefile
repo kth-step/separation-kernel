@@ -15,7 +15,7 @@ DA=$(BUILD)/$(PROGRAM).da
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
-CFLAGS+=-O2
+CFLAGS+=-O3
 CFLAGS+=-gdwarf-2
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Ibsp/$(BSP)
@@ -51,7 +51,7 @@ size: $(ELF)
 cloc:
 	@cloc $(wildcard src/*.c src/*.h src/*.S)
 
-qemu: $(ELF)
+qemu: $(ELF) $(DA)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
 
 tags:

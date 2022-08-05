@@ -1,3 +1,4 @@
+// See LICENSE file for copyright and license details.
 #pragma once
 
 static inline unsigned long long preemption_enable(void)

@@ -1,3 +1,4 @@
+// See LICENSE file for copyright and license details.
 
 .macro zero_state
         li      x1,0
@@ -41,11 +42,10 @@
 .endm
 
 .macro load_sp
-        la      sp,core_stack
+        la      sp,stack
         csrr    t0,mhartid
-        addi    t0,t0,1
         slli    t0,t0,LOG_STACK_SIZE
-        add     sp,sp,t0
+        sub     sp,sp,t0
 .endm
 
 .macro save_context
@@ -117,7 +117,7 @@
         ld      t1,(6*8)(tp)
         ld      t0,(5*8)(tp)
         /*ld      tp,(4*8)(tp)*/
-        ld      gp,(3*8)(tp)
-        ld      sp,(2*8)(tp)
+        /*ld      gp,(3*8)(tp)*/
+        /*ld      sp,(2*8)(tp)*/
         ld      ra,(1*8)(tp)
 .endm

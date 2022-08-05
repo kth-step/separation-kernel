@@ -86,11 +86,14 @@ static inline cap_t s3k_read_cap(uint64_t cid)
 {
         register int64_t a0 __asm__("a0");
         register uint64_t a1 __asm__("a1");
+        register uint64_t a2 __asm__("a2");
         register uint64_t a7 __asm__("a7");
         a0 = cid;
         a7 = S3K_SYSNR_READ_CAP;
-        __asm__ volatile("ecall" : "+r"(a0), "=r"(a1) : "r"(a7));
-        return (cap_t){a0, a1};
+        __asm__ volatile("ecall" : "+r"(a0), "=r"(a1), "=r"(a2) : "r"(a7));
+        if (a0 != S3K_OK)
+                return NULL_CAP;
+        return (cap_t){a1, a2};
 }
 
 static inline uint64_t s3k_move_cap(uint64_t src, uint64_t dest)

@@ -1,9 +1,10 @@
+// See LICENSE file for copyright and license details.
 #include "syscall_ipc.h"
 
 #include "interprocess_move.h"
 #include "preemption.h"
 #include "s3k_consts.h"
-#include "trap.h"
+#include "sched.h"
 
 proc_t* listeners[N_CHANNELS];
 
@@ -35,6 +36,70 @@ static inline void pass_message(proc_t* sender, proc_t* receiver, uint64_t src, 
         receiver->regs.a4 = sender->regs.a4;
 }
 
+void syscall_channels_revoke_cap(cap_node_t* cn, cap_t cap)
+{
+        cap_node_revoke(cn, cap, cap_is_child_channels);
+        cap_channels_set_free(&cap, cap_channels_get_begin(cap));
+
+        preemption_disable();
+        cap_node_update(cap, cn);
+        trap_syscall_exit2(S3K_OK);
+}
+
+void syscall_receiver_revoke_cap(cap_node_t* cn, cap_t cap)
+{
+        cap_node_revoke(cn, cap, cap_is_child_receiver);
+        trap_syscall_exit(S3K_OK);
+}
+
+void syscall_server_revoke_cap(cap_node_t* cn, cap_t cap)
+{
+        cap_node_revoke(cn, cap, cap_is_child_server);
+        trap_syscall_exit(S3K_OK);
+}
+
+void syscall_channels_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap)
+{
+        kassert(cap_get_type(cap) == CAP_TYPE_CHANNELS);
+
+        if (!cap_can_derive_channels(cap, newcap))
+                trap_syscall_exit(S3K_ILLEGAL_DERIVATION);
+
+        if (cap_get_type(newcap) == CAP_TYPE_CHANNELS)
+                cap_channels_set_free(&cap, cap_channels_get_end(newcap));
+        if (cap_get_type(newcap) == CAP_TYPE_RECEIVER)
+                cap_channels_set_free(&cap, cap_receiver_get_channel(newcap) + 1);
+        if (cap_get_type(newcap) == CAP_TYPE_SERVER)
+                cap_channels_set_free(&cap, cap_server_get_channel(newcap) + 1);
+
+        preemption_disable();
+        cap_node_update(cap, cn);
+        cap_node_insert(newcap, newcn, cn);
+        trap_syscall_exit2(S3K_OK);
+}
+
+void syscall_receiver_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap)
+{
+        kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER);
+        if (!cap_can_derive_receiver(cap, newcap))
+                trap_syscall_exit(S3K_ILLEGAL_DERIVATION);
+
+        preemption_disable();
+        cap_node_insert(newcap, newcn, cn);
+        trap_syscall_exit2(S3K_OK);
+}
+
+void syscall_server_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap)
+{
+        kassert(cap_get_type(cap) == CAP_TYPE_SERVER);
+        if (!cap_can_derive_server(cap, newcap))
+                trap_syscall_exit(S3K_ILLEGAL_DERIVATION);
+
+        preemption_disable();
+        cap_node_insert(newcap, newcn, cn);
+        trap_syscall_exit2(S3K_OK);
+}
+
 void syscall_receiver_invoke_cap(cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER);
@@ -45,7 +110,7 @@ void syscall_receiver_invoke_cap(cap_node_t* cn, cap_t cap)
         preemption_disable();
         if (proc_receiver_wait(current, channel)) {
                 /* Process wait for message */
-                trap_yield();
+                sched_yield();
         }
         trap_syscall_exit(S3K_ERROR);
 }
@@ -70,7 +135,7 @@ void syscall_sender_invoke_cap(cap_node_t* cn, cap_t cap)
         proc_sender_release(receiver);
 
         if (current->regs.a6)
-                trap_yield();
+                sched_yield();
         trap_syscall_exit(S3K_OK);
 }
 

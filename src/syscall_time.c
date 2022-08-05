@@ -1,36 +1,30 @@
+// See LICENSE file for copyright and license details.
 #include "syscall_time.h"
 
 #include "preemption.h"
 #include "s3k_consts.h"
 #include "syscall_time.h"
 
-void syscall_time_derive_cap(cap_node_t* cn, cap_t cap)
+void syscall_time_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_TIME);
 
-        cap_node_t* newcn = proc_get_cap_node(current, current->regs.a1);
-        cap_t newcap = (cap_t){current->regs.a2, current->regs.a3};
-
-        if (!cap_node_is_deleted(newcn)) {
-                trap_syscall_exit(S3K_COLLISION);
-        } else if (!cap_can_derive_time(cap, newcap)) {
+        if (!cap_can_derive_time(cap, newcap))
                 trap_syscall_exit(S3K_ILLEGAL_DERIVATION);
-        } else {
-                cap_time_set_free(&cap, cap_time_get_end(newcap));
+        cap_time_set_free(&cap, cap_time_get_end(newcap));
 
-                uint64_t hartid = cap_time_get_hartid(cap);
-                uint64_t depth = cap_time_get_depth(cap);
+        uint64_t hartid = cap_time_get_hartid(cap);
+        uint64_t depth = cap_time_get_depth(cap);
 
-                uint64_t newbegin = cap_time_get_begin(newcap);
-                uint64_t newend = cap_time_get_end(newcap);
-                uint64_t newdepth = cap_time_get_depth(newcap);
+        uint64_t newbegin = cap_time_get_begin(newcap);
+        uint64_t newend = cap_time_get_end(newcap);
+        uint64_t newdepth = cap_time_get_depth(newcap);
 
-                preemption_disable();
-                cap_node_update(cap, cn);
-                cap_node_insert(newcap, newcn, cn);
-                sched_update(newcn, hartid, newbegin, newend, depth, current->pid, newdepth);
-                trap_syscall_exit2(S3K_OK);
-        }
+        preemption_disable();
+        cap_node_update(cap, cn);
+        cap_node_insert(newcap, newcn, cn);
+        sched_update(newcn, hartid, newbegin, newend, depth, current->pid, newdepth);
+        trap_syscall_exit2(S3K_OK);
 }
 
 void syscall_time_revoke_cap(cap_node_t* cn, cap_t cap)

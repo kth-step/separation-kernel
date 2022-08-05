@@ -1,3 +1,7 @@
 // See LICENSE file for copyright and license details.
 #include "platform.h"
-char core_stack[N_CORES][STACK_SIZE];
+.globl stack
+
+.section .bss.stack
+.fill (N_CORES * STACK_SIZE)
+stack:

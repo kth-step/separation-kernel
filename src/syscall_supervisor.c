@@ -1,3 +1,4 @@
+// See LICENSE file for copyright and license details.
 #include "syscall_supervisor.h"
 
 #include "interprocess_move.h"
@@ -7,27 +8,69 @@
 #include "utils.h"
 
 static void syscall_supervisor_suspend(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+    __attribute__((noreturn));
+static void syscall_supervisor_resume(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+    __attribute__((noreturn));
+static void syscall_supervisor_get_state(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+    __attribute__((noreturn));
+static void syscall_supervisor_read_reg(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+    __attribute__((noreturn));
+static void syscall_supervisor_write_reg(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+    __attribute__((noreturn));
+static void syscall_supervisor_read_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+    __attribute__((noreturn));
+static void syscall_supervisor_give_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+    __attribute__((noreturn));
+static void syscall_supervisor_take_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+    __attribute__((noreturn));
+
+void syscall_supervisor_revoke_cap(cap_node_t* cn, cap_t cap)
+{
+        kassert(cap_get_type(cap) == CAP_TYPE_SUPERVISOR);
+        cap_node_revoke(cn, cap, cap_is_child_supervisor);
+        cap_supervisor_set_free(&cap, cap_supervisor_get_begin(cap));
+        preemption_disable();
+        cap_node_update(cap, cn);
+        trap_syscall_exit2(S3K_OK);
+}
+
+void syscall_supervisor_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap)
+{
+        kassert(cap_get_type(cap) == CAP_TYPE_SUPERVISOR);
+        if (!cap_can_derive_supervisor(cap, newcap))
+                trap_syscall_exit(S3K_ILLEGAL_DERIVATION);
+
+        if (cap_get_type(newcap) == CAP_TYPE_SUPERVISOR)
+                cap_supervisor_set_free(&cap, cap_supervisor_get_end(newcap));
+
+        preemption_disable();
+        cap_node_update(cap, cn);
+        cap_node_insert(newcap, newcn, cn);
+        trap_syscall_exit2(S3K_OK);
+}
+
+void syscall_supervisor_suspend(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
         preemption_disable();
         current->regs.a0 = proc_supervisor_suspend(supervisee);
         trap_syscall_exit3();
 }
 
-static void syscall_supervisor_resume(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+void syscall_supervisor_resume(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
         preemption_disable();
         current->regs.a0 = proc_supervisor_resume(supervisee);
         trap_syscall_exit3();
 }
 
-static void syscall_supervisor_get_state(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+void syscall_supervisor_get_state(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
         preemption_disable();
         current->regs.a1 = supervisee->state;
         trap_syscall_exit2(S3K_OK);
 }
 
-static void syscall_supervisor_read_reg(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+void syscall_supervisor_read_reg(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
         preemption_disable();
         if (proc_supervisor_acquire(supervisee)) {
@@ -38,7 +81,7 @@ static void syscall_supervisor_read_reg(cap_node_t* cn, cap_t cap, proc_t* super
         trap_syscall_exit2(S3K_SUPERVISEE_BUSY);
 }
 
-static void syscall_supervisor_write_reg(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+void syscall_supervisor_write_reg(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
         preemption_disable();
         if (proc_supervisor_acquire(supervisee)) {
@@ -49,20 +92,19 @@ static void syscall_supervisor_write_reg(cap_node_t* cn, cap_t cap, proc_t* supe
         trap_syscall_exit2(S3K_SUPERVISEE_BUSY);
 }
 
-static void syscall_supervisor_read_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+void syscall_supervisor_read_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
+        cap_node_t* supervisee_cap_node = proc_get_cap_node(supervisee, current->regs.a3);
+        if (!supervisee_cap_node)
+                trap_syscall_exit(S3K_ERROR);
+        cap_t supervisee_cap = cap_node_get_cap(supervisee_cap_node);
         preemption_disable();
-        if (proc_supervisor_acquire(supervisee)) {
-                cap_t supervisee_cap = proc_get_cap(supervisee, current->regs.a3);
-                proc_supervisor_release(supervisee);
-                current->regs.a1 = supervisee_cap.word0;
-                current->regs.a2 = supervisee_cap.word1;
-                trap_syscall_exit2(S3K_OK);
-        }
-        trap_syscall_exit2(S3K_SUPERVISEE_BUSY);
+        current->regs.a1 = supervisee_cap.word0;
+        current->regs.a2 = supervisee_cap.word1;
+        trap_syscall_exit2(S3K_OK);
 }
 
-static void syscall_supervisor_give_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+void syscall_supervisor_give_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
         preemption_disable();
         if (proc_supervisor_acquire(supervisee)) {
@@ -74,7 +116,7 @@ static void syscall_supervisor_give_cap(cap_node_t* cn, cap_t cap, proc_t* super
         trap_syscall_exit2(S3K_SUPERVISEE_BUSY);
 }
 
-static void syscall_supervisor_take_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
+void syscall_supervisor_take_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
         preemption_disable();
         if (proc_supervisor_acquire(supervisee)) {

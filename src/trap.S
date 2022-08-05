@@ -1,6 +1,10 @@
 # See LICENSE file for copyright and license details.
+#include "s3k_consts.h"
 
-.globl trap_entry
+#define MCAUSE_U_ECALL 8
+#define MSTATUS_IE 8
+
+.globl trap_vector
 .globl trap_resume_proc
 .globl trap_yield
 .globl trap_syscall_exit
@@ -10,91 +14,89 @@
 #include "config.h"
 #include "macros.S"
 
-
 .section .text.trap_entry
 .align 8
-trap_entry:
+trap_vector:
         csrrw   tp,mscratch,tp
-        bnez    tp,user_trap
-
-machine_trap:
-        csrr    a1,mcause
+        bnez    tp,1f
         csrrw   tp,mscratch,zero
-#ifndef NDEBUG
-        /* Check if we have exception in the kernel, hang */
-        bgez    a1,mhang
-#endif
-        j       interrupt
-
-user_trap:
+        /* Must be timer interrupt (or kernel bug), yield */
+        j       sched_yield
+1:
         /* Save all registers except tp */
         save_context
 
         /* Save tp */
         csrrw   t0,mscratch,zero
         sd      t0,(4*8)(tp)
+
         /* Load kernel gp */
         load_gp
         /* Load kernel sp */
         load_sp
 
-        csrr    a1,mcause
-        bltz    a1,interrupt
+        csrr    a0,mcause
+        
+        /* Must be timer interrupt, yield */
+        bltz    a0,sched_yield
+
+        /* Enable preemption */
+        csrw    mstatus,MSTATUS_IE
+
+        /* Check if ecall from U mode */ 
+        li      t0,MCAUSE_U_ECALL
+        bne     a0,t0,exception
+        /* Check that sysnr is correct */
+        li      t0,NUM_OF_SYSNR
+        bge     a0,t0,exception
+
+syscall:
+        la      ra,syscall_vector
+        slli    t0,a7,2
+        add     ra,ra,t0
+        jalr    zero,(ra)
 
 exception:
         /* Enable preemption */
-        csrw    mstatus,8
-        la      ra,exception_trampoline
-        mv      a0,tp
-        csrr    a2,mtval
-        j       trampoline
-
-interrupt:
-        la      ra,interrupt_trampoline
-
-trampoline:
-        /* Add trap code offset */
-        slli    t0,a1,2
+        csrr    a1,mtval
+        la      ra,exception_vector
+        slli    t0,a0,2
         add     ra,ra,t0
-        /* Jump to handler */
-        jalr    ra,(ra)
-
-trap_resume_proc:
-        /* Enable then disable preemption */
-        csrw    mstatus,8
-        csrw    mstatus,0
-        
-        /* Set mscratch to proc tp */
-        ld      t0,(4*8)(tp)
-        csrw    mscratch,t0
-
-        /* Restore all registers except tp */
-        restore_context
-
-        /* Swap proc tp with pcb */
-        csrrw   tp,mscratch,tp
-
-        mret
+        jalr    zero,(ra)
 
 trap_syscall_exit:
+        /* Disable preemption */
         csrw    mstatus,0
 trap_syscall_exit2:
-        sd      a0,(8*10)(tp)
+        /* Save error code to a0 */
+        sd      a0,(10*8)(tp)
 trap_syscall_exit3:
-        ld      a0,(0*10)(tp)
-        addi    a0,a0,4
-        sd      a0,(0*10)(tp)
-        j       trap_resume_proc
+        /* Increment pc */
+        ld      t0,(0*8)(tp)
+        addi    t0,t0,4
+        sd      t0,(0*8)(tp)
 
-trap_yield:
-        la      ra,trap_resume_proc
-        tail    sched
+trap_resume_proc:
+        /* Enable preemption */
+        csrw    mstatus,MSTATUS_IE
+
+        /* Restore all registers except tp, sp, gp */
+        restore_context
+
+        /* Disable preemption */
+        csrw    mstatus,0
+        /* Save pointer to proc_t */
+        csrw    mscratch,tp
+        /* Restore user sp, gp and tp */
+        ld      sp,(2*8)(tp)
+        ld      gp,(3*8)(tp)
+        ld      tp,(4*8)(tp)
+        mret
+
 
 .option push
 .option norvc   /* Prevent compressed instructions */
-trap_trampoline:
-exception_trampoline:
-        /* EXCEPTION HANDLERS */
+exception_vector:
         j       exception_handler  /* 0: Instruction address misaligned */
         j       exception_handler  /* 1: Instruction access fault */
         j       illegal_instruction_handler  /* 2: Illegal instruction */
@@ -103,7 +105,7 @@ exception_trampoline:
         j       exception_handler  /* 5: Load access fault */
         j       exception_handler  /* 6: Store/AMO address misaligned */
         j       exception_handler  /* 7: Store/AMO access fault */
-        j       syscall_handler  /* 8: Environment call from U-mode */
+        j       exception_handler  /* 8: Environment call from U-mode */
         j       hang  /* 9: Environment call from S-mode */
         j       hang  /* 10: Reserved */
         j       hang  /* 11: Environment call from M-mode */
@@ -111,24 +113,17 @@ exception_trampoline:
         j       hang  /* 13: Load page fault */
         j       hang  /* 14: Reserved */
         j       hang  /* 15: Store/AMO page fault */
-interrupt_trampoline:
-        /* INTERRUPT HANDLERS */
-        j       hang  /*  0: User software interrupt */
-        j       hang  /*  1: Supervisor software interrupt */
-        j       hang  /*  2: Reserved */
-        j       hang  /*  3: Machine software interrupt */
-        j       hang  /*  4: User timer interrupt */
-        j       hang  /*  5: Supervisor timer interrupt */
-        j       hang  /*  6: Reserved */
-        j       sched   /*  7: Machine timer interrupt */
-        j       hang  /*  8: User external interrupt */
-        j       hang  /*  9: Supervisor external interrupt */
-        j       hang  /* 10: Reserved */
-        j       hang  /* 11: Machine external interrupt */
-        j       hang  /* 12: ? */
-        j       hang  /* 13: ? */
-        j       hang  /* 14: ? */
-        j       hang  /* 15: ? */
+syscall_vector:
+        j       syscall_get_pid
+        j       syscall_read_reg
+        j       syscall_write_reg
+        j       syscall_yield
+        j       syscall_read_cap
+        j       syscall_move_cap
+        j       syscall_delete_cap
+        j       syscall_revoke_cap
+        j       syscall_derive_cap
+        j       syscall_invoke_cap
 .option pop
 
 hang:

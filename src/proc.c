@@ -102,8 +102,7 @@ static cap_node_t* proc_init_channels(cap_node_t* cn)
 
 void proc_init_boot(proc_t* boot)
 {
-        cap_node_t* cn;
-        cn = boot->cap_table;
+        cap_node_t* cn = boot->cap_table;
         cn = proc_init_memory(cn);
         cn = proc_init_channels(cn);
         cn = proc_init_supervisor(cn);

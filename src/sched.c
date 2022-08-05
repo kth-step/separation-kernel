@@ -7,6 +7,7 @@
 #include "csr.h"
 #include "lock.h"
 #include "proc_state.h"
+#include "trap.h"
 
 #define SCHED_SLICE_OFFSET(sched_slice, hartid) ((sched_slice) << ((hartid)-MIN_HARTID) * 16)
 
@@ -91,7 +92,7 @@ void sched_start(void)
         uintptr_t hartid = read_csr(mhartid);
         /* Process to run and number of time slices to run for */
         proc_t* proc = NULL;
-        uint64_t time, length, timeout = 0, end_time;
+        uint64_t time, length, timeout, end_time;
 
         while (1) {
                 /* Get the current time */
@@ -110,9 +111,10 @@ void sched_start(void)
         /* Wait for time slice to start and set timeout */
         current = proc;
         wait_and_set_timeout(time, length, timeout);
+        trap_resume_proc();
 }
 
-void sched(void)
+void sched_yield(void)
 {
         /* The hart/core id */
         proc_release(current);
