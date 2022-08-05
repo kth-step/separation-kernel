@@ -10,6 +10,7 @@
 
 static uint64_t _addr_begin, _addr_end, * _ready_input;
 static uint64_t consumed_input = 0;
+static uint64_t consumed_message_input = 0;
 extern const uint64_t plaintext_len;
 extern uint64_t begin_time;
 
@@ -65,16 +66,18 @@ static int __consume() {
         // There won't be enough space left to use for the initial size segment; wrap ready tracker back to 0. 
         consumed_input = 0;
     }
-    if (consumed_input == plaintext_len) {
+    consumed_message_input += message_len;
+    //printf("Plaintext message: %.*s\n", (int)message_len, message);
+    if (consumed_message_input == plaintext_len) {
         uint64_t end_time = read_time();
         values[0][round_counter++] = end_time-begin_time;
         consumed_input = 0;
+        consumed_message_input = 0;
         cypher_counter = 0;
         __sync_synchronize();
         soft_reset = true;
         while(1);
     }
-    //printf("Message: %s\n", message);
 
     return 1;
 }

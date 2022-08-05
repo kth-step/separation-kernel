@@ -85,5 +85,8 @@ static int __provide() {
         cypher_counter = 0;
 
     *_ready_output = rdy_output;
+    /* Currently we only want to procude one message */
+    while(cypher_counter >= plaintext_len/message_len)
+        ;
     return ret;
 }

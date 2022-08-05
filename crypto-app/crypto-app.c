@@ -147,6 +147,7 @@ static int __decrypt() {
         }
         rdy_output += cypher_len + message_size_byte_width;
     }
+    //printf("Crypto app message: %.*s\n", (int)cypher_len, plaintext);
 
     if ((_dec_w_addr_begin + rdy_output + message_size_byte_width) > _dec_w_addr_end) {
         // There won't be enough space left to use for the initial size segment; wrap ready tracker back to 0. 
