@@ -15,6 +15,32 @@
 #include "trap.h"
 #include "utils.h"
 
+typedef void (*handler_t)(cap_node_t*, cap_t) __attribute__((noreturn));
+typedef void (*handler_derive_t)(cap_node_t*, cap_t, cap_node_t*, cap_t) __attribute__((noreturn));
+
+static const handler_t revoke_handlers[NUM_OF_CAP_TYPES] = {
+    [CAP_TYPE_MEMORY] = syscall_memory_revoke_cap,
+    [CAP_TYPE_TIME] = syscall_time_revoke_cap,
+    [CAP_TYPE_CHANNELS] = syscall_channels_revoke_cap,
+    [CAP_TYPE_RECEIVER] = syscall_receiver_revoke_cap,
+    [CAP_TYPE_SERVER] = syscall_server_revoke_cap,
+    [CAP_TYPE_SUPERVISOR] = syscall_supervisor_revoke_cap};
+
+static const handler_t invoke_handlers[NUM_OF_CAP_TYPES] = {
+    [CAP_TYPE_RECEIVER] = syscall_receiver_invoke_cap,
+    [CAP_TYPE_SENDER] = syscall_sender_invoke_cap,
+    [CAP_TYPE_SERVER] = syscall_server_invoke_cap,
+    [CAP_TYPE_CLIENT] = syscall_client_invoke_cap,
+    [CAP_TYPE_SUPERVISOR] = syscall_supervisor_invoke_cap};
+
+static const handler_derive_t derive_handlers[NUM_OF_CAP_TYPES] = {
+    [CAP_TYPE_MEMORY] = syscall_memory_derive_cap,
+    [CAP_TYPE_TIME] = syscall_time_derive_cap,
+    [CAP_TYPE_CHANNELS] = syscall_channels_derive_cap,
+    [CAP_TYPE_RECEIVER] = syscall_receiver_derive_cap,
+    [CAP_TYPE_SERVER] = syscall_server_derive_cap,
+    [CAP_TYPE_SUPERVISOR] = syscall_supervisor_derive_cap};
+
 void syscall_get_pid(void)
 {
         trap_syscall_exit(current->pid);
@@ -73,6 +99,8 @@ void syscall_delete_cap(void)
         cap_node_t* cn = proc_get_cap_node(current, current->regs.a0);
         if (!cn)
                 trap_syscall_exit(S3K_ERROR);
+        if (cap_node_is_deleted(cn))
+                trap_syscall_exit(S3K_EMPTY);
         preemption_disable();
         cap_node_delete(cn);
         trap_syscall_exit2(S3K_OK);
@@ -84,6 +112,7 @@ void syscall_derive_cap(void)
         cap_node_t* newcn = proc_get_cap_node(current, current->regs.a1);
         if (!cn || !newcn)
                 trap_syscall_exit(S3K_ERROR);
+
         cap_t cap = cap_node_get_cap(cn);
         cap_t newcap = (cap_t){current->regs.a2, current->regs.a3};
         if (!newcn)
@@ -91,22 +120,9 @@ void syscall_derive_cap(void)
         if (!cap_node_is_deleted(newcn))
                 trap_syscall_exit(S3K_COLLISION);
 
-        switch (cap_get_type(cap)) {
-        case CAP_TYPE_MEMORY:
-                syscall_memory_derive_cap(cn, cap, newcn, newcap);
-        case CAP_TYPE_TIME:
-                syscall_time_derive_cap(cn, cap, newcn, newcap);
-        case CAP_TYPE_CHANNELS:
-                syscall_channels_derive_cap(cn, cap, newcn, newcap);
-        case CAP_TYPE_RECEIVER:
-                syscall_receiver_derive_cap(cn, cap, newcn, newcap);
-        case CAP_TYPE_SERVER:
-                syscall_server_derive_cap(cn, cap, newcn, newcap);
-        case CAP_TYPE_SUPERVISOR:
-                syscall_supervisor_derive_cap(cn, cap, newcn, newcap);
-        default:
-                trap_syscall_exit(S3K_UNIMPLEMENTED);
-        }
+        if (derive_handlers[cap_get_type(cap)])
+                derive_handlers[cap_get_type(cap)](cn, cap, newcn, newcap);
+        trap_syscall_exit(S3K_UNIMPLEMENTED);
 }
 
 void syscall_revoke_cap(void)
@@ -115,22 +131,9 @@ void syscall_revoke_cap(void)
         if (!cn)
                 trap_syscall_exit(S3K_ERROR);
         cap_t cap = cap_node_get_cap(cn);
-        switch (cap_get_type(cap)) {
-        case CAP_TYPE_MEMORY:
-                syscall_memory_revoke_cap(cn, cap);
-        case CAP_TYPE_TIME:
-                syscall_time_revoke_cap(cn, cap);
-        case CAP_TYPE_CHANNELS:
-                syscall_channels_revoke_cap(cn, cap);
-        case CAP_TYPE_RECEIVER:
-                syscall_receiver_revoke_cap(cn, cap);
-        case CAP_TYPE_SERVER:
-                syscall_server_revoke_cap(cn, cap);
-        case CAP_TYPE_SUPERVISOR:
-                syscall_supervisor_revoke_cap(cn, cap);
-        default:
-                trap_syscall_exit(S3K_UNIMPLEMENTED);
-        }
+        if (revoke_handlers[cap_get_type(cap)])
+                revoke_handlers[cap_get_type(cap)](cn, cap);
+        trap_syscall_exit(S3K_UNIMPLEMENTED);
 }
 
 void syscall_invoke_cap(void)
@@ -139,18 +142,7 @@ void syscall_invoke_cap(void)
         if (!cn)
                 trap_syscall_exit(S3K_ERROR);
         cap_t cap = cap_node_get_cap(cn);
-        switch (cap_get_type(cap)) {
-        case CAP_TYPE_RECEIVER:
-                syscall_receiver_invoke_cap(cn, cap);
-        case CAP_TYPE_SENDER:
-                syscall_sender_invoke_cap(cn, cap);
-        case CAP_TYPE_SERVER:
-                syscall_server_invoke_cap(cn, cap);
-        case CAP_TYPE_CLIENT:
-                syscall_client_invoke_cap(cn, cap);
-        case CAP_TYPE_SUPERVISOR:
-                syscall_supervisor_invoke_cap(cn, cap);
-        default:
-                trap_syscall_exit(S3K_UNIMPLEMENTED);
-        }
+        if (invoke_handlers[cap_get_type(cap)])
+                invoke_handlers[cap_get_type(cap)](cn, cap);
+        trap_syscall_exit(S3K_UNIMPLEMENTED);
 }
