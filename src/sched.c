@@ -25,7 +25,7 @@
         uint64_t values[N_CORES][BENCHMARK_ROUNDS];
 #endif
 
-bool soft_reset = false;
+volatile bool soft_reset = false;
 extern void boot_soft_reset(void);
 extern uint64_t boot_lock;
 
@@ -76,11 +76,14 @@ void InitSched() {
         }
         #endif
         for (int i = 0; i < N_QUANTUM; i++) {
-                #if CRYPTO_APP != 0
+                #if CRYPTO_IPC != 0 && CRYPTO_APP != 0
+                        schedule[i] = 0x0000000000000001;
+                #elif CRYPTO_APP != 0
+                        /* Cypher provider always active, crypto-app and plaintext consumer take turns */
                         if (i % 2 == 0) {
-                                schedule[i] = 0x0000000200010000;
+                                schedule[i] = 0x0000000000000001;
                         } else {
-                                schedule[i] = 0x0000000100020000;
+                                schedule[i] = 0x0000000000020001;
                         }
                 #elif SCHEDULE_BENCHMARK != 0
                         schedule[i] = 0x0003000200010000;

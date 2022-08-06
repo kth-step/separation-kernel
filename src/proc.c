@@ -34,6 +34,9 @@ extern void user_code();
         extern void cypher_provider_code();
         extern void plaintext_consumer_code();
         char crypto_memory_area[CRYPTO_MEMORY_SIZE];
+        #if CRYPTO_IPC != 0
+                extern Proc *volatile channels[N_CHANNELS];
+        #endif
 #endif
 
 extern bool soft_reset;
@@ -69,6 +72,25 @@ void ProcIpcInit() {
                 #endif
                 processes[i].pc = (uintptr_t)ipc_benchmark;
         }
+}
+#endif
+
+/* Hard coded for the setup where we have 2 harts, 3 processes, proc 1 always scheduled, proc 0 to give time to proc 2 */
+#if CRYPTO_IPC != 0 && TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
+void ProcCryptoIpcInit() {
+        uint64_t dummy_msg[4];
+        /* We just make all our receivers and senders children of the root channel for simplicity */
+        cap_set(&processes[0].cap_table[3 + N_CORES + N_PROC], cap_serialize_sender(cap_mk_sender(2)));
+        CapAppend(&processes[0].cap_table[3 + N_CORES + N_PROC], &processes[0].cap_table[2]);
+        Proc * p = &processes[2];
+        p->args[1] = 3; // Where to place caps
+        p->args[2] = 1; // How many caps
+        p->args[3] = (uintptr_t)dummy_msg;
+        cap_set(&processes[2].cap_table[1], cap_serialize_receiver(cap_mk_receiver(2)));
+        CapAppend(&processes[2].cap_table[1], &processes[0].cap_table[2]);
+        processes[2].listen_channel = 2;
+        channels[2] = &processes[2];
+        processes[2].state = PROC_WAITING;
 }
 #endif
 
@@ -109,6 +131,52 @@ void ProcReset(int pid) {
                         CapDelete(cap);
                 }
         }
+        proc->pc = 0;
+        proc->listen_channel = -1;
+        #if TIME_SLOT_LOANING_SIMPLE != 0
+                proc->time_giver = pid;
+                proc->time_receiver = pid;
+        #endif
+        /* Set process to HALTED. */
+        //proc->state = PROC_HALTED;
+
+        // TODO: resume relevant processes through function calls instead of setting all processes to be ready. 
+        proc->state = PROC_SUSPENDED;
+}
+
+/* Mostly same as ProcReset, but does not reset the root caps for proc 0. */
+void ProcCryptoIpcSoftReset(int pid) {
+        /* Get the PCB */
+        Proc *proc = &processes[pid];
+        /* Set the process id to */
+        proc->pid = pid;
+        /* Set the process's kernel stack. */
+        proc->ksp = &proc_stack[pid][STACK_SIZE / 8];
+        for (int i = 0; i < STACK_SIZE / 8; i++)
+                proc_stack[pid][i] = 0;
+        /* The assembly trap handeling assumes the user stack pointer is not 0, and that it is found on the kernel stack */
+        proc->ksp[-6] = 1;
+        /* Zero the capability table. */
+        proc->cap_table = cap_tables[pid];
+        if (pid == 0) {
+                for (int i = 3 + N_CORES + N_PROC; i < N_CAPS; ++i) {
+                        Cap *cap = &cap_tables[pid][i];
+                        if (!cap_is_deleted(cap)) {
+                                CapRevoke(cap);
+                                CapDelete(cap);
+                        }
+                }
+        }
+        else {
+                for (int i = 0; i < N_CAPS; ++i) {
+                        Cap *cap = &cap_tables[pid][i];
+                        if (!cap_is_deleted(cap)) {
+                                CapRevoke(cap);
+                                CapDelete(cap);
+                        }
+                }
+        }
+
         proc->pc = 0;
         proc->listen_channel = -1;
         #if TIME_SLOT_LOANING_SIMPLE != 0
@@ -198,6 +266,9 @@ void ProcInitProcesses(void) {
         #endif
         #if CRYPTO_APP != 0
                 ProcCryptoAppInit();
+                #if CRYPTO_IPC != 0 && TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
+                        ProcCryptoIpcInit();
+                #endif
         #endif
         InitSched();
         #if TIME_SLOT_LOANING != 0
@@ -218,13 +289,20 @@ void ProcSoftResetAll() {
         while (read_time() < next_round)
                 ;
         for (int i = 0; i < N_PROC; i++) {
-                ProcReset(i);
+                #if CRYPTO_APP != 0 && CRYPTO_IPC != 0 && TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
+                        ProcCryptoIpcSoftReset(i);
+                #else
+                        ProcReset(i);
+                #endif
         }
         #if IPC_BENCHMARK != 0 
                 ProcIpcInit();
         #endif
         #if CRYPTO_APP != 0
                 ProcCryptoAppInit();
+                #if CRYPTO_IPC != 0 && TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
+                        ProcCryptoIpcInit();
+                #endif
         #endif
         InitSched();
         #if TIME_SLOT_LOANING != 0

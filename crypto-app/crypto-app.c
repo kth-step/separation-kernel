@@ -5,6 +5,8 @@
 #include <stdio.h>
 
 #include "crypto.h"
+#include "../src/config.h"
+#include "../src/s3k.h"
 
 /*
 The _enc and _dec addr variables denote the beginning and end of the read and write areas for encryption and decryption respectively.
@@ -100,6 +102,22 @@ int __encrypt() {
 static int __decrypt() {
     if (*_dec_ready_input == *_dec_ready_output) {
         // Nothing to decrypt
+        #if CRYPTO_IPC != 0 && TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
+            int new_cap_ind = 3 + N_CORES + N_PROC + 1;
+            if (S3K_SLICE_TIME(4, new_cap_ind, 0, N_QUANTUM, 1, 255) < 1) {
+                printf("Failed slice time\n");
+            }
+            if (S3K_SEND(new_cap_ind - 1, new_cap_ind, 1, (uint64_t[4]){0,0,0,0}) < 1) {
+                printf("Failed send\n");
+            }
+            if (S3K_YIELD() < 1) {
+                printf("Failed yield\n");
+            }
+        #elif CRYPTO_IPC != 0 && TIME_SLOT_LOANING_SIMPLE != 0
+            if (S3K_LOAN_TIME(2) < 1) {
+                printf("Failed loan time\n");
+            }
+        #endif
         return 2;
     }
     uint64_t rdy_output = *_dec_ready_output;

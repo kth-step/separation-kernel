@@ -65,14 +65,15 @@
 #define BENCHMARK_DURATION (TICKS_PER_SECOND*0)
 /* We get two rounds less than specified because we need to discard the boot round and the very first measure is before having run any round at all.
    Therefore we explicitly add + 2 to remind us of this (if we want a specific number of data points that is). */
-#define BENCHMARK_ROUNDS (1000000UL + 2) // (BENCHMARK_DURATION / TICKS)
+#define BENCHMARK_ROUNDS (100000UL/*0UL*/ + 2) // (BENCHMARK_DURATION / TICKS)
 
-#define PERFORMANCE_SCHEDULING 0
+#define PERFORMANCE_SCHEDULING 1
 
 #define TIME_SLOT_LOANING 0
 /* Simple solution that only allows a process to loan its time to 1 other process at a time, and it must loan all of its time.
    Furthermore, a process can only loan time from one other process at a time. */
-#define TIME_SLOT_LOANING_SIMPLE 0
+#define TIME_SLOT_LOANING_SIMPLE 1
 
 #define CRYPTO_APP 1
 #define CRYPTO_MEMORY_SIZE (1024*10)
+#define CRYPTO_IPC 1

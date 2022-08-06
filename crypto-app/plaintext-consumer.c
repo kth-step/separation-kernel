@@ -5,6 +5,8 @@
 #include <stdint.h>
 
 #include "crypto-app.h"
+#include "../src/config.h"
+#include "../src/s3k.h"
 #include "../src/timer.h"
 
 
@@ -17,7 +19,7 @@ extern uint64_t begin_time;
 extern volatile int round_counter;
 extern uint64_t values[N_CORES][BENCHMARK_ROUNDS];
 extern int cypher_counter;
-extern bool soft_reset;
+extern volatile bool soft_reset;
 
 static int __consume();
 
@@ -35,6 +37,16 @@ void plaintext_consumer_main(uint64_t addr_begin, uint64_t addr_end, uint64_t * 
 static int __consume() {
     if (*_ready_input == consumed_input) {
         // Nothing to consume
+        #if CRYPTO_IPC != 0 && TIME_SLOT_LOANING == 0 && TIME_SLOT_LOANING_SIMPLE == 0
+            uint64_t msg[4];
+            if (S3K_RECV_DELETE_TS(1, 3, 1, msg, 3) < 1) {
+                printf("Failed recv-delete\n");
+            }
+        #elif CRYPTO_IPC != 0 && TIME_SLOT_LOANING_SIMPLE != 0
+            if (S3K_RETURN_LOANED_TIME() < 1) {
+                printf("Failed return time\n");
+            }
+        #endif
         return 0;
     }
     uint64_t message_len = *(uint64_t *)(_addr_begin + consumed_input);
