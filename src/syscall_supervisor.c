@@ -24,6 +24,13 @@ static void syscall_supervisor_give_cap(cap_node_t* cn, cap_t cap, proc_t* super
 static void syscall_supervisor_take_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
     __attribute__((noreturn));
 
+typedef void (*handler_t)(cap_node_t*, cap_t, proc_t*) __attribute__((noreturn));
+
+static const handler_t handlers[] = {syscall_supervisor_suspend,   syscall_supervisor_resume,
+                                     syscall_supervisor_get_state, syscall_supervisor_read_reg,
+                                     syscall_supervisor_write_reg, syscall_supervisor_read_cap,
+                                     syscall_supervisor_give_cap,  syscall_supervisor_take_cap};
+
 void syscall_supervisor_revoke_cap(cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_SUPERVISOR);
@@ -135,25 +142,8 @@ void syscall_supervisor_invoke_cap(cap_node_t* cn, cap_t cap)
         if (pid < cap_supervisor_get_free(cap) || pid >= cap_supervisor_get_end(cap)) {
                 trap_syscall_exit(S3K_ERROR);
         }
-        proc_t* supervisee = &processes[pid];
-        switch (current->regs.a2) {
-        case 0:
-                syscall_supervisor_suspend(cn, cap, supervisee);
-        case 1:
-                syscall_supervisor_resume(cn, cap, supervisee);
-        case 2:
-                syscall_supervisor_get_state(cn, cap, supervisee);
-        case 3:
-                syscall_supervisor_read_reg(cn, cap, supervisee);
-        case 4:
-                syscall_supervisor_write_reg(cn, cap, supervisee);
-        case 5:
-                syscall_supervisor_read_cap(cn, cap, supervisee);
-        case 6:
-                syscall_supervisor_give_cap(cn, cap, supervisee);
-        case 7:
-                syscall_supervisor_take_cap(cn, cap, supervisee);
-        default:
-                trap_syscall_exit(S3K_ERROR);
-        }
+        uint64_t op = current->regs.a2;
+        if (op < ARRAY_SIZE(handlers))
+                handlers[op](cn, cap, &processes[pid]);
+        trap_syscall_exit(S3K_ERROR);
 }

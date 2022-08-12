@@ -19,7 +19,7 @@ CFLAGS+=-O3
 CFLAGS+=-gdwarf-2
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Ibsp/$(BSP)
-CFLAGS+=-Wall -fanalyzer 
+CFLAGS+=-Wall -fanalyzer -Werror
 CFLAGS+=-MMD
 CFLAGS+= -DNDEBUG
 
