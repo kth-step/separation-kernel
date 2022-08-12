@@ -62,14 +62,11 @@ static inline uint64_t proc_write_register(proc_t* proc, uint64_t regi, uint64_t
 
 cap_node_t* proc_get_cap_node(proc_t* proc, uint64_t cid)
 {
-        if (cid < N_CAPS)
-                return &proc->cap_table[cid];
-        return NULL;
+        return &proc->cap_table[cid % N_CAPS];
 }
 
 cap_t proc_get_cap(proc_t* proc, uint64_t cid)
 {
-        kassert(cid < N_CAPS);
         return cap_node_get_cap(proc_get_cap_node(proc, cid));
 }
 

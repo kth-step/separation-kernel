@@ -35,22 +35,54 @@ trap_vector:
         /* Load kernel sp */
         load_sp
 
-        csrr    a0,mcause
+        csrr    t3,mcause
         
         /* Must be timer interrupt, yield */
-        bltz    a0,sched_yield
+        bltz    t3,sched_yield
 
         /* Enable preemption */
         csrw    mstatus,MSTATUS_IE
 
         /* Check if ecall from U mode */ 
         li      t0,MCAUSE_U_ECALL
-        bne     a0,t0,exception
+        bne     t3,t0,exception
         /* Check that sysnr is correct */
         li      t0,NUM_OF_SYSNR
-        bge     a0,t0,exception
+        bge     a7,t0,exception
 
 syscall:
+
+        /* if syscall number < S3K_SYSNR_READ_CAP,
+         * we use no capabilities */
+        li      t0,S3K_SYSNR_READ_CAP
+        blt     a7,t0,syscall_jump
+
+syscall_get_capability:
+        /* a0 := a0 mod N_CAPS */
+        /* Relies on N_CAP = 2^i, for some i */
+        andi    a0,a0,(N_CAPS - 1)
+
+        /* Get pointer to cap_node */
+        /* t0 = current->cap_table */
+        ld      t0,(43*8)(tp)
+        /* Each cap_node is 32 byte wide (2^5 byte wide) */
+        slli    t1,a0,5
+        /* a2 = current->cap_table[a0] */
+        add     a2,t0,t1 
+
+        /* Get cap = {a0, a1} */
+        ld      a0,16(a2)
+        ld      a1,24(a2)
+
+        /* Get cap first, then check if it has been deleted */
+        fence   r,r
+
+        /* If cap_node->prev == NULL, return error S3K_EMPTY */
+        ld      t4,0(a2)
+        beqz    t4,syscall_empty
+
+syscall_jump:
+        /* Jump to syscall handler */
         la      ra,syscall_vector
         slli    t0,a7,2
         add     ra,ra,t0
@@ -60,9 +92,13 @@ exception:
         /* Enable preemption */
         csrr    a1,mtval
         la      ra,exception_vector
+        mv      a0,t3
         slli    t0,a0,2
         add     ra,ra,t0
         jalr    zero,(ra)
+
+syscall_empty:
+        li      a0,S3K_EMPTY
 
 trap_syscall_exit:
         /* Disable preemption */

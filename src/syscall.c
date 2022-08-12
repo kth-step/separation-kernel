@@ -81,79 +81,48 @@ void syscall_yield(void)
         sched_yield();
 }
 
-void syscall_read_cap(void)
+void syscall_read_cap(cap_t cap, cap_node_t* cap_node)
 {
-        cap_node_t* cap_node = proc_get_cap_node(current, current->regs.a0);
-        if (!cap_node)
-                trap_syscall_exit(S3K_ERROR);
-        cap_t cap = cap_node_get_cap(cap_node);
         preemption_disable();
         current->regs.a1 = cap.word0;
         current->regs.a2 = cap.word1;
         trap_syscall_exit2(S3K_OK);
 }
 
-void syscall_move_cap(void)
+void syscall_move_cap(cap_t cap, cap_node_t* cap_node)
 {
-        cap_node_t* cnsrc = proc_get_cap_node(current, current->regs.a0);
         cap_node_t* cndest = proc_get_cap_node(current, current->regs.a1);
-        if (!cnsrc || !cndest)
-                trap_syscall_exit(S3K_ERROR);
-        if (cap_node_is_deleted(cnsrc))
-                trap_syscall_exit(S3K_EMPTY);
         if (!cap_node_is_deleted(cndest))
                 trap_syscall_exit(S3K_COLLISION);
-
         preemption_disable();
-        cap_node_move(cnsrc, cndest);
+        cap_node_move(cap_node, cndest);
         trap_syscall_exit(S3K_OK);
 }
 
-void syscall_delete_cap(void)
+void syscall_delete_cap(cap_t cap, cap_node_t* cap_node)
 {
-        cap_node_t* cn = proc_get_cap_node(current, current->regs.a0);
-        if (!cn)
-                trap_syscall_exit(S3K_ERROR);
-        if (cap_node_is_deleted(cn))
-                trap_syscall_exit(S3K_EMPTY);
         preemption_disable();
-        cap_node_delete(cn);
+        cap_node_delete(cap_node);
         trap_syscall_exit2(S3K_OK);
 }
 
-void syscall_derive_cap(void)
+void syscall_derive_cap(cap_t cap, cap_node_t* cap_node)
 {
-        cap_node_t* cn = proc_get_cap_node(current, current->regs.a0);
         cap_node_t* newcn = proc_get_cap_node(current, current->regs.a1);
-        if (!cn || !newcn)
-                trap_syscall_exit(S3K_ERROR);
-
-        cap_t cap = cap_node_get_cap(cn);
-        cap_t newcap = (cap_t){current->regs.a2, current->regs.a3};
-        if (!newcn)
-                trap_syscall_exit(S3K_ERROR);
         if (!cap_node_is_deleted(newcn))
                 trap_syscall_exit(S3K_COLLISION);
-
-        derive_handlers[cap_get_type(cap)](cn, cap, newcn, newcap);
+        cap_t newcap = (cap_t){current->regs.a2, current->regs.a3};
+        derive_handlers[cap_get_type(cap)](cap_node, cap, newcn, newcap);
 }
 
-void syscall_revoke_cap(void)
+void syscall_revoke_cap(cap_t cap, cap_node_t* cap_node)
 {
-        cap_node_t* cn = proc_get_cap_node(current, current->regs.a0);
-        if (!cn)
-                trap_syscall_exit(S3K_ERROR);
-        cap_t cap = cap_node_get_cap(cn);
-        revoke_handlers[cap_get_type(cap)](cn, cap);
+        revoke_handlers[cap_get_type(cap)](cap_node, cap);
 }
 
-void syscall_invoke_cap(void)
+void syscall_invoke_cap(cap_t cap, cap_node_t* cap_node)
 {
-        cap_node_t* cn = proc_get_cap_node(current, current->regs.a0);
-        if (!cn)
-                trap_syscall_exit(S3K_ERROR);
-        cap_t cap = cap_node_get_cap(cn);
-        invoke_handlers[cap_get_type(cap)](cn, cap);
+        invoke_handlers[cap_get_type(cap)](cap_node, cap);
 }
 
 void syscall_unimplemented(void)
