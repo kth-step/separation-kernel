@@ -19,8 +19,6 @@ fi
 x-terminal-emulator -e                       \
 $GDB $ELF -ex "target remote localhost:1234" \
           -ex "b _start"                     \
-          -ex "b hang"                       \
-          -ex "b mhang"                      \
           -ex "c"                            \
           -ex "layout split"                 \
           -ex "fs cmd"

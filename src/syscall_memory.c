@@ -18,7 +18,7 @@ void syscall_memory_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap
         kassert(cap_get_type(cap) == CAP_TYPE_MEMORY);
 
         if (!cap_can_derive_memory(cap, newcap))
-                trap_syscall_exit(S3K_ILLEGAL_DERIVATION);
+                trap_syscall_exit1(S3K_ILLEGAL_DERIVATION);
 
         if (cap_get_type(newcap) == CAP_TYPE_MEMORY)
                 cap_memory_set_free(&cap, cap_memory_get_end(newcap));

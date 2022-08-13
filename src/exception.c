@@ -3,34 +3,32 @@
 #include "sched.h"
 #include "trap.h"
 
-void exception_handler(uint64_t mcause, uint64_t mtval)
+#define MRET 0x0320000073ull
+#define ILLEGAL_INSTRUCTION 2ull
+
+void exception_handler(void)
 {
+        uint64_t mcause = read_csr(mcause);
+        uint64_t mtval = read_csr(mtval);
+
         preemption_disable();
-        /* Save pc, sp, a0, a1 to trap frame */
-        current->regs.ppc = current->regs.pc;
-        current->regs.psp = current->regs.sp;
-        current->regs.pa0 = current->regs.a0;
-        current->regs.pa1 = current->regs.a1;
-        /* Prepare for trap handler */
-        current->regs.pc = current->regs.tpc;
-        current->regs.sp = current->regs.tsp;
-        current->regs.a0 = mcause;
-        current->regs.a1 = mtval;
-        trap_resume_proc();
-}
-
-#define MRET 0x0320000073
-
-void illegal_instruction_handler(uint64_t mcause, uint64_t mtval)
-{
-        if (mtval == MRET) {
+        if (mcause == ILLEGAL_INSTRUCTION && mtval == MRET) {
                 /* Restore sp, pc, a0, a1 */
-                preemption_disable();
                 current->regs.sp = current->regs.psp;
                 current->regs.pc = current->regs.ppc;
                 current->regs.a0 = current->regs.pa0;
                 current->regs.a1 = current->regs.pa1;
-                trap_resume_proc();
+        } else {
+                /* Save pc, sp, a0, a1 to trap frame */
+                current->regs.ppc = current->regs.pc;
+                current->regs.psp = current->regs.sp;
+                current->regs.pa0 = current->regs.a0;
+                current->regs.pa1 = current->regs.a1;
+                /* Prepare for trap handler */
+                current->regs.pc = current->regs.tpc;
+                current->regs.sp = current->regs.tsp;
+                current->regs.a0 = mcause;
+                current->regs.a1 = mtval;
         }
-        exception_handler(mcause, mtval);
+        trap_resume_proc();
 }

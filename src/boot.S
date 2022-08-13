@@ -17,7 +17,7 @@ _start:
         csrw    mstatus,x0
 
         /* Set the trap entry function. */
-        la      t0,trap_vector
+        la      t0,trap_entry
         csrw    mtvec,t0
 
         /* Enable machine timer interrupt. */

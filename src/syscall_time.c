@@ -10,7 +10,7 @@ void syscall_time_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t
         kassert(cap_get_type(cap) == CAP_TYPE_TIME);
 
         if (!cap_can_derive_time(cap, newcap))
-                trap_syscall_exit(S3K_ILLEGAL_DERIVATION);
+                trap_syscall_exit1(S3K_ILLEGAL_DERIVATION);
         cap_time_set_free(&cap, cap_time_get_end(newcap));
 
         uint64_t hartid = cap_time_get_hartid(cap);

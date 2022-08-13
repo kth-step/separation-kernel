@@ -45,7 +45,7 @@ void syscall_supervisor_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn,
 {
         kassert(cap_get_type(cap) == CAP_TYPE_SUPERVISOR);
         if (!cap_can_derive_supervisor(cap, newcap))
-                trap_syscall_exit(S3K_ILLEGAL_DERIVATION);
+                trap_syscall_exit1(S3K_ILLEGAL_DERIVATION);
 
         if (cap_get_type(newcap) == CAP_TYPE_SUPERVISOR)
                 cap_supervisor_set_free(&cap, cap_supervisor_get_end(newcap));
@@ -59,15 +59,13 @@ void syscall_supervisor_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn,
 void syscall_supervisor_suspend(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
         preemption_disable();
-        current->regs.a0 = proc_supervisor_suspend(supervisee);
-        trap_syscall_exit3();
+        trap_syscall_exit2(proc_supervisor_suspend(supervisee));
 }
 
 void syscall_supervisor_resume(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
         preemption_disable();
-        current->regs.a0 = proc_supervisor_resume(supervisee);
-        trap_syscall_exit3();
+        trap_syscall_exit2(proc_supervisor_resume(supervisee));
 }
 
 void syscall_supervisor_get_state(cap_node_t* cn, cap_t cap, proc_t* supervisee)
@@ -103,7 +101,7 @@ void syscall_supervisor_read_cap(cap_node_t* cn, cap_t cap, proc_t* supervisee)
 {
         cap_node_t* supervisee_cap_node = proc_get_cap_node(supervisee, current->regs.a3);
         if (!supervisee_cap_node)
-                trap_syscall_exit(S3K_ERROR);
+                trap_syscall_exit1(S3K_ERROR);
         cap_t supervisee_cap = cap_node_get_cap(supervisee_cap_node);
         preemption_disable();
         current->regs.a1 = supervisee_cap.word0;
@@ -140,10 +138,10 @@ void syscall_supervisor_invoke_cap(cap_node_t* cn, cap_t cap)
         kassert(cap_get_type(cap) == CAP_TYPE_SUPERVISOR);
         uint64_t pid = current->regs.a1;
         if (pid < cap_supervisor_get_free(cap) || pid >= cap_supervisor_get_end(cap)) {
-                trap_syscall_exit(S3K_ERROR);
+                trap_syscall_exit1(S3K_ERROR);
         }
         uint64_t op = current->regs.a2;
         if (op < ARRAY_SIZE(handlers))
                 handlers[op](cn, cap, &processes[pid]);
-        trap_syscall_exit(S3K_ERROR);
+        trap_syscall_exit1(S3K_ERROR);
 }
