@@ -67,8 +67,10 @@ void syscall_channels_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, c
 
         if (cap_get_type(newcap) == CAP_TYPE_CHANNELS)
                 cap_channels_set_free(&cap, cap_channels_get_end(newcap));
+
         if (cap_get_type(newcap) == CAP_TYPE_RECEIVER)
                 cap_channels_set_free(&cap, cap_receiver_get_channel(newcap) + 1);
+
         if (cap_get_type(newcap) == CAP_TYPE_SERVER)
                 cap_channels_set_free(&cap, cap_server_get_channel(newcap) + 1);
 
@@ -81,6 +83,7 @@ void syscall_channels_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, c
 void syscall_receiver_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER);
+
         if (!cap_can_derive_receiver(cap, newcap))
                 trap_syscall_exit(S3K_ILLEGAL_DERIVATION);
 
@@ -92,6 +95,7 @@ void syscall_receiver_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, c
 void syscall_server_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, cap_t newcap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_SERVER);
+
         if (!cap_can_derive_server(cap, newcap))
                 trap_syscall_exit(S3K_ILLEGAL_DERIVATION);
 
@@ -147,6 +151,6 @@ void syscall_server_invoke_cap(cap_node_t* cn, cap_t cap)
 
 void syscall_client_invoke_cap(cap_node_t* cn, cap_t cap)
 {
-        kassert(cap_get_type(cap) == CAP_TYPE_SERVER);
+        kassert(cap_get_type(cap) == CAP_TYPE_CLIENT);
         trap_syscall_exit(S3K_UNIMPLEMENTED);
 }
