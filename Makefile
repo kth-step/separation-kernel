@@ -5,9 +5,9 @@ BUILD=build
 
 include config.mk
 
-SRCS=$(wildcard src/*.[cS]) $(wildcard bsp/$(BSP)/*.[cS])
+SRCS=$(filter-out offsets.c, $(wildcard src/*.[cS])) $(wildcard bsp/$(BSP)/*.[cS])
 OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
-HDRS=$(wildcard src/*.h)
+HDRS=$(wildcard src/*.h) src/cap.h src/offsets.h
 DEPS=$(patsubst %.o, %.d, $(OBJS))
 
 ELF=$(BUILD)/$(PROGRAM).elf
@@ -42,7 +42,7 @@ format:
 
 clean:
 	@echo "Cleaning"
-	@rm -f $(ELF) $(DA) $(DEPS) $(OBJS) src/cap.h src/s3k_cap.h
+	@rm -f $(ELF) $(DA) $(DEPS) $(OBJS) src/cap.h src/s3k_cap.h src/offsets.h
 
 size: $(ELF)
 	@echo "Size of binary:"
@@ -65,12 +65,16 @@ src/s3k_cap.h: src/cap.h
 	@echo "Generating $@"
 	@sed '/kassert/d' $< > $@
 
-$(BUILD)/%.c.o: %.c src/cap.h src/s3k_cap.h
+src/offsets.h: src/offsets.c src/proc.h src/cap_node.h src/cap.h
+	@echo "Generating $@"
+	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
+
+$(BUILD)/%.c.o: %.c src/cap.h src/s3k_cap.h src/offsets.h
 	@mkdir -p $(@D) 
 	@echo "Compiling C object $@"
 	@$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/%.S.o: %.S
+$(BUILD)/%.S.o: %.S src/offsets.h
 	@mkdir -p $(@D) 
 	@echo "Compiling ASM object $@"
 	@$(CC) $(CFLAGS) -c -o $@ $<

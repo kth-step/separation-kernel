@@ -1,5 +1,8 @@
 # See LICENSE file for copyright and license details.
 #include "s3k_consts.h"
+#include "offsets.h"
+#include "config.h"
+#include "macros.S"
 
 #define MCAUSE_U_ECALL 8
 #define MSTATUS_IE 8
@@ -9,10 +12,7 @@
 .globl trap_syscall_exit2
 .globl trap_resume_proc
 
-#include "config.h"
-#include "macros.S"
-
-.section .text.trap_entry
+.section .text.trap
 .align 8
 trap_entry:
         csrrw   tp,mscratch,tp
@@ -26,7 +26,7 @@ trap_entry:
 
         /* Save tp */
         csrrw   t0,mscratch,zero
-        sd      t0,(4*8)(tp)
+        sd      t0,(PROC_REGS + REGS_TP)(tp)
 
         /* Load kernel gp */
         load_gp
@@ -49,18 +49,18 @@ trap_entry:
 trap_syscall:
         la      s0,syscall_unimplemented
         li      t0,NUM_OF_SYSNR
-        bge     a7,t0,2f
+        bgeu    a7,t0,2f
         li      t0,S3K_SYSNR_INVOKE_CAP
-        blt     t0,a7,1f
+        bltu    t0,a7,1f
 
         andi    a0,a0,(N_CAPS - 1)
         slli    a0,a0,5
-        ld      t0,(43*8)(tp)
+        ld      t0,(PROC_CAP_TABLE)(tp)
         add     a0,a0,t0
-        ld      a1,16(a0)
-        ld      a2,24(a0)
+        ld      a1,(CAP_NODE_CAP + CAP_WORD0)(a0)
+        ld      a2,(CAP_NODE_CAP + CAP_WORD1)(a0)
         fence
-        ld      t0,0(a0)
+        ld      t0,CAP_NODE_PREV(a0)
         beqz    t0,2f
 
         /* Jump to syscall handler */
@@ -75,10 +75,10 @@ trap_syscall_exit1:
 
 /* Return syscall with error code in a0, and not turning off interrupts */
 trap_syscall_exit2:
-        sd      a0,(10*8)(tp)
-        ld      a0,(0*8)(tp)
+        sd      a0,(PROC_REGS + REGS_A0)(tp)
+        ld      a0,(PROC_REGS + REGS_PC)(tp)
         addi    a0,a0,4
-        sd      a0,(0*8)(tp)
+        sd      a0,(PROC_REGS + REGS_PC)(tp)
 
 trap_resume_proc:
         /* Enable preemption */
@@ -92,9 +92,9 @@ trap_resume_proc:
         /* Save pointer to proc_t */
         csrw    mscratch,tp
         /* Restore user sp, gp and tp */
-        ld      sp,(2*8)(tp)
-        ld      gp,(3*8)(tp)
-        ld      tp,(4*8)(tp)
+        ld      sp,(PROC_REGS + REGS_SP)(tp)
+        ld      gp,(PROC_REGS + REGS_GP)(tp)
+        ld      tp,(PROC_REGS + REGS_TP)(tp)
         mret
 
 syscall_vector:

@@ -48,15 +48,14 @@ void main_supervisor(uint64_t pid, uint64_t begin, uint64_t end)
         dump_cap("supervisor");
 }
 
-void main_uart(uint64_t pid, uint64_t begin, uint64_t end)
+void main_uart_in(uint64_t pid, uint64_t begin, uint64_t end)
 {
-        dump_cap("uart");
-        cap_t new_time = cap_mk_time(1, 8, 12, 8, 2);
-        s3k_derive_cap(0, 2, new_time);
-        dump_cap("uart");
-        uint64_t msg[4] = {0, 1, 2, 3};
-        kprintf("Send message to supervisor %d\n", s3k_send(1, msg, 2, 0));
-        dump_cap("uart");
+        dump_cap("uart_in");
+}
+
+void main_uart_out(uint64_t pid, uint64_t begin, uint64_t end)
+{
+        dump_cap("uart_out");
 }
 
 void main_app1(uint64_t pid, uint64_t begin, uint64_t end)

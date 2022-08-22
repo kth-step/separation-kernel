@@ -6,7 +6,7 @@
 
 #define USER_DATA_SIZE 4096
 
-
+.section .text.user
 user_code:
         // Load global pointer
         .option push
@@ -35,13 +35,15 @@ user_trampoline:
 .option push
 .option norvc
         j       main_supervisor
-        j       main_uart
+        j       main_uart_in
+        j       main_uart_out
         j       main_app1
         j       main_app2
         j       main_crypt
 .option pop
 
-.section .bss.user_data
+.section .bss.user
 // This is data for all processes
 user_data: .fill (USER_DATA_SIZE * N_PROC)
+user_edata:
 
