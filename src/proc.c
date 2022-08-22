@@ -5,6 +5,7 @@
 #include "csr.h"
 #include "kprint.h"
 
+static inline void make_sentinel(cap_node_t *sentinel);
 static cap_node_t* proc_init_memory(cap_node_t* cn);
 static cap_node_t* proc_init_time(cap_node_t* cn);
 static cap_node_t* proc_init_supervisor(cap_node_t* cn);
@@ -18,12 +19,12 @@ extern void user_code();
 /* Defined in proc.h */
 proc_t processes[N_PROC];
 
-#define MAKE_SENTINEL(s)          \
-        do {                      \
-                s.prev = &s;      \
-                s.next = &s;      \
-                s.cap = NULL_CAP; \
-        } while (0)
+void make_sentinel(cap_node_t *sentinel) 
+{
+        sentinel->prev = sentinel;
+        sentinel->next = sentinel;
+        sentinel->cap = NULL_CAP;
+}
 
 cap_node_t* proc_init_memory(cap_node_t* cn)
 {
@@ -31,7 +32,7 @@ cap_node_t* proc_init_memory(cap_node_t* cn)
         static cap_node_t sentinel;
         cap_t cap;
 
-        MAKE_SENTINEL(sentinel);
+        make_sentinel(&sentinel);
 
         /* Arguments for cap_mk_... */
         uint64_t begin = USER_MEMORY_BEGIN >> 12;
@@ -56,7 +57,7 @@ cap_node_t* proc_init_time(cap_node_t* cn)
         static cap_node_t sentinel;
         cap_t cap;
 
-        MAKE_SENTINEL(sentinel);
+        make_sentinel(&sentinel);
 
         /* Default values of time slices */
         uint64_t begin = 0;
@@ -76,7 +77,7 @@ cap_node_t* proc_init_supervisor(cap_node_t* cn)
         static cap_node_t sentinel;
         cap_t cap;
 
-        MAKE_SENTINEL(sentinel);
+        make_sentinel(&sentinel);
 
         cap = cap_mk_supervisor(0, N_PROC, 0);
         cap_node_insert(cap, cn++, &sentinel);
@@ -89,7 +90,7 @@ static cap_node_t* proc_init_channels(cap_node_t* cn)
         static cap_node_t sentinel;
         cap_t cap;
 
-        MAKE_SENTINEL(sentinel);
+        make_sentinel(&sentinel);
 
         uint16_t begin = 0;
         uint16_t end = N_CHANNELS;
