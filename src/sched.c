@@ -9,8 +9,6 @@
 #include "proc_state.h"
 #include "trap.h"
 
-#define SCHED_SLICE_OFFSET(sched_slice, hartid) ((sched_slice) << ((hartid)-MIN_HARTID) * 16)
-
 static uint64_t schedule[N_QUANTUM];
 lock_t lock = INIT_LOCK;
 
@@ -23,6 +21,8 @@ static inline uint64_t sched_pid(uint64_t sched_slice, uint64_t hartid);
 /* Gets the processes that should run on _hartid_ at time _time_. */
 static void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* length);
 
+static inline uint64_t make_sched_entry(uint64_t pid, uint64_t depth, uint64_t hartid);
+
 /**************** Definitions ****************/
 uint64_t sched_entry(uint64_t s, uint64_t hartid)
 {
@@ -34,6 +34,11 @@ uint64_t sched_entry(uint64_t s, uint64_t hartid)
 uint64_t sched_pid(uint64_t s, uint64_t hartid)
 {
         return sched_entry(s, hartid) & 0xFFull;
+}
+
+uint64_t make_sched_entry(uint64_t pid, uint64_t depth, uint64_t hartid) 
+{
+        return (pid | depth << 8) << (hartid * 16);
 }
 
 void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* length)
@@ -131,14 +136,14 @@ bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end,
         kassert((desired_depth & 0xFFull) == desired_depth);
 
         /* Expected value */
-        uint64_t expected = SCHED_SLICE_OFFSET(expected_depth << 8, hartid);
+        uint64_t expected = make_sched_entry(0, expected_depth, hartid);
 
         /* Desired value */
-        uint64_t desired = SCHED_SLICE_OFFSET(desired_depth << 8 | desired_pid, hartid);
+        uint64_t desired = make_sched_entry(desired_pid, expected_depth, hartid);
 
         /* Mask so we match on desired entry */
-        uint64_t mask_desired = ~SCHED_SLICE_OFFSET(0xFFFFull, hartid);
-        uint64_t mask_expected = SCHED_SLICE_OFFSET(0xFF00ull, hartid);
+        uint64_t mask_desired = make_sched_entry(0xFF, 0xFF, hartid);
+        uint64_t mask_expected = make_sched_entry(0x0, 0xFF, hartid);
 
         lock_acquire(&lock);
         if (cap_node_is_deleted(cn)) {
