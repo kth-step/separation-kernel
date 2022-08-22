@@ -5,7 +5,7 @@ BUILD=build
 
 include config.mk
 
-SRCS=$(filter-out offsets.c, $(wildcard src/*.[cS])) $(wildcard bsp/$(BSP)/*.[cS])
+SRCS=$(filter-out src/offsets.c, $(wildcard src/*.[cS])) $(wildcard bsp/$(BSP)/*.[cS])
 OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
 HDRS=$(wildcard src/*.h) src/cap.h src/offsets.h
 DEPS=$(patsubst %.o, %.d, $(OBJS))
@@ -20,7 +20,6 @@ CFLAGS+=-gdwarf-2
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Ibsp/$(BSP)
 CFLAGS+=-Wall -fanalyzer -Werror
-CFLAGS+=-MMD
 CFLAGS+= -DNDEBUG
 
 # Commands
@@ -72,12 +71,12 @@ src/offsets.h: src/offsets.c src/proc.h src/cap_node.h src/cap.h
 $(BUILD)/%.c.o: %.c src/cap.h src/s3k_cap.h src/offsets.h
 	@mkdir -p $(@D) 
 	@echo "Compiling C object $@"
-	@$(CC) $(CFLAGS) -c -o $@ $<
+	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
 $(BUILD)/%.S.o: %.S src/offsets.h
 	@mkdir -p $(@D) 
 	@echo "Compiling ASM object $@"
-	@$(CC) $(CFLAGS) -c -o $@ $<
+	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
 $(ELF): $(OBJS) $(LDS)
 	@echo "Linking ELF $@"
