@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/env python3
 import yaml
 from yaml.loader import SafeLoader
 import re
