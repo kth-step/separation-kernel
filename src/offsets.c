@@ -1,13 +1,14 @@
 // See LICENSE file for copyright and license details.
 
-#include "proc.h"
 #include "cap.h"
 #include "cap_node.h"
+#include "proc.h"
 
 #define DEFINE_OFFSET(name, struct, member) \
-        asm volatile ("#define " #name " %0" :: "i"(offsetof(struct, member)));
+        asm volatile("#define " #name " %0" ::"i"(offsetof(struct, member)));
 
-void foo(void) {
+void foo(void)
+{
         DEFINE_OFFSET(REGS_PC, regs_t, pc);
         DEFINE_OFFSET(REGS_RA, regs_t, ra);
         DEFINE_OFFSET(REGS_SP, regs_t, sp);

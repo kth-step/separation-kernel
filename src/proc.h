@@ -56,7 +56,7 @@ extern proc_t processes[N_PROC];
 register proc_t* current __asm__("tp");
 
 void proc_init(void);
-void proc_load_pmp(proc_t *proc);
+void proc_load_pmp(proc_t* proc);
 
 static inline cap_node_t* proc_get_cap_node(proc_t* proc, uint64_t cid);
 static inline cap_t proc_get_cap(proc_t* proc, uint64_t cid);

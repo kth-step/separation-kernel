@@ -36,7 +36,7 @@ uint64_t sched_pid(uint64_t s, uint64_t hartid)
         return sched_entry(s, hartid) & 0xFFull;
 }
 
-uint64_t make_sched_entry(uint64_t pid, uint64_t depth, uint64_t hartid) 
+uint64_t make_sched_entry(uint64_t pid, uint64_t depth, uint64_t hartid)
 {
         return (pid | depth << 8) << (hartid * 16);
 }

@@ -139,7 +139,7 @@ void proc_load_pmp(proc_t* proc)
         for (int i = 0; i < 8; i++) {
                 uint64_t pmpidx = proc->regs.pmp & 0xFF;
                 pmpcfg <<= 8;
-                if (pmpidx & 0x80) 
+                if (pmpidx & 0x80)
                         continue;
                 cap_t cap = proc_get_cap(proc, i);
                 if (cap_get_type(cap) != CAP_TYPE_PMP)
