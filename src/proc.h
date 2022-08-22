@@ -9,10 +9,10 @@
 #include "config.h"
 #include "s3k_consts.h"
 
-#define N_REGISTERS (sizeof(registers_t) / sizeof(uint64_t))
+#define N_REGISTERS (sizeof(regs_t) / sizeof(uint64_t))
 
 typedef enum proc_state proc_state_t;
-typedef struct registers registers_t;
+typedef struct regs regs_t;
 typedef struct proc proc_t;
 
 enum proc_state {
@@ -26,7 +26,7 @@ enum proc_state {
         PROC_STATE_RECEIVING_THEN_SUSPEND
 };
 
-struct registers {
+struct regs {
         /* Standard registers */
         uint64_t pc;
         uint64_t ra, sp, gp, tp;
@@ -35,6 +35,8 @@ struct registers {
         uint64_t a0, a1, a2, a3, a4, a5, a6, a7;
         uint64_t s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;
         uint64_t t3, t4, t5, t6;
+        /* pmp capabilities */
+        uint64_t pmp;
         /* timer */
         uint64_t timeout;
         /* Exception handling registers */
@@ -43,7 +45,7 @@ struct registers {
 };
 
 struct proc {
-        registers_t regs;
+        regs_t regs;
         uint64_t pid;
         uint64_t state;
         cap_node_t* cap_table;
@@ -54,6 +56,7 @@ extern proc_t processes[N_PROC];
 register proc_t* current __asm__("tp");
 
 void proc_init(void);
+void proc_load_pmp(proc_t *proc);
 
 static inline cap_node_t* proc_get_cap_node(proc_t* proc, uint64_t cid);
 static inline cap_t proc_get_cap(proc_t* proc, uint64_t cid);

@@ -131,3 +131,29 @@ void proc_init(void)
                 proc_init_proc(&processes[i], i);
         proc_init_boot(&processes[0]);
 }
+
+void proc_load_pmp(proc_t* proc)
+{
+        uint64_t pmpcfg = 0;
+        uint64_t pmpaddr[8] = {0};
+        for (int i = 0; i < 8; i++) {
+                uint64_t pmpidx = proc->regs.pmp & 0xFF;
+                pmpcfg <<= 8;
+                if (pmpidx & 0x80) 
+                        continue;
+                cap_t cap = proc_get_cap(proc, i);
+                if (cap_get_type(cap) != CAP_TYPE_PMP)
+                        continue;
+                pmpcfg |= cap_pmp_get_rwx(cap);
+                pmpaddr[i] = cap_pmp_get_addr(cap);
+        }
+        write_csr(pmpcfg0, pmpcfg);
+        write_csr(pmpaddr0, pmpaddr[0]);
+        write_csr(pmpaddr1, pmpaddr[1]);
+        write_csr(pmpaddr2, pmpaddr[2]);
+        write_csr(pmpaddr3, pmpaddr[3]);
+        write_csr(pmpaddr4, pmpaddr[4]);
+        write_csr(pmpaddr5, pmpaddr[5]);
+        write_csr(pmpaddr6, pmpaddr[6]);
+        write_csr(pmpaddr7, pmpaddr[7]);
+}

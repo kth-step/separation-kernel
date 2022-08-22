@@ -115,6 +115,9 @@ void sched_start(void)
         }
         /* Wait for time slice to start and set timeout */
         current = proc;
+#ifdef MEMORY_PROTECTION
+        proc_load_pmp(proc);
+#endif
         wait_and_set_timeout(time, length, timeout);
         trap_resume_proc();
 }

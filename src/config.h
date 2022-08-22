@@ -5,7 +5,7 @@
 #include "platform.h"
 
 /* Number of processes. */
-#define N_PROC 5
+#define N_PROC 6
 
 /* Number of capabilities per process */
 #define N_CAPS 128
@@ -29,4 +29,4 @@
 #define USER_MEMORY_BEGIN 0x80000000UL
 #define USER_MEMORY_END 0x100000000UL
 
-#define MEMORY_PROTECTION 1
+// #define MEMORY_PROTECTION
