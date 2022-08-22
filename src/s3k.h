@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "s3k_cap.h"
+#include "s3k_cap.g.h"
 #include "s3k_consts.h"
 #include "snprintf.h"
 

@@ -1,6 +1,6 @@
 // See LICENSE file for copyright and license details.
 
-#include "cap.h"
+#include "cap.g.h"
 #include "cap_node.h"
 #include "proc.h"
 

@@ -5,7 +5,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "cap.h"
 #include "config.h"
 #include "lock.h"
 #include "platform.h"

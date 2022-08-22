@@ -7,8 +7,9 @@ include config.mk
 
 SRCS=$(filter-out src/offsets.c, $(wildcard src/*.[cS])) $(wildcard bsp/$(BSP)/*.[cS])
 OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
-HDRS=$(wildcard src/*.h) src/cap.h src/offsets.h
+HDRS=$(filter-out src/%.g.h, $(wildcard src/*.h))
 DEPS=$(patsubst %.o, %.d, $(OBJS))
+GEN_HDRS=src/cap.g.h src/s3k_cap.g.h src/offsets.g.h
 
 ELF=$(BUILD)/$(PROGRAM).elf
 DA=$(BUILD)/$(PROGRAM).da
@@ -33,7 +34,7 @@ settings:
 	@echo "  CC      = $(CC)"
 	@echo "  OBJDUMP = $(OBJDUMP)"
 	@echo "  CFLAGS  = $(CFLAGS)"
-	@echo
+	@echo $(HDRS)
 
 format:
 	@echo "Formatting code"
@@ -41,14 +42,14 @@ format:
 
 clean:
 	@echo "Cleaning"
-	@rm -f $(ELF) $(DA) $(DEPS) $(OBJS) src/cap.h src/s3k_cap.h src/offsets.h
+	@rm -f $(ELF) $(DA) $(DEPS) $(OBJS) src/*.g.h
 
 size: $(ELF)
 	@echo "Size of binary:"
 	@$(SIZE) $(OBJS) $(ELF)
 
 cloc:
-	@cloc $(wildcard src/*.c src/*.h src/*.S)
+	@cloc $(SRCS) $(HDRS) scripts/cap_gen.py cap.yml
 
 qemu: $(ELF) $(DA)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
@@ -56,24 +57,24 @@ qemu: $(ELF) $(DA)
 tags:
 	@ctags $(SRCS) $(HDRS)
 
-src/cap.h: scripts/cap_gen.py cap.yml
+src/cap.g.h: scripts/cap_gen.py cap.yml
 	@echo "Generating $@"
 	@./scripts/cap_gen.py cap.yml > $@
 
-src/s3k_cap.h: src/cap.h
+src/s3k_cap.g.h: src/cap.g.h
 	@echo "Generating $@"
 	@sed '/kassert/d' $< > $@
 
-src/offsets.h: src/offsets.c src/proc.h src/cap_node.h src/cap.h
+src/offsets.g.h: src/offsets.c src/proc.h src/cap_node.h src/cap.g.h
 	@echo "Generating $@"
 	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
 
-$(BUILD)/%.c.o: %.c src/cap.h src/s3k_cap.h src/offsets.h
+$(BUILD)/%.c.o: %.c $(GEN_HDRS)
 	@mkdir -p $(@D) 
 	@echo "Compiling C object $@"
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
-$(BUILD)/%.S.o: %.S src/offsets.h
+$(BUILD)/%.S.o: %.S $(GEN_HDRS)
 	@mkdir -p $(@D) 
 	@echo "Compiling ASM object $@"
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<

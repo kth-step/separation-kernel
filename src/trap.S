@@ -1,6 +1,6 @@
 # See LICENSE file for copyright and license details.
 #include "s3k_consts.h"
-#include "offsets.h"
+#include "offsets.g.h"
 #include "config.h"
 #include "macros.S"
 
