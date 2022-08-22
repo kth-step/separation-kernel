@@ -9,6 +9,7 @@
 
 void foo(void)
 {
+        asm volatile("#pragme once");
         DEFINE_OFFSET(REGS_PC, regs_t, pc);
         DEFINE_OFFSET(REGS_RA, regs_t, ra);
         DEFINE_OFFSET(REGS_SP, regs_t, sp);
