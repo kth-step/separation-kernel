@@ -11,6 +11,9 @@
 /* Maximum hartid */
 #define MAX_HARTID 4
 
+/* Clint memory location */
+#define CLINT 0x2000000ull
+
 /* Stack size. */
 /* log_2 of stack size. */
 #define LOG_STACK_SIZE 12

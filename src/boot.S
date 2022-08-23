@@ -6,84 +6,75 @@
 .section .init
 /*** This is the kernel's entry point ***/
 .globl _start
-_start:
+_start: /* Start of the kernel */
         load_gp
         load_sp
 
         /* Trap handler interpret mscratch == 0 as trap in machine-mode */
         csrw    mscratch,x0    
 
-        /* No preemption */
+        /* No machine-mode preemption */
         csrw    mstatus,x0
 
         /* Set the trap entry function. */
         la      t0,trap_entry
         csrw    mtvec,t0
 
-        /* Enable machine timer interrupt. */
-        li      t0,128
-        csrw    mie,t0
-
-        /* make all memory accessible */
+        /* make memory accessible */
         csrw    pmpcfg0,0x0f
         li      t0,0xfffffffffffull
         csrw    pmpaddr0,t0
 
-        /* If hartid != 0, then jump to __wait. */
+        /* If hartid != MIN_HARTID, then jump to __wait. */
         csrr    t0,mhartid
         li      t1,MIN_HARTID
-        blt     t0,t1,boot_park
-        bne     t0,t1,wait
+        bne     t0,t1,_wait
 
-        /* Single process work*/
+_initialize_kernel: /* Initialize kernel */
+        /* Zero bss section */
         la      t0,_bss
         la      t1,_ebss
-        j       2f
-
-1:      sd      x0,0(t0)
+1:      beq     t0,t1,2f
+        sd      x0,0(t0)
         addi    t0,t0,8
-2:      bne     t0,t1,1b
-
+        j       1b
+2:      
+        /* Zero sbss section */
         la      t0,_sbss
         la      t1,_esbss
-        j       2f
-1:      sd      x0,0(t0)
+1:      beq     t0,t1,2f
+        sd      x0,0(t0)
         addi    t0,t0,8
-2:      bne     t0,t1,1b
+        j       1b
+2:      
 
+        /* Initializes PCBs. */
         call    proc_init
 
+        /* Print information about kernel, scheduler, and platform. */
         call    print_info
 
-        /* Unlock the other harts. */
-        fence   rw,rw
-        la      t0,lock
-        sd      x0,(t0)
-
+_wake:
+        /* Wake cores MIN_HARTID-MAX_HARTID */
+        li      t2,1
+        li      t0,(MIN_HARTID * 4 + CLINT)
+        li      t1,(MAX_HARTID * 4 + CLINT)
+1:      sw      t2,0(t0)
+        addi    t0,t0,4
+        bgeu    t1,t0,1b
        
-        /* Wait for hart 0 to finish process initialization. */
-wait: 
-        la      t0,lock
-        ld      t1,(t0)
-        bnez    t1,wait
+_wait: 
+        /* Wait for initilization to finish */
+        csrw    mie,8
+        wfi
+        csrr    t0,mip
+        andi    t0,t0,0x8
+        beqz    t0,_wait
 
-        csrr    t0,mhartid
-        li      t1,MIN_HARTID
-        li      t2,MAX_HARTID
-        blt     t0,t1,boot_park
-        blt     t2,t0,boot_park
+        /* Enable timer interrupt */
+        li      t0,128
+        csrw    mie,t0
 
         /*** Here we start executing the kernel. ***/
-        /* Set thread pointer to 0. */
-        li      tp,0
-        /* Jump to scheduler. */
-        la      ra,trap_resume_proc
+        /*la      ra,trap_resume_proc*/
         tail    sched_start
-
-boot_park:
-        wfi
-        j       boot_park
-
-.section .data.init
-/* This lock is used for process initialization */
-lock: .dword 1

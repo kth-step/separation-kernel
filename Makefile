@@ -34,7 +34,6 @@ settings:
 	@echo "  CC      = $(CC)"
 	@echo "  OBJDUMP = $(OBJDUMP)"
 	@echo "  CFLAGS  = $(CFLAGS)"
-	@echo $(HDRS)
 
 format:
 	@echo "Formatting code"
