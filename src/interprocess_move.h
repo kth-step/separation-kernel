@@ -4,6 +4,7 @@
 #include "s3k_consts.h"
 #include "syscall_supervisor.h"
 #include "syscall_time.h"
+#include "syscall_ipc.h"
 
 static inline uint64_t interprocess_move(proc_t* psrc, proc_t* pdest, uint64_t cidsrc,
                                          uint64_t ciddest)
@@ -19,7 +20,9 @@ static inline uint64_t interprocess_move(proc_t* psrc, proc_t* pdest, uint64_t c
         switch (cap_get_type(cap)) {
         case CAP_TYPE_TIME:
                 return time_interprocess_move(cap, psrc, pdest, cnsrc, cndest);
-
+        case CAP_TYPE_RECEIVER: /* fallthrough */
+        case CAP_TYPE_SERVER:
+                return ipc_interprocess_move(cap, psrc, pdest, cnsrc, cndest);
         case CAP_TYPE_EMPTY:
                 return S3K_EMPTY;
 

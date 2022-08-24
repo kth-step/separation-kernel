@@ -68,11 +68,15 @@ void syscall_channels_derive_cap(cap_node_t* cn, cap_t cap, cap_node_t* newcn, c
         if (cap_get_type(newcap) == CAP_TYPE_CHANNELS)
                 cap_channels_set_free(&cap, cap_channels_get_end(newcap));
 
-        if (cap_get_type(newcap) == CAP_TYPE_RECEIVER)
+        if (cap_get_type(newcap) == CAP_TYPE_RECEIVER) {
                 cap_channels_set_free(&cap, cap_receiver_get_channel(newcap) + 1);
+                set_listener(cn, current, cap_receiver_get_channel(newcap));
+        }
 
-        if (cap_get_type(newcap) == CAP_TYPE_SERVER)
+        if (cap_get_type(newcap) == CAP_TYPE_SERVER) {
                 cap_channels_set_free(&cap, cap_server_get_channel(newcap) + 1);
+                set_listener(cn, current, cap_receiver_get_channel(newcap));
+        }
 
         preemption_disable();
         cap_node_update(cap, cn);
@@ -109,8 +113,6 @@ void syscall_receiver_invoke_cap(cap_node_t* cn, cap_t cap)
         kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER);
 
         uint64_t channel = cap_receiver_get_channel(cap);
-        if (!set_listener(cn, current, channel))
-                trap_syscall_exit1(S3K_EMPTY);
         preemption_disable();
         if (proc_receiver_wait(current, channel)) {
                 /* Process wait for message */
@@ -153,4 +155,19 @@ void syscall_client_invoke_cap(cap_node_t* cn, cap_t cap)
 {
         kassert(cap_get_type(cap) == CAP_TYPE_CLIENT);
         trap_syscall_exit1(S3K_UNIMPLEMENTED);
+}
+
+uint64_t ipc_interprocess_move(cap_t cap, proc_t* psrc, proc_t* pdest, cap_node_t* cnsrc,
+                                    cap_node_t* cndest)
+{
+        kassert(cap_get_type(cap) == CAP_TYPE_RECEIVER || cap_get_type(cap) == CAP_TYPE_SERVER);
+
+        if (!cap_node_is_deleted(cndest))
+                return S3K_COLLISION;
+        cap_node_move(cnsrc, cndest);
+        if (cap_get_type(cap) == CAP_TYPE_RECEIVER)
+        set_listener(cndest, pdest, cap_receiver_get_channel(cap));
+        if (cap_get_type(cap) == CAP_TYPE_SERVER)
+        set_listener(cndest, pdest, cap_server_get_channel(cap));
+        return S3K_OK;
 }

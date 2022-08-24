@@ -18,3 +18,6 @@ void syscall_receiver_invoke_cap(cap_node_t* cn, cap_t cap) __attribute__((noret
 void syscall_sender_invoke_cap(cap_node_t* cn, cap_t cap) __attribute__((noreturn));
 void syscall_server_invoke_cap(cap_node_t* cn, cap_t cap) __attribute__((noreturn));
 void syscall_client_invoke_cap(cap_node_t* cn, cap_t cap) __attribute__((noreturn));
+
+uint64_t ipc_interprocess_move(cap_t cap, proc_t* psrc, proc_t* pdest, cap_node_t* cnsrc,
+                                cap_node_t* cndest);
