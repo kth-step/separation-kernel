@@ -76,6 +76,8 @@ void syscall_move_cap(cap_node_t* cap_node, cap_t cap)
 
 void syscall_delete_cap(cap_node_t* cap_node, cap_t cap)
 {
+        if (cap_get_type(cap) == CAP_TYPE_TIME)
+                syscall_time_delete_cap(cap_node, cap);
         preemption_disable();
         cap_node_delete(cap_node);
         trap_syscall_exit2(S3K_OK);
