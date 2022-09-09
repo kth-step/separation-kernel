@@ -1,6 +1,6 @@
 #!/usr/bin/env -S bash -e
 
-# Kill QEMU_SYSTEM 
+# Kill QEMU_SYSTEM
 function cleanup {
         kill $(jobs -p)
 }

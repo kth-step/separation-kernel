@@ -8,8 +8,6 @@
 #define MSTATUS_IE 8
 
 .globl trap_entry
-.globl trap_syscall_exit1
-.globl trap_syscall_exit2
 .globl trap_resume_proc
 
 .section .text.trap
@@ -17,77 +15,70 @@
 trap_entry:
         /* Save tp, load pcb */ 
         csrrw   tp,mscratch,tp
-        bnez    tp,_trap_umode   /* if tp != 0, then U-mode trap */
-_trap_mmode:
-        csrrw   tp,mscratch,zero /* Restore pcb */
-        j       sched_yield     /* Yield */
-_trap_umode:
-        /* Save all registers except tp */
+
+        /* if tp == 0, then M-mode preemption */
+        beqz    tp,trap_timer_preempted   
+
+        /* Save all registers except tp and pc */
         save_context
 
         /* Save tp */
-        csrrw   t0,mscratch,zero
-        sd      t0,(PROC_REGS + REGS_TP)(tp)
+        csrr    s0,mepc
+        csrrw   t1,mscratch,zero
+        sd      s0,(PROC_REGS + REGS_PC)(tp)
+        sd      t1,(PROC_REGS + REGS_TP)(tp)
 
-        /* Load kernel gp */
+        /* Load kernel gp and sp */
         load_gp
-        /* Load kernel sp */
         load_sp
 
-        /* Get the trap cause */
-        csrr    t0,mcause
-        
         /* mcause < 0, must be timer interrupt so yield */
-        bltz    t0,sched_yield
+        csrr    s1,mcause
+        bltz    s1,trap_timer
 
-        /* Enable preemption */
-        csrw    mstatus,MSTATUS_IE
-
-        la      s0,exception_handler
-        /* Check if ecall from U mode */ 
+        /* if mcause == User ecall, it is a system call */ 
         li      t1,MCAUSE_U_ECALL
-        bne     t0,t1,1f
+        beq     s1,t1,trap_syscall
+
+trap_exception:
+        mv      a0,s1
+        mv      a2,s0
+        csrr    a1,mtval
+        call    exception_handler
+        j       trap_resume_proc
+
+trap_timer_preempted:
+        csrrw   tp,mscratch,zero
+        csrr    t0,mcause
+        bgez    t0, __hang
+trap_timer:
+        tail    sched_yield
 
 trap_syscall:
-        la      s0,syscall_unimplemented
-        li      t0,NUM_OF_SYSNR
-        bgeu    a7,t0,2f        /* a7 >= NUM_OF_SYSNR, then syscall_unimplemented */
-        li      t0,S3K_SYSNR_INVOKE_CAP
-        bltu    t0,a7,1f        /* a7 >= SYSNR_INVOKE_CAP, then dont fetch capability */
+        /* Incr. pc with 4 */
+        addi    s0,s0,4
+        sd      s0,(PROC_REGS + REGS_PC)(tp)
 
-        /* Fetch capability */
-        andi    a0,a0,(N_CAPS - 1) /* a0 = a0 % N_CAPS */
-        slli    a0,a0,5         /* a0 = a0 * 32 (width of cap_node) */
-        ld      t0,(PROC_CAP_TABLE)(tp)
-        add     a0,a0,t0
-        ld      a1,(CAP_NODE_CAP + CAP_WORD0)(a0)
-        ld      a2,(CAP_NODE_CAP + CAP_WORD1)(a0)
-        fence
-        ld      t0,CAP_NODE_PREV(a0)
-        beqz    t0,2f   /* if cap_node is deleted, then syscall unimplemented */
+        /* if a7 >= NUM_OF_SYSNR (or a7 == 0), then syscall_unimplemented */
+1:      auipc   ra,%pcrel_hi(syscall_vector)
+        li      t1,NUM_OF_SYSNR
+        bgeu    t0,t1,2f
 
         /* Jump to syscall handler */
-1:      la      s0,_syscall_vector
-        slli    t0,a7,2
-        add     s0,s0,t0
-2:      jalr    s0
-
-/* Return syscall with error code in a0, and turning off interrupts */
-trap_syscall_exit1:
-        csrw    mstatus,0
-
-/* Return syscall with error code in a0, and not turning off interrupts */
-trap_syscall_exit2:
-        sd      a0,(PROC_REGS + REGS_A0)(tp)    /* Save the syscall code */
-        ld      a0,(PROC_REGS + REGS_PC)(tp)    /* Load pc */
-        addi    a0,a0,4                         /* pc += 4 */
-        sd      a0,(PROC_REGS + REGS_PC)(tp)    /* Save pc */
+        slli    t0,t0,2
+        add     ra,ra,t0
+2:      jalr    %pcrel_lo(1b)(ra)
+        sd      a0,(PROC_REGS + REGS_A0)(tp)
 
 trap_resume_proc:
         /* Enable preemption */
         csrw    mstatus,MSTATUS_IE
 
-        /* Restore all registers except tp, sp, gp */
+        /* Restore pc */
+        ld      t0,(PROC_REGS + REGS_PC)(tp)
+        csrw    mepc,t0
+
+        /* Restore all registers except tp, sp, gp, pc */
         restore_context
 
         /* Disable preemption */
@@ -101,19 +92,21 @@ trap_resume_proc:
         /* Return to user mode */
         mret
 
-_syscall_vector:
+syscall_vector:
 .option push
 .option norvc
-        /* Syscall using capabilities */
+        j       syscall_unimplemented
         j       syscall_read_cap
         j       syscall_move_cap
         j       syscall_delete_cap
         j       syscall_revoke_cap
         j       syscall_derive_cap
         j       syscall_invoke_cap
-        /* Syscall not using capabilities */
         j       syscall_get_pid
         j       syscall_read_reg
         j       syscall_write_reg
         j       syscall_yield
 .option pop
+
+__hang:
+        j       __hang

@@ -18,7 +18,7 @@
 
 /* Number of ticks per quantum. */
 /* TICKS_PER_SECOND defined in platform.h */
-#define TICKS (TICKS_PER_SECOND / N_QUANTUM / 60)
+#define TICKS (TICKS_PER_SECOND / N_QUANTUM / 100)
 
 /* Number of scheduler ticks. */
 #define SCHEDULER_TICKS 2000

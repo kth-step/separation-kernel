@@ -16,12 +16,12 @@ DA=$(BUILD)/$(PROGRAM).da
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
-CFLAGS+=-O3
+CFLAGS+=-Og
 CFLAGS+=-gdwarf-2
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Ibsp/$(BSP)
 CFLAGS+=-Wall -fanalyzer -Werror
-CFLAGS+= -DNDEBUG
+#CFLAGS+= -DNDEBUG
 
 # Commands
 .PHONY: all settings format clean size cloc qemu tags
@@ -34,10 +34,11 @@ settings:
 	@echo "  CC      = $(CC)"
 	@echo "  OBJDUMP = $(OBJDUMP)"
 	@echo "  CFLAGS  = $(CFLAGS)"
+	@echo
 
 format:
 	@echo "Formatting code"
-	@clang-format -i $(HDRS) $(filter %.c, $(SRCS)) 
+	@clang-format -i $(wildcard src/*.[ch]) $(wildcard bsp/*/*.[ch])
 
 clean:
 	@echo "Cleaning"

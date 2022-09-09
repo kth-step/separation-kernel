@@ -24,7 +24,7 @@ sudo apt-get install autoconf automake autotools-dev curl python3 libmpc-dev \
         libtool patchutils bc zlib1g-dev libexpat-dev
 
 # Optional, checkout working branch
-git checkout 051b9f7ddb7d136777505ea19c70a41926842b96 
+git checkout 051b9f7ddb7d136777505ea19c70a41926842b96
 
 # --with-cmodel=medany: This is required to get stdlib working on non-low memory.
 # --prefix=<path>: Install location.

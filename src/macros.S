@@ -25,7 +25,7 @@
         li      x20,0
         li      x21,0
         li      x22,0
-        li      x23,0
+        li      x23,0 
         li      x24,0
         li      x25,0
         li      x26,0
@@ -39,15 +39,15 @@
 .macro load_gp
         .option push
         .option norelax
-        la      gp,__global_pointer$
+        lla     gp,__global_pointer$
         .option pop
 .endm
 
 .macro load_sp
         la      sp,stack
-        csrr    t0,mhartid
-        slli    t0,t0,LOG_STACK_SIZE
-        sub     sp,sp,t0
+        csrr    t1,mhartid
+        slli    t1,t1,LOG_STACK_SIZE
+        sub     sp,sp,t1
 .endm
 
 .macro save_context
@@ -82,14 +82,9 @@
         sd      t4,(PROC_REGS + REGS_T4)(tp)
         sd      t5,(PROC_REGS + REGS_T5)(tp)
         sd      t6,(PROC_REGS + REGS_T6)(tp)
-
-        csrr    t0,mepc
-        sd      t0,(PROC_REGS + REGS_PC)(tp)
 .endm
 
 .macro restore_context
-        ld      t0,(PROC_REGS + REGS_PC)(tp)
-        csrw    mepc,t0
         ld      t6,(PROC_REGS + REGS_T6)(tp)
         ld      t5,(PROC_REGS + REGS_T5)(tp)
         ld      t4,(PROC_REGS + REGS_T4)(tp)

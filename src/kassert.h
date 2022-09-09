@@ -4,18 +4,19 @@
 #ifndef NDEBUG
 #include "kprint.h"
 #include "platform.h"
+extern void hang() __attribute__((noreturn));
 
-#define kassert(val)                                                                              \
-        ({                                                                                        \
-                while (!(val)) {                                                                  \
-                        kprintf("Assert '%s' failed at %s:%d in function %s\r\n", #val, __FILE__, \
-                                __LINE__, __FUNCTION__);                                          \
-                }                                                                                 \
-        })
+#define kassert(val)                                                                                           \
+    ({                                                                                                         \
+        if (!(val)) {                                                                                          \
+            kprintf("Assert '%s' failed at %s:%d in function %s\r\n", #val, __FILE__, __LINE__, __FUNCTION__); \
+            hang();                                                                                            \
+        }                                                                                                      \
+    })
 #else
-#define kassert(val)                             \
-        ({                                       \
-                if (!(val))                      \
-                        __builtin_unreachable(); \
-        })
+#define kassert(val)                 \
+    ({                               \
+        if (!(val))                  \
+            __builtin_unreachable(); \
+    })
 #endif

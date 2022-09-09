@@ -3,161 +3,139 @@
 
 #include <stddef.h>
 
+#include "kprint.h"
 #include "cap_node.h"
 #include "csr.h"
 #include "lock.h"
 #include "proc_state.h"
 #include "trap.h"
 
-static uint64_t schedule[N_QUANTUM];
-lock_t lock = INIT_LOCK;
 
-/* Returns pid and depth on an sched_slice for a hart */
-static inline uint64_t sched_entry(uint64_t sched_slice, uint64_t hartid);
+static uint16_t schedule[N_QUANTUM][N_HARTS];
+static lock_t lock = INIT_LOCK;
 
-/* Returns pid on an sched_slice for a hart */
-static inline uint64_t sched_pid(uint64_t sched_slice, uint64_t hartid);
+typedef struct sched_entry {
+    uint8_t pid;
+    uint8_t length;
+} sched_entry_t;
 
-/* Gets the processes that should run on _hartid_ at time _time_. */
-static void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* length);
+static inline sched_entry_t sched_get(uint64_t q, uint64_t hartid);
+static inline void sched_set(uint64_t q, uint64_t hartid, uint64_t pid, uint64_t length);
+static inline bool sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* length);
 
-static inline uint64_t make_sched_entry(uint64_t pid, uint64_t depth, uint64_t hartid);
-
-/**************** Definitions ****************/
-uint64_t sched_entry(uint64_t s, uint64_t hartid)
+void sched_init(void)
 {
-        kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
-        s >>= ((hartid)-MIN_HARTID) * 16;
-        return s & 0xFFFFull;
+    for (int i = 0; i < N_QUANTUM; i++) {
+        for (int j = MIN_HARTID; j <= MAX_HARTID; j++) {
+            /* The length of the initial time slices are all N_QUANTUM and pid is 0*/
+            schedule[i][j - MIN_HARTID] = (N_QUANTUM - i) << 8;
+        } 
+    }
 }
 
-uint64_t sched_pid(uint64_t s, uint64_t hartid)
+sched_entry_t sched_get(uint64_t q, uint64_t hartid)
 {
-        return sched_entry(s, hartid) & 0xFFull;
+    kassert(q < N_QUANTUM);
+    kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
+    uint64_t val = schedule[q][hartid - MIN_HARTID];
+    return (sched_entry_t){val & 0xFF, (val >> 8) & 0xFF};
 }
 
-uint64_t make_sched_entry(uint64_t pid, uint64_t depth, uint64_t hartid)
+void sched_set(uint64_t q, uint64_t hartid, uint64_t pid, uint64_t length)
 {
-        return (pid | depth << 8) << (hartid * 16);
+    kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
+    kassert(q < N_QUANTUM);
+    kassert(pid == INVALID_PID || pid < N_PROC);
+    kassert((length & 0xFF) == length);
+    schedule[q][hartid - MIN_HARTID] = pid | (length << 8);
 }
 
-void sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* length)
+bool sched_get_proc(uint64_t hartid, uint64_t time, proc_t** proc, uint64_t* length)
 {
-        kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
+    /* Calculate the current quantum */
+    uint64_t quantum = time % N_QUANTUM;
+    /* Get the current quantum schedule */
+    synchronize();
+    sched_entry_t entry = sched_get(quantum, hartid);
 
-        /* Set proc to NULL as default */
-        *proc = NULL;
-        *length = 0;
-        /* Calculate the current quantum */
-        uint64_t quantum = time % N_QUANTUM;
-        /* Get the current quantum schedule */
-        synchronize();
-        uint64_t sched_slice = schedule[quantum];
-        uint64_t pid = sched_pid(sched_slice, hartid);
+    /* Check if slot is invalid/inactive */
+    if (entry.pid == INVALID_PID)
+        return false;
 
-        /* Check if slot is invalid/inactive */
-        if (pid == 0xFFull)
-                return;
+    /* Check if some other thread preempts */
+    for (size_t i = MIN_HARTID; i < hartid; i++) {
+        if (entry.pid == sched_get(quantum, i).pid)
+            return false;
+    }
 
-        /* Check if some other thread preempts */
-        for (size_t i = MIN_HARTID; i < hartid; i++) {
-                /* If the pid is same, there is hart with higher priortiy */
-                uint64_t other_pid = sched_pid(sched_slice, i);
-                if (pid == other_pid)
-                        return;
-        }
-
-        /* Calculate the length of the same time slice */
-        uint64_t quantum_end = quantum + 1;
-        while (quantum_end < N_QUANTUM &&
-               sched_entry(sched_slice, hartid) == sched_entry(schedule[quantum_end], hartid))
-                quantum_end++;
-
-        /* Set proc and length */
-        *proc = &processes[pid];
-        *length = quantum_end - quantum;
-        return;
+    /* Set proc and length */
+    *proc = &processes[entry.pid];
+    *length = entry.length;
+    return true;
 }
 
 void wait_and_set_timeout(uint64_t time, uint64_t length, uint64_t timeout)
 {
-        uint64_t start_time = time * TICKS;
-        uint64_t end_time = start_time + length * TICKS - SCHEDULER_TICKS;
-        uint64_t hartid = read_csr(mhartid);
-        if (timeout > start_time)
-                start_time = timeout;
-        write_timeout(hartid, start_time);
-        while (!(read_csr(mip) & 128))
-                asm volatile("wfi");
-        write_timeout(hartid, end_time);
-}
-
-void sched_start(void)
-{
-        uintptr_t hartid = read_csr(mhartid);
-        /* Process to run and number of time slices to run for */
-        proc_t* proc = NULL;
-        uint64_t time, length, timeout, end_time;
-
-        while (1) {
-                /* Get the current time */
-                time = (read_time() / TICKS) + 1;
-                /* Try getting a process at that time slice. */
-                sched_get_proc(hartid, time, &proc, &length);
-                if (proc == NULL)
-                        continue;
-                timeout = proc->regs.timeout;
-                end_time = (time + length) * TICKS - SCHEDULER_TICKS;
-                if (timeout >= end_time)
-                        continue;
-                if (proc_acquire(proc))
-                        break;
-        }
-        /* Wait for time slice to start and set timeout */
-        current = proc;
-#ifdef MEMORY_PROTECTION
-        proc_load_pmp(proc);
-#endif
-        wait_and_set_timeout(time, length, timeout);
-        trap_resume_proc();
+    uint64_t start_time = time * TICKS;
+    uint64_t end_time = start_time + length * TICKS - SCHEDULER_TICKS;
+    uint64_t hartid = read_csr(mhartid);
+    if (timeout > start_time)
+        start_time = timeout;
+    write_timeout(hartid, start_time);
+    while (!(read_csr(mip) & 128))
+        asm volatile("wfi");
+    write_timeout(hartid, end_time);
 }
 
 void sched_yield(void)
 {
-        /* The hart/core id */
-        proc_release(current);
-        sched_start();
+    proc_release(current);
+    sched_start();
 }
 
-bool sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end,
-                  uint64_t expected_depth, uint64_t desired_pid, uint64_t desired_depth)
+void sched_start(void)
 {
-        kassert(begin < end);
-        kassert(end <= N_QUANTUM);
-        kassert((expected_depth & 0xFFull) == expected_depth);
-        kassert((desired_pid & 0xFFull) == desired_pid);
-        kassert((desired_depth & 0xFFull) == desired_depth);
+    uintptr_t hartid = read_csr(mhartid);
+    /* Process to run and number of time slices to run for */
+    proc_t* proc;
+    uint64_t time, length, timeout, end_time;
 
-        /* Expected value */
-        uint64_t expected = make_sched_entry(0, expected_depth, hartid);
-
-        /* Desired value */
-        uint64_t desired = make_sched_entry(desired_pid, expected_depth, hartid);
-
-        /* Mask so we match on desired entry */
-        uint64_t mask_desired = make_sched_entry(0xFF, 0xFF, hartid);
-        uint64_t mask_expected = make_sched_entry(0x0, 0xFF, hartid);
-
-        lock_acquire(&lock);
-        if (cap_node_is_deleted(cn)) {
-                lock_release(&lock);
-                return false;
+    while (1) {
+        /* Get the current time */
+        time = (read_time() / TICKS) + 1;
+        /* Try getting a process at that time slice. */
+        if (!sched_get_proc(hartid, time, &proc, &length))
+            continue;
+        timeout = proc->regs.timeout;
+        end_time = (time + length) * TICKS - SCHEDULER_TICKS;
+        if (timeout >= end_time) {
+            continue;
         }
+        if (proc_acquire(proc))
+            break;
+    }
+    /* Wait for time slice to start and set timeout */
+    current = proc;
+#ifdef MEMORY_PROTECTION
+    proc_load_pmp(proc);
+#endif
+    wait_and_set_timeout(time, length, timeout);
+    trap_resume_proc();
+}
 
+void sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end, uint64_t pid)
+{
+    kprintf("%d %d %d %d\n", hartid, begin, end, pid);
+    kassert(begin < end);
+    kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
+    kassert(end <= N_QUANTUM);
+    kassert(pid == INVALID_PID || pid < N_PROC);
+
+    lock_acquire(&lock);
+    if (!cap_node_is_deleted(cn)) {
         for (int i = begin; i < end; ++i) {
-                if ((schedule[i] & mask_expected) == expected)
-                        schedule[i] = (schedule[i] & mask_desired) | desired;
+            sched_set(i, hartid, pid, end - i);
         }
-        lock_release(&lock);
-        return true;
+    }
+    lock_release(&lock);
 }

@@ -36,9 +36,9 @@ user_trampoline:
 .option norvc
         j       main_supervisor
         j       main_uart_in
-        j       main_uart_out
+        j       main_app0
         j       main_app1
-        j       main_app2
+        j       main_uart_out
         j       main_crypt
 .option pop
 

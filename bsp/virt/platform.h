@@ -11,6 +11,8 @@
 /* Maximum hartid */
 #define MAX_HARTID 4
 
+#define N_HARTS (MAX_HARTID - MIN_HARTID + 1)
+
 /* Clint memory location */
 #define CLINT 0x2000000ull
 
@@ -22,33 +24,49 @@
 #define PLATFORM_NAME "virt"
 
 #ifndef __ASSEMBLER__
-#define MTIME ((volatile unsigned long long *)0x200bff8UL)
-#define MTIMECMP(x) ((volatile unsigned long long *)(0x2004000UL + ((x)*8)))
+#define MTIME ((volatile unsigned long long*)0x200bff8UL)
+#define MTIMECMP(x) ((volatile unsigned long long*)(0x2004000UL + ((x)*8)))
 
-static inline unsigned long long read_time(void) {
-        return *MTIME;
+static inline unsigned long long read_time(void)
+{
+    return *MTIME;
 }
 
-static inline void write_time(unsigned long long time) {
-        *MTIME = time;
+static inline void write_time(unsigned long long time)
+{
+    *MTIME = time;
 }
 
-static inline unsigned long long read_timeout(int hartid) {
-        return *MTIMECMP(hartid);
+static inline unsigned long long read_timeout(int hartid)
+{
+    return *MTIMECMP(hartid);
 }
 
-static inline void write_timeout(int hartid, unsigned long long timeout) {
-        *MTIMECMP(hartid) = timeout;
+static inline void write_timeout(int hartid, unsigned long long timeout)
+{
+    *MTIMECMP(hartid) = timeout;
 }
 
-static inline int uart_putchar(char c) {
-        unsigned int *txdata = (unsigned int *)0x10000000;
-        asm volatile(
-            "1:amoswap.w t0,%0,(%1)\n"
-            "  sext.w t0,t0\n"
-            "  bltz t0,1b" ::"r"(c), "r"(txdata)
-            : "t0");
-        return c;
+static inline void uart_init(void)
+{
+    unsigned char* uart = (unsigned char*)0x10000000;
+    uart[3] = 3;
+    uart[2] = 1;
+}
+
+static inline int uart_putchar(char c)
+{
+    unsigned char* uart = (unsigned char*)0x10000000;
+    uart[0] = c;
+    return c;
+}
+
+static inline int uart_getchar(void)
+{
+    unsigned char* uart = (unsigned char*)0x10000000;
+    if (uart[5] & 1)
+        return uart[0];
+    return 0;
 }
 
 #endif /* __ASSEMBLY__ */

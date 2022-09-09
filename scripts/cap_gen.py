@@ -39,9 +39,11 @@ def make_getter(cap_name, name, size, bins):
     if name == 'padd':
         return
     print(f"static inline uint64_t cap_{cap_name}_get_{name}(cap_t cap) {{")
-    make_assert(f"(cap.word0 >> 56) == CAP_TYPE_{cap_name.upper()}")
+    make_assert(f"cap_is_type(cap, CAP_TYPE_{cap_name.upper()})")
     i, b = get_bin(bins, name)
     offset = get_offset(b, name)
+    if i == 0:
+        offset += 8
     if offset:
         print(f"return (cap.word{i} >> {offset}) & 0x{'ff'*size}ull;")
     else:
@@ -51,16 +53,19 @@ def make_getter(cap_name, name, size, bins):
 def make_setter(cap_name, name, size, bins):
     if name == 'padd':
         return
-    print(f'static inline void cap_{cap_name}_set_{name}(cap_t *cap, uint64_t {name}) {{')
-    make_assert(f"(cap->word0 >> 56) == CAP_TYPE_{cap_name.upper()}")
+    print(f'static inline cap_t cap_{cap_name}_set_{name}(cap_t cap, uint64_t {name}) {{')
+    make_assert(f"cap_is_type(cap, CAP_TYPE_{cap_name.upper()})")
     make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")
-    i, b = get_bin(bins, name) 
+    i, b = get_bin(bins, name)
     offset = get_offset(b, name)
+    if i == 0:
+        offset += 8
     mask = f"0x{'ff'*size + '00'*(offset//8)}ull"
     if offset:
-        print(f"cap->word{i} = (cap->word{i} & ~{mask}) | {name} << {offset};")
+        print(f"cap.word{i} = (cap.word{i} & ~{mask}) | {name} << {offset};")
     else:
-        print(f"cap->word{i} = (cap->word{i} & ~{mask}) | {name};")
+        print(f"cap.word{i} = (cap.word{i} & ~{mask}) | {name};")
+    print("return cap;")
     print("}")
 
 def make_constructor(cap_name, fields, asserts, bins):
@@ -72,18 +77,26 @@ def make_constructor(cap_name, fields, asserts, bins):
     for a in asserts:
         make_assert(a)
     print("cap_t c;")
-    print(f"c.word0 = (uint64_t)CAP_TYPE_{cap_name.upper()} << 56;")
+    print(f"c.word0 = (uint64_t)CAP_TYPE_{cap_name.upper()};")
     print(f"c.word1 = 0;")
     for (i,b) in enumerate(bins):
         for (f, s) in b:
             if f == 'padd':
                 continue
             offset = get_offset(b, f)
+            if i == 0:
+                offset += 8
             if offset:
                 print(f"c.word{i} |= {f} << {offset};")
             else:
                 print(f"c.word{i} |= {f};")
     print("return c;")
+    print("}")
+
+def make_revokable(caps):
+    print("static inline int cap_is_revokable(cap_t cap) {")
+    p = [f"cap_is_type(cap, CAP_TYPE_{cap['name'].upper()})" for cap in caps if cap['revokable']]
+    print(f"return {'&&'.join(p)};")
     print("}")
 
 def make_cap_functions(data):
@@ -98,7 +111,7 @@ def make_cap_functions(data):
     for (f, s) in fields:
         make_getter(cap_name, f, s, bins)
         make_setter(cap_name, f, s, bins)
-    
+
 def make_translator(case):
     pairs = []
     for rel in case['conditions']:
@@ -114,26 +127,25 @@ def make_translator(case):
     rels = []
     for rel in case['conditions']:
         for key, val in dic.items():
-            rel = rel.replace(key, val) 
+            rel = rel.replace(key, val)
         rels.append("(" + rel + ")")
     case['conditions'] = rels
-        
+
 def make_pred_case(case):
     parent_type = f"CAP_TYPE_{case['parent'].upper()}"
     child_type = f"CAP_TYPE_{case['child'].upper()}"
     make_translator(case)
-    print(f"if (parent_type == {parent_type} && child_type == {child_type})")
+    print(f"if (cap_is_type(p,{parent_type}) && cap_is_type(c, {child_type}))")
     print(f"return {'&&'.join(case['conditions'])};")
 
 def make_pred(p):
     name=p['name']
     print(f"static inline int cap_{name}(cap_t p, cap_t c) {{")
-    print("cap_type_t parent_type = cap_get_type(p);")
-    print("cap_type_t child_type = cap_get_type(c);")
     for case in p['cases']:
         make_pred_case(case)
     print("return 0;")
     print("}")
+    
 
 # Open the file and load the file
 
@@ -163,12 +175,18 @@ unsigned long long word0, word1;
 }};
 
 static inline cap_type_t cap_get_type(cap_t cap) {{
-return (cap.word0 >> 56) & 0xff;
+return 0xffull & cap.word0;
+}}
+
+static inline int cap_is_type(cap_t cap, cap_type_t t) {{
+    return cap_get_type(cap) == t;
 }}
 """)
 
 for i in caps:
     make_cap_functions(i)
+
+make_revokable(caps)
 
 for p in data['predicates']:
     make_pred(p)
