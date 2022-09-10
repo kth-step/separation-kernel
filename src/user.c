@@ -92,6 +92,12 @@ bool init_proc(uint64_t pid)
 
 void main_supervisor(uint64_t pid, uint64_t begin, uint64_t end)
 {
+    while (s3k_derive_cap(2, 10, cap_mk_pmp(0x10000fff >> 12, 0x3)))
+    s3k_write_reg(33, 10 << 8);
+    s3k_yield();
+    dump_cap("supervisor");
+
+    while (1);
     uart_init();
     for (int i = 1; i <= 5; i++)
         init_proc(i);

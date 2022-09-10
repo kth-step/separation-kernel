@@ -23,10 +23,4 @@
 /* Number of scheduler ticks. */
 #define SCHEDULER_TICKS 2000
 
-/* Beginning and end of the user processes' memory region.
- * Used for setting up initial memory of the boot process. */
-#define BOOT_PMP_LENGTH 0x100000UL
-#define USER_MEMORY_BEGIN 0x80000000UL
-#define USER_MEMORY_END 0x100000000UL
-
-// #define MEMORY_PROTECTION
+//#define MEMORY_PROTECTION

@@ -5,6 +5,8 @@
 #include "csr.h"
 #include "kprint.h"
 
+#define ARRAY_SIZE(x) ((sizeof(x) / sizeof(x[0])))
+
 static inline void make_sentinel(cap_node_t* sentinel);
 static cap_node_t* proc_init_memory(cap_node_t* cn);
 static cap_node_t* proc_init_time(cap_node_t* cn);
@@ -34,20 +36,17 @@ cap_node_t* proc_init_memory(cap_node_t* cn)
 
     make_sentinel(&sentinel);
 
-    /* Arguments for cap_mk_... */
-    uint64_t begin = USER_MEMORY_BEGIN >> 12;
-    uint64_t end = USER_MEMORY_END >> 12;
-
-    uint64_t pmp_length = BOOT_PMP_LENGTH >> 12;
-    uint64_t pmp_addr = begin | ((pmp_length - 1) >> 1);
-
     /* Make and insert pmp frame */
-    cap = cap_mk_pmp(pmp_addr, 5);
+    cap = cap_mk_pmp(PMP);
     cap_node_insert(cap, cn++, &sentinel);
 
-    /* Make and insert memory slice */
-    cap = cap_mk_memory(begin, end, 7, begin, 0);
-    cap_node_insert(cap, cn++, &sentinel);
+    uint64_t memory_slices[][2] = MEMORY_SLICES;
+    for (int i = 0; i < ARRAY_SIZE(memory_slices); i++) {
+        uint64_t begin = memory_slices[i][0];
+        uint64_t end = memory_slices[i][1];
+        cap = cap_mk_memory(begin, end, 7, begin, 0);
+        cap_node_insert(cap, cn++, &sentinel);
+    }
 
     return cn;
 }
@@ -138,14 +137,13 @@ void proc_load_pmp(proc_t* proc)
     uint64_t pmpaddr[8] = {0};
     for (int i = 0; i < 8; i++) {
         uint64_t pmpidx = proc->regs.pmp & 0xFF;
-        pmpcfg <<= 8;
         if (pmpidx & 0x80)
             continue;
         cap_t cap = proc_get_cap(proc, i);
         if (cap_get_type(cap) != CAP_TYPE_PMP)
             continue;
-        pmpcfg |= cap_pmp_get_rwx(cap);
-        pmpaddr[i] = cap_pmp_get_addr(cap);
+        pmpcfg |= (cap_pmp_get_rwx(cap) << (i * 8)) | 0x18;
+        pmpaddr[i] = (cap_pmp_get_addr(cap) << 10) | 0x3FF;
     }
     write_csr(pmpcfg0, pmpcfg);
     write_csr(pmpaddr0, pmpaddr[0]);
