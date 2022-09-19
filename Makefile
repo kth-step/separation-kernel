@@ -7,14 +7,15 @@ include config.mk
 
 SRCS=$(wildcard src/*.[cS]) $(wildcard bsp/$(BSP)/*.[cS])
 OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
-HDRS=$(filter-out src/%.g.h, $(wildcard src/*.h))
+HDRS=$(wildcard inc/*.h)
 DEPS=$(patsubst %.o, %.d, $(OBJS))
-GEN_HDRS=src/cap.g.h src/offsets.g.h
+GEN_HDRS=inc/offsets.g.h inc/cap.g.h
 
 ELF=$(BUILD)/$(PROGRAM).elf
 DA=$(BUILD)/$(PROGRAM).da
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
+CFLAGS+=-Iinc
 CFLAGS+=-std=gnu18
 CFLAGS+=-Og
 CFLAGS+=-gdwarf-2
@@ -42,14 +43,14 @@ format:
 
 clean:
 	@echo "Cleaning"
-	@rm -f $(ELF) $(DA) $(DEPS) $(OBJS) src/*.g.h
+	@rm -f $(ELF) $(DA) $(DEPS) $(OBJS) $(GEN_HDRS)
 
 size: $(ELF)
 	@echo "Size of binary:"
 	@$(SIZE) $(OBJS) $(ELF)
 
 cloc:
-	@cloc $(SRCS) $(HDRS) scripts/cap_gen.py cap.yml
+	@cloc $(SRCS) $(HDRS) $(GEN_HDRS)
 
 qemu: $(ELF) $(DA)
 	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
@@ -57,13 +58,13 @@ qemu: $(ELF) $(DA)
 tags:
 	@ctags $(SRCS) $(HDRS)
 
-src/cap.g.h: gen/cap.yml scripts/cap_gen.py 
+inc/cap.g.h: gen/cap.yml scripts/cap_gen.py 
 	@echo "Generating $@"
 	@./scripts/cap_gen.py $< > $@
 
-src/offsets.g.h: gen/offsets.c src/proc.h src/cap_node.h src/cap.g.h
+inc/offsets.g.h: gen/offsets.c inc/proc.h inc/cap_node.h inc/cap.g.h
 	@echo "Generating $@"
-	@$(CC) $(CFLAGS) -Isrc -S -o - $< | grep -oE "#\w+ .*" > $@
+	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
 
 $(BUILD)/%.c.o: %.c $(GEN_HDRS)
 	@mkdir -p $(@D) 
