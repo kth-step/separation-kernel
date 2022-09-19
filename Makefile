@@ -5,7 +5,7 @@ BUILD=build
 
 include config.mk
 
-SRCS=$(filter-out src/offsets.c, $(wildcard src/*.[cS])) $(wildcard bsp/$(BSP)/*.[cS])
+SRCS=$(wildcard src/*.[cS]) $(wildcard bsp/$(BSP)/*.[cS])
 OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
 HDRS=$(filter-out src/%.g.h, $(wildcard src/*.h))
 DEPS=$(patsubst %.o, %.d, $(OBJS))
@@ -57,13 +57,13 @@ qemu: $(ELF) $(DA)
 tags:
 	@ctags $(SRCS) $(HDRS)
 
-src/cap.g.h: scripts/cap_gen.py cap.yml
+src/cap.g.h: gen/cap.yml scripts/cap_gen.py 
 	@echo "Generating $@"
-	@./scripts/cap_gen.py cap.yml > $@
+	@./scripts/cap_gen.py $< > $@
 
-src/offsets.g.h: src/offsets.c src/proc.h src/cap_node.h src/cap.g.h
+src/offsets.g.h: gen/offsets.c src/proc.h src/cap_node.h src/cap.g.h
 	@echo "Generating $@"
-	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
+	@$(CC) $(CFLAGS) -Isrc -S -o - $< | grep -oE "#\w+ .*" > $@
 
 $(BUILD)/%.c.o: %.c $(GEN_HDRS)
 	@mkdir -p $(@D) 
