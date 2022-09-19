@@ -15,9 +15,6 @@ static cap_node_t* proc_init_channels(cap_node_t* cn);
 static void proc_init_boot(proc_t* boot);
 static void proc_init_proc(proc_t* proc, int pid);
 
-/* Temporary. */
-extern void user_code();
-
 /* Defined in proc.h */
 proc_t processes[N_PROC];
 
@@ -108,7 +105,7 @@ void proc_init_boot(proc_t* boot)
     proc_init_time(cn);
     /* Set the initial PC. */
     // boot->pc = (uintptr_t)(pe_begin << 2);
-    boot->regs.pc = (uint64_t)user_code;  // Temporary code.
+    boot->regs.pc = BOOT_PC;
     boot->state = PROC_STATE_READY;
 }
 

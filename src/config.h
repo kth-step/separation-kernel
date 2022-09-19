@@ -24,3 +24,4 @@
 #define SCHEDULER_TICKS 2000
 
 //#define MEMORY_PROTECTION
+#define BOOT_PC 0

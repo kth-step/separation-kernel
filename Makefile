@@ -9,7 +9,7 @@ SRCS=$(filter-out src/offsets.c, $(wildcard src/*.[cS])) $(wildcard bsp/$(BSP)/*
 OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
 HDRS=$(filter-out src/%.g.h, $(wildcard src/*.h))
 DEPS=$(patsubst %.o, %.d, $(OBJS))
-GEN_HDRS=src/cap.g.h src/s3k_cap.g.h src/offsets.g.h
+GEN_HDRS=src/cap.g.h src/offsets.g.h
 
 ELF=$(BUILD)/$(PROGRAM).elf
 DA=$(BUILD)/$(PROGRAM).da
@@ -60,10 +60,6 @@ tags:
 src/cap.g.h: scripts/cap_gen.py cap.yml
 	@echo "Generating $@"
 	@./scripts/cap_gen.py cap.yml > $@
-
-src/s3k_cap.g.h: src/cap.g.h
-	@echo "Generating $@"
-	@sed '/kassert/d' $< > $@
 
 src/offsets.g.h: src/offsets.c src/proc.h src/cap_node.h src/cap.g.h
 	@echo "Generating $@"

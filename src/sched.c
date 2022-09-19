@@ -3,13 +3,12 @@
 
 #include <stddef.h>
 
-#include "kprint.h"
 #include "cap_node.h"
 #include "csr.h"
+#include "kprint.h"
 #include "lock.h"
 #include "proc_state.h"
 #include "trap.h"
-
 
 static uint16_t schedule[N_QUANTUM][N_HARTS];
 static lock_t lock = INIT_LOCK;
@@ -29,7 +28,7 @@ void sched_init(void)
         for (int j = MIN_HARTID; j <= MAX_HARTID; j++) {
             /* The length of the initial time slices are all N_QUANTUM and pid is 0*/
             schedule[i][j - MIN_HARTID] = (N_QUANTUM - i) << 8;
-        } 
+        }
     }
 }
 

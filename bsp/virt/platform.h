@@ -19,7 +19,13 @@
 /* PMP region of boot (>> 10) */
 #define PMP 0x8007f, 0x7
 /* Memory slices (>> 12) */
-#define MEMORY_SLICES {{0x80000, 0x100000}, {0x10000, 0x10001}}
+#define MEMORY_SLICES        \
+    {                        \
+        {0x80000, 0x100000}, \
+        {                    \
+            0x10000, 0x10001 \
+        }                    \
+    }
 
 /* Stack size. */
 /* log_2 of stack size. */
