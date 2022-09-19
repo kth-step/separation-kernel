@@ -108,6 +108,7 @@ make debug-qemu # Runs the kernel using QEMU
 - [ ] Start on formal verification.
 
 ## Related Projects 
+- [OpenMZ](https://github.com/castor-software/openmz) - A lightweight open-source implementation of MultiZone Security.
 - [seL4](https://sel4.systems/) - A verified and secure µ-kernel, suitable for more capable hardware.
 - [eChronos](https://github.com/echronos/echronos) - a real-time operating systems.
 - [CertiKOS](http://flint.cs.yale.edu/certikos/) - A verified, secure and modularized kernel for more capable hardware.
