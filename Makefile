@@ -1,18 +1,15 @@
 # See LICENSE file for copyright and license details.
-PROGRAM=s3k
-LDS=config.lds
-BUILD=build
+LDS		=config.lds
+TARGET	=$(BUILD)/s3k.elf
+BUILD  ?=.
 
 include config.mk
 
-SRCS=$(wildcard src/*.[cS]) $(wildcard bsp/$(BSP)/*.[cS])
-OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
-HDRS=$(wildcard inc/*.h)
-DEPS=$(patsubst %.o, %.d, $(OBJS))
-GEN_HDRS=inc/offsets.g.h inc/cap.g.h
-
-ELF=$(BUILD)/$(PROGRAM).elf
-DA=$(BUILD)/$(PROGRAM).da
+SRC=$(wildcard src/*.[cS]) $(wildcard bsp/$(BSP)/*.[cS])
+OBJ=$(patsubst %, $(BUILD)/%.o, $(SRC))
+DEP=$(patsubst %, $(BUILD)/%.d, $(SRC))
+GEN_HDR=inc/offsets.g.h inc/cap.g.h
+HDR=$(wildcard inc/*.h) $(GEN_HDR)
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-Iinc
@@ -25,38 +22,17 @@ CFLAGS+=-Wall -fanalyzer -Werror
 #CFLAGS+= -DNDEBUG
 
 # Commands
-.PHONY: all settings format clean size cloc qemu tags
+.PHONY: all target debug release
 
-# Show settings, compile elf and make a disassembly by default.
-all: settings $(ELF) $(DA)
+all: debug 
 
-settings:
-	@echo "Build options:"
-	@echo "  CC      = $(CC)"
-	@echo "  OBJDUMP = $(OBJDUMP)"
-	@echo "  CFLAGS  = $(CFLAGS)"
-	@echo
+debug:
+	$(MAKE) BUILD=debug target
 
-format:
-	@echo "Formatting code"
-	@clang-format -i $(wildcard src/*.[ch]) $(wildcard bsp/*/*.[ch])
+release:
+	$(MAKE) BUILD=release target
 
-clean:
-	@echo "Cleaning"
-	@rm -f $(ELF) $(DA) $(DEPS) $(OBJS) $(GEN_HDRS)
-
-size: $(ELF)
-	@echo "Size of binary:"
-	@$(SIZE) $(OBJS) $(ELF)
-
-cloc:
-	@cloc $(SRCS) $(HDRS) $(GEN_HDRS)
-
-qemu: $(ELF) $(DA)
-	@GDB=$(GDB) QEMU_SYSTEM=$(QEMU_SYSTEM) ELF=$(ELF) scripts/debug-qemu.sh
-
-tags:
-	@ctags $(SRCS) $(HDRS)
+target: $(TARGET)
 
 inc/cap.g.h: gen/cap.yml scripts/cap_gen.py 
 	@echo "Generating $@"
@@ -66,23 +42,20 @@ inc/offsets.g.h: gen/offsets.c inc/proc.h inc/cap_node.h inc/cap.g.h
 	@echo "Generating $@"
 	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
 
-$(BUILD)/%.c.o: %.c $(GEN_HDRS)
+%.o: $(GEN_HDR)
+
+$(BUILD)/%.c.o: %.c
 	@mkdir -p $(@D) 
 	@echo "Compiling C object $@"
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
-$(BUILD)/%.S.o: %.S $(GEN_HDRS)
+$(BUILD)/%.S.o: %.S
 	@mkdir -p $(@D) 
 	@echo "Compiling ASM object $@"
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
-$(ELF): $(OBJS) $(LDS)
+$(TARGET): $(OBJ) $(LDS)
 	@echo "Linking ELF $@"
-	@$(CC) $(CFLAGS) -o $@ $(OBJS)
+	@$(CC) $(CFLAGS) -o $@ $(OBJ)
 
-%.da: %.elf
-	@echo "Disassembling ELF $<"
-	@$(OBJDUMP) -d $< > $@
-
-
--include $(DEPS)
+-include $(DEP)
