@@ -7,13 +7,15 @@
 
 #define ARRAY_SIZE(x) ((sizeof(x) / sizeof(x[0])))
 
-extern const uint64_t init_proc_start;
+extern const uint64_t root_start;
 
 static inline void make_sentinel(cap_node_t* sentinel);
 static cap_node_t* proc_init_memory(cap_node_t* cn);
 static cap_node_t* proc_init_time(cap_node_t* cn);
 static cap_node_t* proc_init_supervisor(cap_node_t* cn);
 static cap_node_t* proc_init_channels(cap_node_t* cn);
+static void proc_init_proc(proc_t* proc, uint64_t pid);
+static void proc_init_root(proc_t* root);
 
 /* Defined in proc.h */
 proc_t processes[N_PROC];
@@ -33,17 +35,9 @@ cap_node_t* proc_init_memory(cap_node_t* cn)
 
     make_sentinel(&sentinel);
 
-    /* Make and insert pmp frame */
-    cap = cap_mk_pmp(PMP);
+    /* Make and insert root proc pmp frame */
+    cap = cap_mk_pmp(root_start >> 12, 0x7);
     cap_node_insert(cap, cn++, &sentinel);
-
-    uint64_t memory_slices[][2] = MEMORY_SLICES;
-    for (int i = 0; i < ARRAY_SIZE(memory_slices); i++) {
-        uint64_t begin = memory_slices[i][0];
-        uint64_t end = memory_slices[i][1];
-        cap = cap_mk_memory(begin, end, 7, begin, 0);
-        cap_node_insert(cap, cn++, &sentinel);
-    }
 
     return cn;
 }
@@ -96,30 +90,34 @@ static cap_node_t* proc_init_channels(cap_node_t* cn)
     return cn;
 }
 
-/* Defined in proc.h */
-void proc_init(void)
+void proc_init_proc(proc_t* proc, uint64_t pid)
 {
-    /* Set the cap_table and process IDs */
-    for (int i = 0; i < N_PROC; i++) {
-        proc_t *proc = &processes[i];
-        /* Set the process id */
-        proc->pid = i;
-        /* Capability table. */
-        proc->cap_table = cap_tables[i];
-        /* All processes are by default suspended */
-        proc->state = PROC_STATE_SUSPENDED;
-    }
+    /* Set the process id */
+    proc->pid = pid;
+    /* Capability table. */
+    proc->cap_table = cap_tables[pid];
+    /* All processes are by default suspended */
+    proc->state = PROC_STATE_SUSPENDED;
+}
 
-    /* Initialize the init process */
-    proc_t *init = &processes[0];
-    cap_node_t* cn = init->cap_table;
-    cn = proc_init_memory(cn);
+void proc_init_root(proc_t* root)
+{
+    cap_node_t* cn;
+    cn = proc_init_memory(root->cap_table);
     cn = proc_init_channels(cn);
     cn = proc_init_supervisor(cn);
     proc_init_time(cn);
-    /* Set the initial PC. */
-    init->regs.pc = init_proc_start;
-    init->state = PROC_STATE_READY;
+    root->regs.pc = root_start;
+    root->regs.a0 = 0;
+    root->state = PROC_STATE_READY;
+}
+
+/* Defined in proc.h */
+void proc_init(void)
+{
+    for (int i = 0; i < N_PROC; i++)
+        proc_init_proc(&processes[i], i);
+    proc_init_root(&processes[0]);
 }
 
 void proc_load_pmp(proc_t* proc)

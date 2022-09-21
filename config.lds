@@ -37,5 +37,8 @@ SECTIONS {
         *(.rodata.*)
     }
     
-    PROVIDE(init_proc_start = ALIGN(4096));
+    .data : ALIGN(4096) {
+        PROVIDE(root_start = .);
+        KEEP(*(.payload))
+    }
 }
