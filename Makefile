@@ -1,6 +1,8 @@
 # See LICENSE file for copyright and license details.
 LDS		 =config.lds
-TARGET	 =$(BUILD)/s3k.elf
+ELF	     =$(BUILD)/s3k.elf
+BIN	     =$(BUILD)/s3k.bin
+TARGET   =$(ELF) $(BIN)
 BSP	     ?=virt
 CONFIG_H ?=./config.h
 BUILD    ?=debug
@@ -12,7 +14,7 @@ OBJ=$(patsubst %, $(BUILD)/%.o, $(SRC))
 DEP=$(patsubst %, $(BUILD)/%.d, $(SRC))
 GEN_HDR=inc/asm_consts.g.h inc/cap.g.h
 HDR=$(wildcard inc/*.h) $(GEN_HDR) $(CONFIG_H)
-DA=$(patsubst %.elf, %.da, $(TARGET))
+DA=$(patsubst %.elf, %.da, $(ELF))
 
 CFLAGS+=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-Iinc -I$(dir $(CONFIG_H))
@@ -37,6 +39,8 @@ endif
 all: target 
 
 target: $(TARGET)
+elf: $(ELF)
+bin: $(BIN)
 
 clean:
 	@echo "Cleaning"
@@ -60,9 +64,13 @@ $(BUILD)/%.S.o: %.S $(GEN_HDR)
 	@echo "Compiling ASM object $@"
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
-$(TARGET): $(OBJ) $(LDS)
+$(ELF): $(OBJ) $(LDS)
 	@echo "Linking ELF $@"
 	@$(CC) $(CFLAGS) -o $@ $(OBJ)
+
+$(BIN): $(ELF)
+	@echo "Converting $@"
+	@$(OBJCOPY) -O binary $< $@
 
 
 -include $(DEP)
@@ -72,7 +80,7 @@ $(TARGET): $(OBJ) $(LDS)
 
 disassemble: $(DA)
 
-$(DA): $(TARGET)
+$(DA): $(ELF)
 	@echo "Disassembling $@"
 	@$(OBJDUMP) -D $< > $@
 
