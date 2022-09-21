@@ -82,6 +82,3 @@ wait:   /*** Wait for initilization to finish. ***/
 
 hang:
         j       hang
-
-.section .payload
-        .incbin PAYLOAD

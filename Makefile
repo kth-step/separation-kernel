@@ -21,15 +21,6 @@ CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Ibsp/$(BSP)
 CFLAGS+=-Wall -fanalyzer -Werror
 CFLAGS+=-fPIC -fno-pie
-CFLAGS+=-DPAYLOAD=\"$(PAYLOAD)\"
-
-ifeq "$(PAYLOAD)" ""
-PAYLOAD:=dummy_payload/payload.bin
-$(TARGET): $(PAYLOAD) 
-$(PAYLOAD):
-	$(MAKE) -C dummy_payload
-else
-endif
 
 ifeq "$(BUILD)" "debug"
 CFLAGS+=-gdwarf-2
