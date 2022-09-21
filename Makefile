@@ -25,10 +25,11 @@ CFLAGS+=-Og
 else
 CFLAGS+=-O2
 CFLAGS+= -DNDEBUG
+SRC:=$(filter-out src/info.c src/snprintf.c src/kprint.c, $(SRC))
 endif
 
 # Commands
-.PHONY: all settings target debug release clean
+.PHONY: all settings target clean
 
 all: target 
 
@@ -83,9 +84,9 @@ cloc: $(GEN_HDR)
 	@cloc $(HDR) $(GEN_HDR) $(SRC)
 
 # Calculating size of binary
-size: 
+size: $(TARGET) $(OBJ)
 	@echo "Calculating size of binaries"
-	@$(SIZE) $(TARGET) $(OBJ)
+	@$(SIZE) $(OBJ) $(TARGET) 
 
 format:
 	@echo "Formatting source code"

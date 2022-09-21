@@ -45,8 +45,10 @@ initialize_kernel: /*** Initialize kernel ***/
         call    proc_init
         call    sched_init
 
+#ifndef NDEBUG
         /* Print information about kernel, scheduler, and platform. */
         call    print_info
+#endif
 
 wake:   /*** Wake cores MIN_HARTID .. MAX_HARTID. ***/
         li      t2,1

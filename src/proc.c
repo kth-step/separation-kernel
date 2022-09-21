@@ -12,8 +12,6 @@ static cap_node_t* proc_init_memory(cap_node_t* cn);
 static cap_node_t* proc_init_time(cap_node_t* cn);
 static cap_node_t* proc_init_supervisor(cap_node_t* cn);
 static cap_node_t* proc_init_channels(cap_node_t* cn);
-static void proc_init_boot(proc_t* boot);
-static void proc_init_proc(proc_t* proc, int pid);
 
 /* Defined in proc.h */
 proc_t processes[N_PROC];
@@ -96,36 +94,32 @@ static cap_node_t* proc_init_channels(cap_node_t* cn)
     return cn;
 }
 
-void proc_init_boot(proc_t* boot)
+/* Defined in proc.h */
+void proc_init(uint64_t init_start, uint64_t init_end)
 {
-    cap_node_t* cn = boot->cap_table;
+    /* Set the cap_table and process IDs */
+    for (int i = 0; i < N_PROC; i++) {
+        proc_t *proc = &processes[i];
+        /* Set the process id */
+        proc->pid = i;
+        /* Capability table. */
+        proc->cap_table = cap_tables[i];
+        /* All processes are by default suspended */
+        proc->state = PROC_STATE_SUSPENDED;
+    }
+
+    /* Initialize the init process */
+    proc_t *init = &processes[0];
+    cap_node_t* cn = init->cap_table;
     cn = proc_init_memory(cn);
     cn = proc_init_channels(cn);
     cn = proc_init_supervisor(cn);
     proc_init_time(cn);
     /* Set the initial PC. */
-    // boot->pc = (uintptr_t)(pe_begin << 2);
-    boot->regs.pc = BOOT_PC;
-    boot->state = PROC_STATE_READY;
-}
-
-/* Initializes one process. */
-void proc_init_proc(proc_t* proc, int pid)
-{
-    /* Set the process id */
-    proc->pid = pid;
-    /* Capability table. */
-    proc->cap_table = cap_tables[pid];
-    /* All processes are by default suspended */
-    proc->state = PROC_STATE_SUSPENDED;
-}
-
-/* Defined in proc.h */
-void proc_init(void)
-{
-    for (int i = 0; i < N_PROC; i++)
-        proc_init_proc(&processes[i], i);
-    proc_init_boot(&processes[0]);
+    init->regs.pc = init_start;
+    init->regs.a0 = init_start; 
+    init->regs.a1 = init_end; 
+    init->state = PROC_STATE_READY;
 }
 
 void proc_load_pmp(proc_t* proc)

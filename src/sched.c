@@ -124,7 +124,6 @@ void sched_start(void)
 
 void sched_update(cap_node_t* cn, uint64_t hartid, uint64_t begin, uint64_t end, uint64_t pid)
 {
-    kprintf("%d %d %d %d\n", hartid, begin, end, pid);
     kassert(begin < end);
     kassert(MIN_HARTID <= hartid && hartid <= MAX_HARTID);
     kassert(end <= N_QUANTUM);
