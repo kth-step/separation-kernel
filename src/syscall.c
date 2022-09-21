@@ -43,7 +43,7 @@ static proc_t* receivers[N_CHANNELS][2];
 
 uint64_t syscall_unimplemented(void)
 {
-    return S3K_UNIMPLEMENTED;
+    return ERROR_UNIMPLEMENTED;
 }
 
 uint64_t syscall_read_cap(uint64_t cidx)
@@ -53,7 +53,7 @@ uint64_t syscall_read_cap(uint64_t cidx)
     cap_t cap = cap_node_get_cap(node);
     current->regs.a1 = cap.word0;
     current->regs.a2 = cap.word1;
-    return S3K_OK;
+    return ERROR_OK;
 }
 
 uint64_t syscall_move_cap(uint64_t src_cidx, uint64_t dest_cidx)
@@ -63,10 +63,10 @@ uint64_t syscall_move_cap(uint64_t src_cidx, uint64_t dest_cidx)
     cap_t cap = cap_node_get_cap(src_node);
     cap_node_t* dest_node = proc_get_cap_node(current, dest_cidx);
     if (cap_node_is_deleted(src_node))
-        return S3K_EMPTY;
+        return ERROR_EMPTY;
     if (!cap_node_is_deleted(dest_node))
-        return S3K_COLLISION;
-    return cap_node_move(cap, src_node, dest_node) ? S3K_OK : S3K_EMPTY;
+        return ERROR_COLLISION;
+    return cap_node_move(cap, src_node, dest_node) ? ERROR_OK : ERROR_EMPTY;
 }
 
 uint64_t syscall_delete_cap(uint64_t cidx)
@@ -75,16 +75,16 @@ uint64_t syscall_delete_cap(uint64_t cidx)
     cap_node_t* node = proc_get_cap_node(current, cidx);
     cap_t cap = cap_node_get_cap(node);
     if (cap_node_is_deleted(node) || !cap_node_delete(node))
-        return S3K_EMPTY;
+        return ERROR_EMPTY;
     cap_update_hook(NULL, node, cap);
-    return S3K_OK;
+    return ERROR_OK;
 }
 
 uint64_t syscall_revoke_cap(uint64_t cidx)
 {
     kassert(current != NULL);
-    /* Return S3K_PREEMPTED if preemted */
-    current->regs.a0 = S3K_PREEMPTED;
+    /* Return ERROR_PREEMPTED if preemted */
+    current->regs.a0 = ERROR_PREEMPTED;
 
     /* !!! ENABLE PREEMPTION !!! */
     preemption_enable();
@@ -94,7 +94,7 @@ uint64_t syscall_revoke_cap(uint64_t cidx)
     cap_t cap = node->cap;
 
     if (!cap_node_is_deleted(node))
-        return S3K_EMPTY;
+        return ERROR_EMPTY;
 
     while (!cap_node_is_deleted(node)) {
         cap_node_t* next_node = node->next;
@@ -110,14 +110,14 @@ uint64_t syscall_revoke_cap(uint64_t cidx)
     preemption_disable();
     node->cap = revoke_update_cap(cap);
     cap_update_hook(current, node, cap);
-    return S3K_OK;
+    return ERROR_OK;
 }
 
 uint64_t syscall_derive_cap(uint64_t src_cidx, uint64_t dest_cidx, uint64_t word0, uint64_t word1)
 {
     kassert(current != NULL);
-    /* If we get preempted, return S3K_PREEMPTED */
-    current->regs.a0 = S3K_PREEMPTED;
+    /* If we get preempted, return ERROR_PREEMPTED */
+    current->regs.a0 = ERROR_PREEMPTED;
 
     /* !!! ENABLE PREEMPTION !!! */
     preemption_enable();
@@ -129,15 +129,15 @@ uint64_t syscall_derive_cap(uint64_t src_cidx, uint64_t dest_cidx, uint64_t word
 
     /* Check if we can derive the capability */
     if (cap_node_is_deleted(src_node))
-        return S3K_EMPTY;
+        return ERROR_EMPTY;
     if (!cap_node_is_deleted(dest_node))
-        return S3K_COLLISION;
+        return ERROR_COLLISION;
     if (!cap_can_derive(src_cap, new_cap))
-        return S3K_ILLEGAL_DERIVATION;
+        return ERROR_ILLEGAL_DERIVATION;
     preemption_disable();
     src_node->cap = derive_update_cap(src_cap, new_cap);
     cap_update_hook(current, src_node, new_cap);
-    return cap_node_insert(new_cap, dest_node, src_node) ? S3K_OK : S3K_EMPTY;
+    return cap_node_insert(new_cap, dest_node, src_node) ? ERROR_OK : ERROR_EMPTY;
 }
 
 static uint64_t syscall_invoke_supervisor(cap_t cap, uint64_t pid, uint64_t op, uint64_t arg3, uint64_t arg4);
@@ -149,7 +149,7 @@ uint64_t syscall_invoke_cap(uint64_t cidx, uint64_t arg1, uint64_t arg2, uint64_
     cap_t cap = cap_node_get_cap(node);
     switch (cap_get_type(cap)) {
     case CAP_TYPE_EMPTY:
-        return S3K_EMPTY;
+        return ERROR_EMPTY;
     case CAP_TYPE_SUPERVISOR:
         /* arg1 -> pid */
         /* arg2 -> op */
@@ -172,7 +172,7 @@ uint64_t syscall_invoke_cap(uint64_t cidx, uint64_t arg1, uint64_t arg2, uint64_
         /* arg5 -> cap to send */
         return syscall_invoke_client(cap, arg1, arg2, arg3, arg4, arg5);
     default:
-        return S3K_UNIMPLEMENTED;
+        return ERROR_UNIMPLEMENTED;
     }
 }
 
@@ -182,66 +182,66 @@ uint64_t syscall_invoke_supervisor(cap_t cap, uint64_t pid, uint64_t op, uint64_
 
     /* We are only allowed to work with processor i if cap.free <= i < cap.end */
     if (cap_supervisor_get_free(cap) > pid || pid >= cap_supervisor_get_end(cap))
-        return S3K_INVALID_SUPERVISEE;
+        return ERROR_INVALID_SUPERVISEE;
 
     /* Get ptr to supervisee pcb. */
     proc_t* supervisee = &processes[pid];
 
     /* op(eration) decides what the invocation does */
     switch (op) {
-    case S3K_CALL_SUP_SUSPEND: { /* Order suspend of process */
-        return proc_supervisor_suspend(supervisee) ? S3K_OK : S3K_FAILED;
+    case ECALL_SUP_SUSPEND: { /* Order suspend of process */
+        return proc_supervisor_suspend(supervisee) ? ERROR_OK : ERROR_FAILED;
     }
-    case S3K_CALL_SUP_RESUME: { /* Resume process */
-        return proc_supervisor_resume(supervisee) ? S3K_OK : S3K_FAILED;
+    case ECALL_SUP_RESUME: { /* Resume process */
+        return proc_supervisor_resume(supervisee) ? ERROR_OK : ERROR_FAILED;
     }
-    case S3K_CALL_SUP_GET_STATE: { /* Get state */
+    case ECALL_SUP_GET_STATE: { /* Get state */
         current->regs.a1 = supervisee->state;
-        return S3K_OK;
+        return ERROR_OK;
     }
-    case S3K_CALL_SUP_READ_REG: { /* Read register */
+    case ECALL_SUP_READ_REG: { /* Read register */
         if (!proc_supervisor_acquire(supervisee))
-            return S3K_SUPERVISEE_BUSY;
+            return ERROR_SUPERVISEE_BUSY;
         /* arg0 -> register number */
         current->regs.a1 = proc_read_register(supervisee, arg0);
         proc_supervisor_release(supervisee);
-        return S3K_OK;
+        return ERROR_OK;
     }
-    case S3K_CALL_SUP_WRITE_REG: { /* Write register */
+    case ECALL_SUP_WRITE_REG: { /* Write register */
         if (!proc_supervisor_acquire(supervisee))
-            return S3K_SUPERVISEE_BUSY;
+            return ERROR_SUPERVISEE_BUSY;
         /* arg0 -> register number */
         /* arg1 -> value to write */
         proc_write_register(supervisee, arg0, arg1);
         proc_supervisor_release(supervisee);
-        return S3K_OK;
+        return ERROR_OK;
     }
-    case S3K_CALL_SUP_READ_CAP: { /* Read capability */
+    case ECALL_SUP_READ_CAP: { /* Read capability */
         if (!proc_supervisor_acquire(supervisee))
-            return S3K_SUPERVISEE_BUSY;
+            return ERROR_SUPERVISEE_BUSY;
         /* arg0 -> cap index to read */
         cap_t cap = cap_node_get_cap(proc_get_cap_node(supervisee, arg0));
         current->regs.a1 = cap.word0;
         current->regs.a2 = cap.word1;
         proc_supervisor_release(supervisee);
-        return S3K_OK;
+        return ERROR_OK;
     }
-    case S3K_CALL_SUP_GIVE_CAP: { /* Give capability */
+    case ECALL_SUP_GIVE_CAP: { /* Give capability */
         if (!proc_supervisor_acquire(supervisee))
-            return S3K_SUPERVISEE_BUSY;
+            return ERROR_SUPERVISEE_BUSY;
         uint64_t code = interprocess_move(current, arg0, supervisee, arg1);
         proc_supervisor_release(supervisee);
         return code;
     }
-    case S3K_CALL_SUP_TAKE_CAP: { /* Take capability */
+    case ECALL_SUP_TAKE_CAP: { /* Take capability */
         if (!proc_supervisor_acquire(supervisee))
-            return S3K_SUPERVISEE_BUSY;
+            return ERROR_SUPERVISEE_BUSY;
         uint64_t code = interprocess_move(supervisee, arg0, current, arg1);
         proc_supervisor_release(supervisee);
         return code;
     }
     default: { /* No matching operation. */
-        return S3K_UNIMPLEMENTED;
+        return ERROR_UNIMPLEMENTED;
     }
     }
 }
@@ -260,16 +260,16 @@ uint64_t syscall_invoke_sender(cap_t cap, uint64_t msg0, uint64_t msg1, uint64_t
     uint64_t channel = cap_sender_get_channel(cap);
     proc_t* receiver = receivers[channel][0];
     if (receiver == NULL || !proc_sender_acquire(receiver, channel))
-        return S3K_NO_RECEIVER;
+        return ERROR_NO_RECEIVER;
     if (src_cidx < N_CAPS && receiver->regs.dest_cidx < N_CAPS)
         interprocess_move(current, src_cidx, receiver, receiver->regs.dest_cidx);
-    receiver->regs.a0 = S3K_OK;
+    receiver->regs.a0 = ERROR_OK;
     receiver->regs.a1 = msg0;
     receiver->regs.a2 = msg1;
     receiver->regs.a3 = msg2;
     receiver->regs.a4 = msg3;
     proc_sender_release(receiver);
-    return S3K_OK;
+    return ERROR_OK;
 }
 
 uint64_t syscall_invoke_server(cap_t cap, uint64_t msg0, uint64_t msg1, uint64_t msg2, uint64_t msg3, uint64_t src_cidx,
@@ -282,7 +282,7 @@ uint64_t syscall_invoke_server(cap_t cap, uint64_t msg0, uint64_t msg1, uint64_t
     if (client != NULL && proc_sender_acquire(client, channel)) {
         if (src_cidx < N_CAPS && client->regs.dest_cidx < N_CAPS)
             interprocess_move(current, src_cidx, client, client->regs.dest_cidx);
-        client->regs.a0 = S3K_OK;
+        client->regs.a0 = ERROR_OK;
         client->regs.a1 = msg0;
         client->regs.a2 = msg1;
         client->regs.a3 = msg2;
@@ -302,11 +302,11 @@ uint64_t syscall_invoke_client(cap_t cap, uint64_t msg0, uint64_t msg1, uint64_t
     uint64_t channel = cap_client_get_channel(cap);
     proc_t* server = receivers[channel][0];
     if (server == NULL || !proc_sender_acquire(server, channel))
-        return S3K_NO_RECEIVER;
+        return ERROR_NO_RECEIVER;
 
     if (src_cidx < N_CAPS && server->regs.dest_cidx < N_CAPS)
         interprocess_move(current, src_cidx, server, server->regs.dest_cidx);
-    server->regs.a0 = S3K_OK;
+    server->regs.a0 = ERROR_OK;
     server->regs.a1 = msg0;
     server->regs.a2 = msg1;
     server->regs.a3 = msg2;
@@ -317,7 +317,7 @@ uint64_t syscall_invoke_client(cap_t cap, uint64_t msg0, uint64_t msg1, uint64_t
     /* Place the thread in waiting at channel */
     proc_receiver_wait(current, channel);
     /* If the thread is not waiting, it was interrupted */
-    current->regs.a0 = S3K_INTERRUPTED;
+    current->regs.a0 = ERROR_INTERRUPTED;
     /* Release the server */
     proc_sender_release(server);
     /* Yield */
@@ -342,7 +342,7 @@ uint64_t syscall_write_reg(uint64_t regnr, uint64_t val)
 void syscall_yield(void)
 {
     current->regs.timeout = read_timeout(read_csr(mhartid));
-    current->regs.a0 = S3K_OK;
+    current->regs.a0 = ERROR_OK;
     sched_yield();
 }
 
@@ -354,11 +354,11 @@ uint64_t interprocess_move(proc_t* src_proc, uint64_t src_cidx, proc_t* dest_pro
     cap_t cap = cap_node_get_cap(src_node);
     cap_node_t* dest_node = proc_get_cap_node(dest_proc, dest_cidx);
     if (cap_node_is_deleted(src_node))
-        return S3K_EMPTY;
+        return ERROR_EMPTY;
     if (!cap_node_is_deleted(dest_node))
-        return S3K_COLLISION;
+        return ERROR_COLLISION;
     cap_update_hook(dest_proc, src_node, cap);
-    return cap_node_move(cap, src_node, dest_node) ? S3K_OK : S3K_EMPTY;
+    return cap_node_move(cap, src_node, dest_node) ? ERROR_OK : ERROR_EMPTY;
 }
 
 void cap_update_hook(proc_t* proc, cap_node_t* node, cap_t cap)
