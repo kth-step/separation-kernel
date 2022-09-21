@@ -1,0 +1,57 @@
+#pragma once
+
+typedef enum proc_state proc_state_t;
+typedef enum s3k_error s3k_error_t;
+typedef enum s3k_call s3k_call_t;
+typedef enum s3k_call_sup s3k_call_sup_t;
+
+enum proc_state {
+    PROC_STATE_READY,
+    PROC_STATE_RUNNING,
+    PROC_STATE_WAITING,
+    PROC_STATE_RECEIVING,
+    PROC_STATE_SUSPENDED,
+    PROC_STATE_RUNNING_THEN_SUSPEND,
+    PROC_STATE_SUSPENDED_BUSY,
+    PROC_STATE_RECEIVING_THEN_SUSPEND
+};
+
+enum s3k_error {
+    S3K_OK, /* No error */
+    S3K_EMPTY,
+    S3K_FAILED,
+    S3K_PREEMPTED,
+    S3K_INTERRUPTED,
+    S3K_COLLISION,
+    S3K_NO_RECEIVER,
+    S3K_ILLEGAL_DERIVATION,
+    S3K_INVALID_SUPERVISEE,
+    S3K_SUPERVISEE_BUSY,
+    S3K_UNIMPLEMENTED = -1
+};
+
+enum s3k_call {
+    S3K_CALL_UNIMPLEMENTED,
+    S3K_CALL_READ_CAP,
+    S3K_CALL_MOVE_CAP,
+    S3K_CALL_DELETE_CAP,
+    S3K_CALL_REVOKE_CAP,
+    S3K_CALL_DERIVE_CAP,
+    S3K_CALL_INVOKE_CAP,
+    S3K_CALL_GET_PID,
+    S3K_CALL_READ_REG,
+    S3K_CALL_WRITE_REG,
+    S3K_CALL_YIELD,
+    NUM_OF_SYSNR
+};
+
+enum s3k_call_sup {
+    S3K_CALL_SUP_SUSPEND,
+    S3K_CALL_SUP_RESUME,
+    S3K_CALL_SUP_GET_STATE,
+    S3K_CALL_SUP_READ_REG,
+    S3K_CALL_SUP_WRITE_REG,
+    S3K_CALL_SUP_READ_CAP,
+    S3K_CALL_SUP_GIVE_CAP,
+    S3K_CALL_SUP_TAKE_CAP,
+};

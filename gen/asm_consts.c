@@ -5,6 +5,7 @@
 #include "proc.h"
 
 #define DEFINE_OFFSET(name, struct, member) asm volatile("#define " #name " %0" ::"i"(offsetof(struct, member)));
+#define DEFINE_ENUM(name) asm volatile("#define " #name " %0" ::"i"(name));
 
 void foo(void)
 {
@@ -64,4 +65,6 @@ void foo(void)
 
     DEFINE_OFFSET(CAP_WORD0, cap_t, word0);
     DEFINE_OFFSET(CAP_WORD1, cap_t, word1);
+
+    DEFINE_ENUM(NUM_OF_SYSNR);
 }

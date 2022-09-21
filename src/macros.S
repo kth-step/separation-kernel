@@ -1,6 +1,6 @@
 // See LICENSE file for copyright and license details.
 
-#include "offsets.g.h"
+#include "asm_consts.g.h"
 
 .macro zero_state
         li      x1,0

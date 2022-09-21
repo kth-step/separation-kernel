@@ -8,7 +8,7 @@ BUILD  ?=debug
 SRC=$(wildcard src/*.[cS])
 OBJ=$(patsubst %, $(BUILD)/%.o, $(SRC))
 DEP=$(patsubst %, $(BUILD)/%.d, $(SRC))
-GEN_HDR=inc/offsets.g.h inc/cap.g.h
+GEN_HDR=inc/asm_consts.g.h inc/cap.g.h
 HDR=$(wildcard inc/*.h) $(GEN_HDR)
 DA=$(patsubst %.elf, %.da, $(TARGET))
 
@@ -50,7 +50,7 @@ inc/cap.g.h: gen/cap.yml scripts/cap_gen.py
 	@echo "Generating $@"
 	@./scripts/cap_gen.py $< > $@
 
-inc/offsets.g.h: gen/offsets.c inc/proc.h inc/cap_node.h inc/cap.g.h
+inc/asm_consts.g.h: gen/asm_consts.c inc/proc.h inc/cap_node.h inc/cap.g.h inc/consts.h
 	@echo "Generating $@"
 	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
 

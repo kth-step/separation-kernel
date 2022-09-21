@@ -7,24 +7,13 @@
 
 #include "cap_node.h"
 #include "config.h"
-#include "s3k_consts.h"
+#include "consts.h"
 
 #define N_REGISTERS (sizeof(regs_t) / sizeof(uint64_t))
 
-typedef enum proc_state proc_state_t;
 typedef struct regs regs_t;
 typedef struct proc proc_t;
 
-enum proc_state {
-    PROC_STATE_READY,
-    PROC_STATE_RUNNING,
-    PROC_STATE_WAITING,
-    PROC_STATE_RECEIVING,
-    PROC_STATE_SUSPENDED,
-    PROC_STATE_RUNNING_THEN_SUSPEND,
-    PROC_STATE_SUSPENDED_BUSY,
-    PROC_STATE_RECEIVING_THEN_SUSPEND
-};
 
 struct regs {
     /* Standard registers */

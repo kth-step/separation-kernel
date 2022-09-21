@@ -12,7 +12,7 @@
 #include "preemption.h"
 #include "proc.h"
 #include "proc_state.h"
-#include "s3k_consts.h"
+#include "consts.h"
 #include "sched.h"
 #include "trap.h"
 #include "utils.h"
@@ -189,17 +189,17 @@ uint64_t syscall_invoke_supervisor(cap_t cap, uint64_t pid, uint64_t op, uint64_
 
     /* op(eration) decides what the invocation does */
     switch (op) {
-    case S3K_SYSNR_INVOKE_SUPERVISOR_SUSPEND: { /* Order suspend of process */
+    case S3K_CALL_SUP_SUSPEND: { /* Order suspend of process */
         return proc_supervisor_suspend(supervisee) ? S3K_OK : S3K_FAILED;
     }
-    case S3K_SYSNR_INVOKE_SUPERVISOR_RESUME: { /* Resume process */
+    case S3K_CALL_SUP_RESUME: { /* Resume process */
         return proc_supervisor_resume(supervisee) ? S3K_OK : S3K_FAILED;
     }
-    case S3K_SYSNR_INVOKE_SUPERVISOR_GET_STATE: { /* Get state */
+    case S3K_CALL_SUP_GET_STATE: { /* Get state */
         current->regs.a1 = supervisee->state;
         return S3K_OK;
     }
-    case S3K_SYSNR_INVOKE_SUPERVISOR_READ_REG: { /* Read register */
+    case S3K_CALL_SUP_READ_REG: { /* Read register */
         if (!proc_supervisor_acquire(supervisee))
             return S3K_SUPERVISEE_BUSY;
         /* arg0 -> register number */
@@ -207,7 +207,7 @@ uint64_t syscall_invoke_supervisor(cap_t cap, uint64_t pid, uint64_t op, uint64_
         proc_supervisor_release(supervisee);
         return S3K_OK;
     }
-    case S3K_SYSNR_INVOKE_SUPERVISOR_WRITE_REG: { /* Write register */
+    case S3K_CALL_SUP_WRITE_REG: { /* Write register */
         if (!proc_supervisor_acquire(supervisee))
             return S3K_SUPERVISEE_BUSY;
         /* arg0 -> register number */
@@ -216,7 +216,7 @@ uint64_t syscall_invoke_supervisor(cap_t cap, uint64_t pid, uint64_t op, uint64_
         proc_supervisor_release(supervisee);
         return S3K_OK;
     }
-    case S3K_SYSNR_INVOKE_SUPERVISOR_READ_CAP: { /* Read capability */
+    case S3K_CALL_SUP_READ_CAP: { /* Read capability */
         if (!proc_supervisor_acquire(supervisee))
             return S3K_SUPERVISEE_BUSY;
         /* arg0 -> cap index to read */
@@ -226,14 +226,14 @@ uint64_t syscall_invoke_supervisor(cap_t cap, uint64_t pid, uint64_t op, uint64_
         proc_supervisor_release(supervisee);
         return S3K_OK;
     }
-    case S3K_SYSNR_INVOKE_SUPERVISOR_GIVE_CAP: { /* Give capability */
+    case S3K_CALL_SUP_GIVE_CAP: { /* Give capability */
         if (!proc_supervisor_acquire(supervisee))
             return S3K_SUPERVISEE_BUSY;
         uint64_t code = interprocess_move(current, arg0, supervisee, arg1);
         proc_supervisor_release(supervisee);
         return code;
     }
-    case S3K_SYSNR_INVOKE_SUPERVISOR_TAKE_CAP: { /* Take capability */
+    case S3K_CALL_SUP_TAKE_CAP: { /* Take capability */
         if (!proc_supervisor_acquire(supervisee))
             return S3K_SUPERVISEE_BUSY;
         uint64_t code = interprocess_move(supervisee, arg0, current, arg1);
