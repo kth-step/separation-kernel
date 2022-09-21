@@ -3,5 +3,4 @@
 *.da
 *.elf
 *.bin
-src/*.g.h
-
+*.g.h
