@@ -18,6 +18,7 @@ CFLAGS+=-std=gnu18
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Ibsp/$(BSP)
 CFLAGS+=-Wall -fanalyzer -Werror
+CFLAGS+=-fPIC -fno-pie
 
 ifeq "$(BUILD)" "debug"
 CFLAGS+=-gdwarf-2
@@ -33,15 +34,7 @@ endif
 
 all: target 
 
-settings:
-	@echo "Compile settings:"
-	@echo " TARGET=$(TARGET)"
-	@echo "     CC=$(CC)"
-	@echo " CFLAGS=$(CFLAGS)"
-	@echo "    SRC=$(SRC)"
-	@echo
-
-target: settings $(TARGET) $(DA)
+target: $(TARGET)
 
 clean:
 	@echo "Cleaning"
@@ -69,14 +62,17 @@ $(TARGET): $(OBJ) $(LDS)
 	@echo "Linking ELF $@"
 	@$(CC) $(CFLAGS) -o $@ $(OBJ)
 
-$(DA): $(TARGET)
-	@echo "Disassembling $@"
-	@$(OBJDUMP) -d $< > $@
 
 -include $(DEP)
 
 # Extra targets
 .PHONY: cloc format size
+
+disassemble: $(DA)
+
+$(DA): $(TARGET)
+	@echo "Disassembling $@"
+	@$(OBJDUMP) -D $< > $@
 
 # Count Lines Of Code
 cloc: $(GEN_HDR)
