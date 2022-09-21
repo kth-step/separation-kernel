@@ -8,7 +8,7 @@
 #define N_PROC 6
 
 /* Number of capabilities per process */
-#define N_CAPS 128
+#define N_CAPS 64
 
 /* Number of time slices in a major frame. */
 #define N_QUANTUM 128
@@ -24,4 +24,3 @@
 #define SCHEDULER_TICKS 2000
 
 //#define MEMORY_PROTECTION
-#define BOOT_PC 0

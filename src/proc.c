@@ -7,6 +7,8 @@
 
 #define ARRAY_SIZE(x) ((sizeof(x) / sizeof(x[0])))
 
+extern const uint64_t init_proc_start;
+
 static inline void make_sentinel(cap_node_t* sentinel);
 static cap_node_t* proc_init_memory(cap_node_t* cn);
 static cap_node_t* proc_init_time(cap_node_t* cn);
@@ -95,7 +97,7 @@ static cap_node_t* proc_init_channels(cap_node_t* cn)
 }
 
 /* Defined in proc.h */
-void proc_init(uint64_t init_start, uint64_t init_end)
+void proc_init(void)
 {
     /* Set the cap_table and process IDs */
     for (int i = 0; i < N_PROC; i++) {
@@ -116,9 +118,7 @@ void proc_init(uint64_t init_start, uint64_t init_end)
     cn = proc_init_supervisor(cn);
     proc_init_time(cn);
     /* Set the initial PC. */
-    init->regs.pc = init_start;
-    init->regs.a0 = init_start; 
-    init->regs.a1 = init_end; 
+    init->regs.pc = init_proc_start;
     init->state = PROC_STATE_READY;
 }
 

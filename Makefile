@@ -1,19 +1,21 @@
 # See LICENSE file for copyright and license details.
-LDS		=config.lds
-TARGET	=$(BUILD)/s3k.elf
+LDS		 =config.lds
+TARGET	 =$(BUILD)/s3k.elf
+BSP	     ?=virt
+CONFIG_H ?=./config.h
+BUILD ?=debug
 
 include config.mk
 
-BUILD  ?=debug
 SRC=$(wildcard src/*.[cS])
 OBJ=$(patsubst %, $(BUILD)/%.o, $(SRC))
 DEP=$(patsubst %, $(BUILD)/%.d, $(SRC))
 GEN_HDR=inc/asm_consts.g.h inc/cap.g.h
-HDR=$(wildcard inc/*.h) $(GEN_HDR)
+HDR=$(wildcard inc/*.h) $(GEN_HDR) $(CONFIG_H)
 DA=$(patsubst %.elf, %.da, $(TARGET))
 
 CFLAGS+=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
-CFLAGS+=-Iinc
+CFLAGS+=-Iinc -I$(dir $(CONFIG_H))
 CFLAGS+=-std=gnu18
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Ibsp/$(BSP)

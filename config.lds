@@ -8,7 +8,7 @@ SECTIONS {
         KEEP(*(.init))
         *(.text)
         *(.text.*)
-    } 
+    }
 
     .data : ALIGN(4) {
         __global_pointer$ = . + 0x7bc;
@@ -36,4 +36,6 @@ SECTIONS {
         *(.rodata)
         *(.rodata.*)
     }
+    
+    PROVIDE(init_proc_start = ALIGN(4096));
 }

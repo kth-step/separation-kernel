@@ -47,7 +47,7 @@ struct proc {
 extern proc_t processes[N_PROC];
 register proc_t* current __asm__("tp");
 
-void proc_init(uint64_t init_start, uint64_t init_end);
+void proc_init(void);
 void proc_load_pmp(proc_t* proc);
 
 static inline cap_node_t* proc_get_cap_node(proc_t* proc, uint64_t cid);
