@@ -7,12 +7,12 @@
 #include <stdint.h>
 
 #include "cap_node.h"
+#include "consts.h"
 #include "kprint.h"
 #include "lock.h"
 #include "preemption.h"
 #include "proc.h"
 #include "proc_state.h"
-#include "consts.h"
 #include "sched.h"
 #include "trap.h"
 #include "utils.h"

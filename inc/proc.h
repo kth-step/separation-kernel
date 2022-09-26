@@ -13,7 +13,6 @@
 typedef struct regs regs_t;
 typedef struct proc proc_t;
 
-
 struct regs {
     /* Standard registers */
     uint64_t pc;

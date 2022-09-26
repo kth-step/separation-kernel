@@ -5,7 +5,8 @@ typedef enum s3k_error s3k_error_t;
 typedef enum s3k_call s3k_call_t;
 typedef enum s3k_call_sup s3k_call_sup_t;
 
-enum proc_state {
+enum proc_state
+{
     PROC_STATE_READY,
     PROC_STATE_RUNNING,
     PROC_STATE_WAITING,
@@ -16,7 +17,8 @@ enum proc_state {
     PROC_STATE_RECEIVING_THEN_SUSPEND
 };
 
-enum s3k_error {
+enum s3k_error
+{
     ERROR_OK, /* No error */
     ERROR_EMPTY,
     ERROR_FAILED,
@@ -30,7 +32,8 @@ enum s3k_error {
     ERROR_UNIMPLEMENTED = -1
 };
 
-enum s3k_call {
+enum s3k_call
+{
     ECALL_UNIMPLEMENTED,
     ECALL_READ_CAP,
     ECALL_MOVE_CAP,
@@ -45,7 +48,8 @@ enum s3k_call {
     NUM_OF_SYSNR
 };
 
-enum s3k_call_sup {
+enum s3k_call_sup
+{
     ECALL_SUP_SUSPEND,
     ECALL_SUP_RESUME,
     ECALL_SUP_GET_STATE,

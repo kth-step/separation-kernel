@@ -12,4 +12,4 @@ AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 IndentCaseLabels: false
 BreakBeforeBraces: Linux
-SeparateDefinitionBlocks: Always
+#SeparateDefinitionBlocks: Always
