@@ -1,3 +1,4 @@
+// See LICENSE file for copyright and license details.
 #pragma once
 
 typedef enum proc_state proc_state_t;

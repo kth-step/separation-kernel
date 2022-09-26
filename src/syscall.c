@@ -15,7 +15,6 @@
 #include "proc_state.h"
 #include "sched.h"
 #include "trap.h"
-#include "utils.h"
 
 /*** INTERNAL FUNCTION DECLARATIONS ***/
 /* For moving capability between processes */

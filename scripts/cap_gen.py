@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# See LICENSE file for copyright and license details.
 import yaml
 from yaml.loader import SafeLoader
 import re
