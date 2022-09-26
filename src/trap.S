@@ -1,7 +1,6 @@
 # See LICENSE file for copyright and license details.
-#include "asm_consts.g.h"
-#include "config.h"
 #include "macros.S"
+#include "gen/asm_consts.h"
 
 #define MCAUSE_U_ECALL 8
 #define MSTATUS_IE 8

@@ -6,8 +6,7 @@
 #include <stdint.h>
 
 #include "atomic.h"
-#include "cap.g.h"
-#include "config.h"
+#include "gen/cap.h"
 #include "kassert.h"
 #include "preemption.h"
 

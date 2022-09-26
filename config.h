@@ -1,9 +1,6 @@
 // See LICENSE file for copyright and license details.
 #pragma once
 
-/* Import board settings fomr 'bsp/$(BSP)/platform.h' */
-#include "platform.h"
-
 /* Number of processes. */
 #define N_PROC 6
 
@@ -23,4 +20,12 @@
 /* Number of scheduler ticks. */
 #define SCHEDULER_TICKS 2000
 
+/* Uncomment to enable memory protection */
 //#define MEMORY_PROTECTION
+
+/* Set absolute path of payload */
+//#define PAYLOAD "my_payload.bin"
+
+#ifndef __ASSEMBLER__
+/* Non assembly definitions */
+#endif

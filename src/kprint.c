@@ -2,7 +2,6 @@
 #include "kprint.h"
 
 #include "lock.h"
-#include "platform.h"
 #include "snprintf.h"
 
 int kprintf(const char* format, ...)

@@ -157,7 +157,6 @@ enums = ", ".join([f"CAP_TYPE_{d['name'].upper()}"  for d in caps])
 
 print(f"""\
 #pragma once
-#include "config.h"
 #include "kassert.h"
 #include "pmp.h"
 

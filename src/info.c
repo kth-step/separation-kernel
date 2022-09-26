@@ -1,7 +1,5 @@
 // See LICENSE file for copyright and license details.
-#include "config.h"
 #include "kprint.h"
-#include "platform.h"
 
 void print_info()
 {

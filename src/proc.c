@@ -1,13 +1,12 @@
 // See LICENSE file for copyright and license details.
 #include "proc.h"
 
-#include "config.h"
 #include "csr.h"
 #include "kprint.h"
 
 #define ARRAY_SIZE(x) ((sizeof(x) / sizeof(x[0])))
 
-extern const uint64_t root_start;
+extern const uint64_t root_payload;
 
 static inline void make_sentinel(cap_node_t* sentinel);
 static cap_node_t* proc_init_memory(cap_node_t* cn);
@@ -36,7 +35,7 @@ cap_node_t* proc_init_memory(cap_node_t* cn)
     make_sentinel(&sentinel);
 
     /* Make and insert root proc pmp frame */
-    cap = cap_mk_pmp(root_start >> 12, 0x7);
+    cap = cap_mk_pmp(root_payload >> 12, 0x7);
     cap_node_insert(cap, cn++, &sentinel);
 
     return cn;
@@ -107,7 +106,7 @@ void proc_init_root(proc_t* root)
     cn = proc_init_channels(cn);
     cn = proc_init_supervisor(cn);
     proc_init_time(cn);
-    root->regs.pc = root_start;
+    root->regs.pc = root_payload;
     root->regs.a0 = 0;
     root->state = PROC_STATE_READY;
 }

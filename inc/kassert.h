@@ -3,7 +3,6 @@
 
 #ifndef NDEBUG
 #include "kprint.h"
-#include "platform.h"
 extern void hang() __attribute__((noreturn));
 
 #define kassert(val)                                                                                           \

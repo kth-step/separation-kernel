@@ -5,9 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "config.h"
 #include "lock.h"
-#include "platform.h"
 #include "proc.h"
 
 #define INVALID_PID 0xFFull

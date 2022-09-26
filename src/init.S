@@ -1,6 +1,5 @@
 # See LICENSE file for copyright and license details.
 
-#include "config.h"
 #include "macros.S"
 
 .globl _start

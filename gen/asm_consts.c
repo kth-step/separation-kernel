@@ -1,8 +1,7 @@
 // See LICENSE file for copyright and license details.
 
-#include "cap.g.h"
-#include "cap_node.h"
 #include "proc.h"
+#include "cap_node.h"
 
 #define DEFINE_OFFSET(name, struct, member) asm volatile("#define " #name " %0" ::"i"(offsetof(struct, member)));
 #define DEFINE_ENUM(name) asm volatile("#define " #name " %0" ::"i"(name));

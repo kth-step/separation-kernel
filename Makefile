@@ -1,99 +1,67 @@
 # See LICENSE file for copyright and license details.
-LDS		 =config.lds
-ELF	     =$(BUILD)/s3k.elf
-BIN	     =$(BUILD)/s3k.bin
-TARGET   =$(ELF) $(BIN)
-BSP	     ?=virt
-CONFIG_H ?=./config.h
-BUILD    ?=debug
+TARGET ?=s3k.elf
+LDS    ?=config.lds
+CONFIG ?=config.h
+PLATFORM ?=bsp/virt.h
+BUILD  ?=build
 
-include config.mk
-
-SRC=$(wildcard src/*.[cS])
-OBJ=$(patsubst %, $(BUILD)/%.o, $(SRC))
-DEP=$(patsubst %, $(BUILD)/%.d, $(SRC))
-GEN_HDR=inc/asm_consts.g.h inc/cap.g.h
-HDR=$(wildcard inc/*.h) $(GEN_HDR) $(CONFIG_H)
+SRCS+=$(wildcard src/*.[cS])
+OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
+GEN_HDRS=inc/gen/cap.h inc/gen/asm_consts.h 
+HDRS=$(wildcard inc/*.h) $(GEN_HDRS) $(CONFIG) $(PLATFORM)
 DA=$(patsubst %.elf, %.da, $(ELF))
 
-CFLAGS+=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
-CFLAGS+=-Iinc -I$(dir $(CONFIG_H))
+ARCH=rv64imac
+ABI=lp64
+CMODEL=medany
+
+CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
 CFLAGS+= -T$(LDS) -nostartfiles
-CFLAGS+=-Ibsp/$(BSP)
 CFLAGS+=-Wall -fanalyzer -Werror
 CFLAGS+=-fPIC -fno-pie
-
-ifeq "$(BUILD)" "debug"
+CFLAGS+=-Iinc
 CFLAGS+=-gdwarf-2
-CFLAGS+=-Og
-else
 CFLAGS+=-O2
-CFLAGS+= -DNDEBUG
-SRC:=$(filter-out src/info.c src/snprintf.c src/kprint.c, $(SRC))
-endif
 
-# Commands
-.PHONY: all settings target clean
+CFLAGS+=-include $(PLATFORM) -include $(CONFIG) 
 
-all: target 
+.PHONY: all clean
+.SECONDARY:
 
-target: $(TARGET)
-elf: $(ELF)
-bin: $(BIN)
+all: $(TARGET)
 
-clean:
-	@echo "Cleaning"
-	@git clean -xfd
-
-inc/cap.g.h: gen/cap.yml scripts/cap_gen.py 
-	@echo "Generating $@"
+inc/gen/cap.h: gen/cap.yml scripts/cap_gen.py 
+	@echo "GEN\t$@"
+	@mkdir -p $(@D) 
 	@./scripts/cap_gen.py $< > $@
 
-inc/asm_consts.g.h: gen/asm_consts.c inc/proc.h inc/cap_node.h inc/cap.g.h inc/consts.h
-	@echo "Generating $@"
+inc/gen/asm_consts.h: gen/asm_consts.c inc/proc.h inc/cap_node.h inc/consts.h
+	@echo "GEN\t$@"
+	@mkdir -p $(@D) 
 	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
 
-$(BUILD)/%.c.o: %.c $(GEN_HDR)
-	@mkdir -p $(@D) 
-	@echo "Compiling C object $@"
-	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
+$(wildcard src/*.c): inc/gen/cap.h
+$(wildcard src/*.S): inc/gen/asm_consts.h
 
-$(BUILD)/%.S.o: %.S $(GEN_HDR)
-	@mkdir -p $(@D) 
-	@echo "Compiling ASM object $@"
-	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
+$(BUILD)/%.S.o: %.S
+	@echo "CC\t$@"
+	@mkdir -p $(@D)
+	@$(CC) $(CFLAGS) -c -o $@ $<
 
-$(ELF): $(OBJ) $(LDS)
-	@echo "Linking ELF $@"
-	@$(CC) $(CFLAGS) -o $@ $(OBJ)
+$(BUILD)/%.c.o: %.c
+	@echo "CC\t$@"
+	@mkdir -p $(@D)
+	@$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BIN): $(ELF)
-	@echo "Converting $@"
+%.elf: $(OBJS) $(LDS)
+	@echo "CC\t$@"
+	@mkdir -p $(@D)
+	@$(CC) $(CFLAGS) -o $@ $(SRCS)
+
+%.bin: $(BUILD)/%.elf
+	@echo "OBJCOPY\t$@"
 	@$(OBJCOPY) -O binary $< $@
 
-
--include $(DEP)
-
-# Extra targets
-.PHONY: cloc format size
-
-disassemble: $(DA)
-
-$(DA): $(ELF)
-	@echo "Disassembling $@"
-	@$(OBJDUMP) -D $< > $@
-
-# Count Lines Of Code
-cloc: $(GEN_HDR)
-	@echo "Counting lines of code"
-	@cloc $(HDR) $(GEN_HDR) $(SRC)
-
-# Calculating size of binary
-size: $(TARGET) $(OBJ)
-	@echo "Calculating size of binaries"
-	@$(SIZE) $(OBJ) $(TARGET) 
-
-format:
-	@echo "Formatting source code"
-	@clang-format -i $(HDR) $(filter %.s, $(SRC))
+clean:
+	rm $(OBJS) $(DEPS) $(GEN_HDRS)

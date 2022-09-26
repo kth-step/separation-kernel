@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 #include "cap_node.h"
-#include "config.h"
 #include "consts.h"
 
 #define N_REGISTERS (sizeof(regs_t) / sizeof(uint64_t))

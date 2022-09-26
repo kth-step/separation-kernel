@@ -37,5 +37,8 @@ SECTIONS {
         *(.rodata.*)
     }
     
-    PROVIDE(root_start = ALIGN(4096));
+    .data : ALIGN(4096) {
+        PROVIDE(root_payload = .);
+        *(.payload)
+    }
 }
