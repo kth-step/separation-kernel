@@ -1,16 +1,23 @@
 # See LICENSE file for copyright and license details.
 TARGET ?=s3k.elf
 LDS    ?=config.lds
-CONFIG ?=config.h
-PLATFORM ?=bsp/virt.h
+CONFIG_H ?=config.h
+PLATFORM_H ?=bsp/virt.h
 BUILD  ?=build
 
-SRCS+=$(wildcard src/*.[cS])
+SRCS=$(wildcard src/*.[cS])
 OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
 DEPS=$(patsubst %, $(BUILD)/%.d, $(SRCS))
 GEN_HDRS=inc/gen/cap.h inc/gen/asm_consts.h 
-HDRS=$(wildcard inc/*.h) $(GEN_HDRS) $(CONFIG) $(PLATFORM)
-DA=$(patsubst %.elf, %.da, $(ELF))
+HDRS=$(wildcard inc/*.h) $(GEN_HDRS) $(CONFIG_H) $(PLATFORM_H)
+DA=$(patsubst %, %.da, $(TARGET))
+
+# Tools
+PREFIX ?=riscv64-unknown-elf
+CC=$(PREFIX)-gcc
+SIZE=$(PREFIX)-size
+OBJCOPY=$(PREFIX)-objcopy
+OBJDUMP=$(PREFIX)-objdump
 
 ARCH?=rv64imac
 ABI?=lp64
@@ -24,13 +31,14 @@ CFLAGS+=-fPIC -fno-pie
 CFLAGS+=-Iinc
 CFLAGS+=-gdwarf-2
 CFLAGS+=-O2
+CFLAGS+=-include $(PLATFORM_H) -include $(CONFIG_H) 
 
-CFLAGS+=-include $(PLATFORM) -include $(CONFIG) 
-
-.PHONY: all clean
+.PHONY: all target clean size da cloc format
 .SECONDARY:
 
-all: $(TARGET)
+all: target
+
+target: $(TARGET)
 
 inc/gen/cap.h: gen/cap.yml scripts/cap_gen.py 
 	@echo -e "GEN\t$@"
@@ -42,12 +50,12 @@ inc/gen/asm_consts.h: gen/asm_consts.c inc/proc.h inc/cap_node.h inc/consts.h
 	@mkdir -p $(@D) 
 	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
 
-$(BUILD)/%.S.o: %.S inc/gen/asm_consts.h
+$(BUILD)/%.S.o: %.S inc/gen/asm_consts.h $(CONFIG_H) $(PLATFORM_H)
 	@echo -e "CC\t$@"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
-$(BUILD)/%.c.o: %.c inc/gen/cap.h
+$(BUILD)/%.c.o: %.c inc/gen/cap.h $(CONFIG_H) $(PLATFORM_H)
 	@echo -e "CC\t$@"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
@@ -61,7 +69,22 @@ $(BUILD)/%.c.o: %.c inc/gen/cap.h
 	@echo -e "OBJCOPY\t$@"
 	@$(OBJCOPY) -O binary $< $@
 
+%.da: $(TARGET)
+	@echo -e "OBJDUMP\t$@"
+	@$(OBJDUMP) -d $< > $@
+
+da: $(DA)
+
 clean:
-	rm -f $(OBJS) $(DEPS) $(GEN_HDRS)
+	rm -f $(OBJS) $(DEPS) $(GEN_HDRS) $(TARGET) $(DA)
+
+size:
+	@$(SIZE) $(OBJS) $(TARGET)
+
+cloc:
+	@cloc $(HDRS) $(SRCS)
+
+format:
+	clang-format -i $(filter inc/%.h, $(HDRS)) $(filter src/%.c, $(SRCS))
 
 -include $(DEPS)
