@@ -48,7 +48,7 @@ trap_exception:
 trap_timer_preempted:
         csrrw   tp,mscratch,zero
         csrr    t0,mcause
-        bgez    t0, __hang
+        bgez    t0,hang
 trap_timer:
         tail    sched_yield
 
@@ -106,5 +106,6 @@ syscall_vector:
         j       syscall_yield
 .option pop
 
-__hang:
-        j       __hang
+hang:
+        wfi
+        j       hang

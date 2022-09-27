@@ -69,10 +69,10 @@ make CC=riscv64-unknown-elf-gcc # or CC=riscv64-elf-gcc for AUR
 ```
 
 Custom payload, kernel config and platform:
-+ Copy `config.h` and set the PAYLOAD definition to `path/to/my/payload.bin`
++ Copy `config.h` and configure.
 + Configure the variables in your config file. 
 + Copy `bsp/virt.h` or `bsp/sifive_u.h` and configure it for your platform.
-+ `make CC=riscv64-unknown-elf-gcc CONFIG=path/to/my/config.h PLATFORM=path/to/my/platform.h`
++ `make CC=riscv64-unknown-elf-gcc CONFIG=path/to/my/config.h PLATFORM=path/to/my/platform.h` PAYLOAD=path/to/my/payload.bin
 
 Check https://github.com/kth-step/separation-kernel-example (WIP) for sample application.
 

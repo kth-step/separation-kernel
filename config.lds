@@ -12,17 +12,17 @@ SECTIONS {
         KEEP(*(.init))
         *(.text)
         *(.text.*)
-    }
+    } >RAM
 
-    .data : ALIGN(4) {
+    .data : {
         __global_pointer$ = . + 0x7bc;
         *(.sdata)
         *(.sdata.*)
         *(.srodata)
         *(.srodata.*)
-    }
+    } >RAM
 
-    .bss : ALIGN(4) {
+    .bss : {
         PROVIDE(_bss = .);
         *(.sbss)
         *(.sbss.*)
@@ -30,19 +30,18 @@ SECTIONS {
         *(.bss.*)
         *(COMMON)
         PROVIDE(_ebss = ALIGN(4));
-    }
+    } >RAM
 
-    .data : ALIGN(4) {
+    .data :  {
         *(.data)
         *(.data.*)
         *(.rdata)
         *(.rdata.*)
         *(.rodata)
         *(.rodata.*)
-    }
+    } >RAM
     
     .data : ALIGN(4096) {
-        PROVIDE(root_payload = .);
-        *(.payload)
-    }
+        KEEP(*(.data.payload))
+    } >RAM
 }

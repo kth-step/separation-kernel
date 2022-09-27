@@ -17,8 +17,7 @@ _start: /* Start of the kernel */
         /* No machine-mode preemption */
         csrw    mstatus,x0
 
-        /* Set the trap entry function. */
-        lla     t0,trap_entry
+        lla     t0,hang
         csrw    mtvec,t0
 
         /* make memory accessible */
@@ -41,6 +40,7 @@ initialize_kernel: /*** Initialize kernel ***/
 2:      bne     t0,t1,1b
 
         /* Initializes PCBs. */
+        la      a0,root_payload
         call    proc_init
         call    sched_init
 
@@ -75,9 +75,14 @@ wait:   /*** Wait for initilization to finish. ***/
         li      t0,128
         csrw    mie,t0
 
+        /* Set the trap entry function. */
+        lla     t0,trap_entry
+        csrw    mtvec,t0
+
         /*** Here we start the processes. ***/
         la      ra,trap_resume_proc
         tail    sched_start
 
 hang:
+        wfi
         j       hang

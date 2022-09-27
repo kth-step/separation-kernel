@@ -6,15 +6,13 @@
 
 #define ARRAY_SIZE(x) ((sizeof(x) / sizeof(x[0])))
 
-extern const uint64_t root_payload;
-
 static inline void make_sentinel(cap_node_t* sentinel);
-static cap_node_t* proc_init_memory(cap_node_t* cn);
+static cap_node_t* proc_init_memory(cap_node_t* cn, uint64_t root_payload);
 static cap_node_t* proc_init_time(cap_node_t* cn);
 static cap_node_t* proc_init_supervisor(cap_node_t* cn);
 static cap_node_t* proc_init_channels(cap_node_t* cn);
 static void proc_init_proc(proc_t* proc, uint64_t pid);
-static void proc_init_root(proc_t* root);
+static void proc_init_root(proc_t* root, uint64_t root_payload);
 
 /* Defined in proc.h */
 proc_t processes[N_PROC];
@@ -26,7 +24,7 @@ void make_sentinel(cap_node_t* sentinel)
     sentinel->cap = NULL_CAP;
 }
 
-cap_node_t* proc_init_memory(cap_node_t* cn)
+cap_node_t* proc_init_memory(cap_node_t* cn, uint64_t root_payload)
 {
     /* Node at beginning and end of capabiliy list */
     static cap_node_t sentinel;
@@ -99,10 +97,10 @@ void proc_init_proc(proc_t* proc, uint64_t pid)
     proc->state = PROC_STATE_SUSPENDED;
 }
 
-void proc_init_root(proc_t* root)
+void proc_init_root(proc_t* root, uint64_t root_payload)
 {
     cap_node_t* cn;
-    cn = proc_init_memory(root->cap_table);
+    cn = proc_init_memory(root->cap_table, root_payload);
     cn = proc_init_channels(cn);
     cn = proc_init_supervisor(cn);
     proc_init_time(cn);
@@ -112,11 +110,11 @@ void proc_init_root(proc_t* root)
 }
 
 /* Defined in proc.h */
-void proc_init(void)
+void proc_init(uint64_t root_payload)
 {
     for (int i = 0; i < N_PROC; i++)
         proc_init_proc(&processes[i], i);
-    proc_init_root(&processes[0]);
+    proc_init_root(&processes[0], root_payload);
 }
 
 void proc_load_pmp(proc_t* proc)

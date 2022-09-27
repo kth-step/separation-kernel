@@ -17,7 +17,6 @@ GEN_HDRS=inc/gen/cap.h inc/gen/asm_consts.h
 HDRS=$(wildcard inc/*.h) $(GEN_HDRS) $(CONFIG_H) $(PLATFORM_H)
 DA=$(patsubst %, %.da, $(TARGET))
 
-
 # Tools
 RISCV_PREFIX ?=riscv64-unknown-elf
 CC=$(RISCV_PREFIX)-gcc
@@ -33,9 +32,11 @@ CFLAGS =-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
 CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Wall -fanalyzer -Werror
-CFLAGS+=-fPIC -fno-pie
 CFLAGS+=-gdwarf-2
-CFLAGS+=-O2
+CFLAGS+=-Og
+ifneq "$(PAYLOAD)" ""
+CFLAGS+=-DPAYLOAD=\"$(PAYLOAD)\"
+endif
 CFLAGS+=-include $(PLATFORM_H) -include $(CONFIG_H) 
 CFLAGS+=-Iinc
 
@@ -56,26 +57,29 @@ inc/gen/asm_consts.h: gen/asm_consts.c inc/proc.h inc/cap_node.h inc/consts.h
 	@mkdir -p $(@D) 
 	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
 
+$(BUILD)/src/payload.S.o: src/payload.S $(PAYLOAD)
 $(BUILD)/%.S.o: %.S inc/gen/asm_consts.h $(CONFIG_H) $(PLATFORM_H)
 	@echo -e "  CC\t$@"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
+
+
 
 $(BUILD)/%.c.o: %.c inc/gen/cap.h $(CONFIG_H) $(PLATFORM_H)
 	@echo -e "  CC\t$@"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
-%.elf: $(OBJS) $(LDS)
+$(ELF): $(OBJS) $(LDS) 
 	@echo -e "  CC\t$@"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -o $@ $(SRCS)
 
-%.bin: %.elf
+$(BIN): $(ELF)
 	@echo -e "  OBJCOPY\t$@"
 	@$(OBJCOPY) -O binary $< $@
 
-%.da: %.elf
+$(DA): $(ELF)
 	@echo -e "  OBJDUMP\t$@"
 	@$(OBJDUMP) -d $< > $@
 
