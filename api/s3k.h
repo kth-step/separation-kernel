@@ -3,10 +3,10 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "s3k_cap.h"
 #include "s3k_consts.h"
-#include "snprintf.h"
 
 #define S3K_SYSCALL8(sysnr, a0, a1, a2, a3, a4, a5, a6, a7) S3K_SYSCALL(8, sysnr, a0, a1, a2, a3, a4, a5, a6, a7)
 #define S3K_SYSCALL7(sysnr, a0, a1, a2, a3, a4, a5, a6) S3K_SYSCALL(7, sysnr, a0, a1, a2, a3, a4, a5, a6, 0)
