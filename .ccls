@@ -1,4 +1,0 @@
-riscv64-unknown-elf-gcc
--Iinc
--I.
--Ibsp/virt
