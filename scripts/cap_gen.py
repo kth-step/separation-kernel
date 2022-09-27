@@ -159,7 +159,7 @@ enums = ", ".join([f"CAP_TYPE_{d['name'].upper()}"  for d in caps])
 print(f"""\
 #pragma once
 #include "kassert.h"
-#include "pmp.h"
+#include <stdint.h>
 
 #define NULL_CAP ((cap_t){{0,0}})
 
@@ -173,6 +173,15 @@ enum cap_type {{
 struct cap {{
 unsigned long long word0, word1;
 }};
+
+
+static inline uint64_t pmp_napot_begin(uint64_t addr) {{
+    return addr & (addr + 1);
+}}
+
+static inline uint64_t pmp_napot_end(uint64_t addr) {{
+    return addr | (addr + 1);
+}}
 
 static inline cap_type_t cap_get_type(cap_t cap) {{
 return 0xffull & cap.word0;

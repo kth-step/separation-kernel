@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "s3k_cap.g.h"
+#include "s3k_cap.h"
 #include "s3k_consts.h"
 #include "snprintf.h"
 
@@ -146,7 +146,7 @@ static inline uint64_t s3k_supervisor_get_state(uint64_t sup_cid, uint64_t pid)
 
 static inline uint64_t s3k_supervisor_read_reg(uint64_t sup_cid, uint64_t pid, uint64_t reg_nr)
 {
-    return S3K_SYSCALL4(S3K_SYSNR_INVOKE_CAP, sup_cid, pid,  S3K_SYSNR_INVOKE_SUPERVISOR_READ_REG, reg_nr);
+    return S3K_SYSCALL4(S3K_SYSNR_INVOKE_CAP, sup_cid, pid, S3K_SYSNR_INVOKE_SUPERVISOR_READ_REG, reg_nr);
 }
 
 static inline uint64_t s3k_supervisor_write_reg(uint64_t sup_cid, uint64_t pid, uint64_t reg_nr, uint64_t val)
@@ -174,12 +174,12 @@ static inline cap_t s3k_supervisor_read_cap(uint64_t sup_cid, uint64_t pid, uint
 
 static inline uint64_t s3k_supervisor_give_cap(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest)
 {
-    return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, pid,  S3K_SYSNR_INVOKE_SUPERVISOR_GIVE_CAP, src, dest);
+    return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, pid, S3K_SYSNR_INVOKE_SUPERVISOR_GIVE_CAP, src, dest);
 }
 
 static inline uint64_t s3k_supervisor_take_cap(uint64_t sup_cid, uint64_t pid, uint64_t src, uint64_t dest)
 {
-    return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, pid,  S3K_SYSNR_INVOKE_SUPERVISOR_TAKE_CAP, src, dest);
+    return S3K_SYSCALL5(S3K_SYSNR_INVOKE_CAP, sup_cid, pid, S3K_SYSNR_INVOKE_SUPERVISOR_TAKE_CAP, src, dest);
 }
 
 static inline uint64_t s3k_receive(uint64_t cid, uint64_t msg[4], uint64_t dest)
@@ -225,7 +225,8 @@ static inline int s3k_dump_cap(char* buf, int n, cap_t cap)
         return snprintf(buf, n, "CHANNELS{begin=%ld,end=%ld,free=%ld}", cap_channels_get_begin(cap),
                         cap_channels_get_end(cap), cap_channels_get_free(cap));
     case CAP_TYPE_RECEIVER:
-        return snprintf(buf, n, "RECEIVER{channel=%ld,mode=%ld}", cap_receiver_get_channel(cap), cap_receiver_get_grant(cap));
+        return snprintf(buf, n, "RECEIVER{channel=%ld,mode=%ld}", cap_receiver_get_channel(cap),
+                        cap_receiver_get_grant(cap));
     case CAP_TYPE_SENDER:
         return snprintf(buf, n, "SENDER{channel=%ld,mode=%ld}", cap_sender_get_channel(cap), cap_sender_get_grant(cap));
     case CAP_TYPE_SERVER:

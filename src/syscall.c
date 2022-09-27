@@ -8,6 +8,7 @@
 
 #include "cap_node.h"
 #include "consts.h"
+#include "csr.h"
 #include "kprint.h"
 #include "lock.h"
 #include "preemption.h"

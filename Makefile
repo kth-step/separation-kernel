@@ -39,12 +39,12 @@ CFLAGS+=-gdwarf-2
 CFLAGS+=-O2
 CFLAGS+=-include $(PLATFORM_H) -include $(CONFIG_H) 
 
-.PHONY: all target clean size da cloc format
+.PHONY: all target clean size da cloc format api
 .SECONDARY:
 
 all: target
 
-target: $(TARGET)
+target: $(TARGET) 
 
 inc/gen/cap.h: gen/cap.yml scripts/cap_gen.py 
 	@echo -e "GEN\t$@"
@@ -79,6 +79,16 @@ $(BUILD)/%.c.o: %.c inc/gen/cap.h $(CONFIG_H) $(PLATFORM_H)
 	@echo -e "OBJDUMP\t$@"
 	@$(OBJDUMP) -d $< > $@
 
+api/s3k_cap.h: inc/gen/cap.h
+	@echo -e "GEN\t$@"
+	@sed '/kassert/d' inc/gen/cap.h > api/s3k_cap.h
+
+api/s3k_consts.h: inc/const.h
+	@echo -e "GEN\t$@"
+	@cp inc/consts.h api/s3k_consts.h
+
+api: api/s3k_consts.h api/s3k_cap.h
+
 clean:
 	@echo "Cleaning separation-kernel"
 	@rm -f $(OBJS) $(DEPS) $(GEN_HDRS) $(TARGET) $(DA)
@@ -90,6 +100,6 @@ cloc:
 	@cloc $(HDRS) $(SRCS)
 
 format:
-	clang-format -i $(filter inc/%.h, $(HDRS)) $(filter src/%.c, $(SRCS))
+	clang-format -i $(filter inc/%.h, $(HDRS)) $(filter src/%.c, $(SRCS)) $(wildcard api/*.h)
 
 -include $(DEPS)
