@@ -53,40 +53,22 @@ TODO: Fix constants for virtual registers.
 
 ## User guide
 
-### Install the RISC-V GCC compiler
-Install the GNU RISC-V toolchain (around 16 GB of space required):
-```
-# Install the prerequisites, see https://github.com/riscv-collab/riscv-gnu-toolchain
+Prerequisites:
+- python3 with pyyaml
+- riscv-gnu-toolchain : compiled with unknown-elf or similar (i.e., not linux)
+    + Download from SiFive, 
+    + Install with your package manager, or
+    + Install from source git@github.com:riscv-collab/riscv-gnu-toolchain
+        + Suggested config: `./configure --prefix=/opt/riscv --enable-multilib`
 
-# Clone repository
-git clone https://github.com/riscv-collab/riscv-gnu-toolchain.git
-cd riscv-gnu-toolchain
-
-# --with-cmodel=medany: This is required to get stdlib working on non-low memory.
-# --prefix=<path>: Install location.
-# --enable-multilib: Allows us to compile to many versions of RISC-V. Could be replaced with something more specific.
-./configure --prefix=/opt/riscv --enable-multilib --with-cmodel=medany
-
-# Make the toolchain, installs automatically to /opt/riscv, no need for 'make install'
-# Do not compile with "make linux", this would create a toolchain for Linux on RISC-V,
-# not embedded software on RISC-V.
-sudo make -j <nr of CPUs>
-
-# Need to add path to tools, I add this in bashrc.
-export PATH=/opt/riscv:$PATH
-```
-*You can also install the toolchain from SiFive.*
-
-### 
-```
-# Clone this repository:
+The following commands will compile the kernel with a dummy payload:
+```bash
 git clone git@github.com:kth-step/separation-kernel.git
 cd separation-kernel
-
-# Other prerequisites, python3 for generating files.
-make
-make debug-qemu # Runs the kernel using QEMU
+make CC=riscv64-unknown-elf-gcc # or CC=riscv64-elf-gcc for AUR
 ```
+
+For example application, check https://github.com/kth-step/separation-kernel-example (WIP).
 
 ## Coding style
 
