@@ -1,9 +1,14 @@
 # See LICENSE file for copyright and license details.
-TARGET ?=s3k.elf
-LDS    ?=config.lds
-CONFIG_H ?=config.h
+PROGRAM ?=separation-kernel
+BUILD   ?=build
+
+TARGET=$(ELF) $(BIN)
+ELF=$(BUILD)/$(PROGRAM).elf
+BIN=$(BUILD)/$(PROGRAM).bin
+
+LDS        ?=config.lds
+CONFIG_H   ?=config.h
 PLATFORM_H ?=bsp/virt.h
-BUILD  ?=build
 
 SRCS=$(wildcard src/*.[cS])
 OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
@@ -12,6 +17,7 @@ GEN_HDRS=inc/gen/cap.h inc/gen/asm_consts.h
 HDRS=$(wildcard inc/*.h) $(GEN_HDRS) $(CONFIG_H) $(PLATFORM_H)
 DA=$(patsubst %, %.da, $(TARGET))
 
+
 # Tools
 PREFIX ?=riscv64-unknown-elf
 CC=$(PREFIX)-gcc
@@ -19,9 +25,9 @@ SIZE=$(PREFIX)-size
 OBJCOPY=$(PREFIX)-objcopy
 OBJDUMP=$(PREFIX)-objdump
 
-ARCH?=rv64imac
-ABI?=lp64
-CMODEL?=medany
+ARCH   ?=rv64imac
+ABI    ?=lp64
+CMODEL ?=medany
 
 CFLAGS=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
