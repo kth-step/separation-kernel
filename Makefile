@@ -64,4 +64,4 @@ $(BUILD)/%.c.o: %.c
 	@$(OBJCOPY) -O binary $< $@
 
 clean:
-	rm $(OBJS) $(DEPS) $(GEN_HDRS)
+	rm -f $(OBJS) $(DEPS) $(GEN_HDRS)
