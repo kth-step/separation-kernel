@@ -44,7 +44,7 @@
 .endm
 
 .macro load_sp
-        la      sp,stack
+        la      sp,(stack - MIN_HARTID*STACK_SIZE)
         csrr    t1,mhartid
         slli    t1,t1,LOG_STACK_SIZE
         sub     sp,sp,t1
