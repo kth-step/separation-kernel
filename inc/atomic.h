@@ -36,7 +36,7 @@
             while (1)                                     \
                 ;                                         \
         }                                                 \
-        (typeof(*ptr)) tmp0;                              \
+        (typeof(*ptr))tmp0;                               \
     })
 #define compare_and_set(ptr, expected, desired) (compare_and_swap(ptr, expected, desired) == expected)
 #else
