@@ -58,17 +58,23 @@ Prerequisites:
 - riscv-gnu-toolchain : compiled with unknown-elf or similar (i.e., not linux)
     + Download from SiFive, 
     + Install with your package manager, or
-    + Install from source git@github.com:riscv-collab/riscv-gnu-toolchain
+    + Install from source https://github.com/riscv-collab/riscv-gnu-toolchain
         + Suggested config: `./configure --prefix=/opt/riscv --enable-multilib`
 
-The following commands will compile the kernel with a dummy payload:
+The following commands will compile the kernel, `s3k.elf`, with a dummy payload:
 ```bash
 git clone git@github.com:kth-step/separation-kernel.git
 cd separation-kernel
 make CC=riscv64-unknown-elf-gcc # or CC=riscv64-elf-gcc for AUR
 ```
 
-For example application, check https://github.com/kth-step/separation-kernel-example (WIP).
+Custom payload, kernel config and platform:
++ Copy `config.h` and set the PAYLOAD definition to `path/to/my/payload.bin`
++ Configure the variables in your config file. 
++ Copy `bsp/virt.h` or `bsp/sifive_u.h` and configure it for your platform.
++ `make CC=riscv64-unknown-elf-gcc CONFIG=path/to/my/config.h PLATFORM=path/to/my/platform.h`
+
+Check https://github.com/kth-step/separation-kernel-example (WIP) for sample application.
 
 ## Coding style
 
