@@ -65,18 +65,17 @@ $(BUILD)/%.c.o: %.c inc/gen/cap.h $(CONFIG_H) $(PLATFORM_H)
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -o $@ $(SRCS)
 
-%.bin: $(BUILD)/%.elf
+%.bin: %.elf
 	@echo -e "OBJCOPY\t$@"
 	@$(OBJCOPY) -O binary $< $@
 
-%.da: $(TARGET)
+%.da: %.elf
 	@echo -e "OBJDUMP\t$@"
 	@$(OBJDUMP) -d $< > $@
 
-da: $(DA)
-
 clean:
-	rm -f $(OBJS) $(DEPS) $(GEN_HDRS) $(TARGET) $(DA)
+	@echo "Cleaning separation-kernel"
+	@rm -f $(OBJS) $(DEPS) $(GEN_HDRS) $(TARGET) $(DA)
 
 size:
 	@$(SIZE) $(OBJS) $(TARGET)
