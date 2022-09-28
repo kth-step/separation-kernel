@@ -48,47 +48,47 @@ all: target
 target: $(TARGET) 
 
 inc/gen/cap.h: gen/cap.yml scripts/cap_gen.py 
-	@echo -e "  GEN\t$@"
+	@printf "  GEN\t$@\n"
 	@mkdir -p $(@D) 
 	@./scripts/cap_gen.py $< > $@
 
 inc/gen/asm_consts.h: gen/asm_consts.c inc/proc.h inc/cap_node.h inc/consts.h
-	@echo -e "  GEN\t$@"
+	@printf "  GEN\t$@\n"
 	@mkdir -p $(@D) 
 	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
 
 $(BUILD)/src/payload.S.o: src/payload.S $(PAYLOAD)
 $(BUILD)/%.S.o: %.S inc/gen/asm_consts.h $(CONFIG_H) $(PLATFORM_H)
-	@echo -e "  CC\t$@"
+	@printf "  CC\t$@\n"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
 
 
 $(BUILD)/%.c.o: %.c inc/gen/cap.h $(CONFIG_H) $(PLATFORM_H)
-	@echo -e "  CC\t$@"
+	@printf "  CC\t$@\n"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
 $(ELF): $(OBJS) $(LDS) 
-	@echo -e "  CC\t$@"
+	@printf "  CC\t$@\n"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -o $@ $(SRCS)
 
 $(BIN): $(ELF)
-	@echo -e "  OBJCOPY\t$@"
+	@printf "  OBJCOPY\t$@\n"
 	@$(OBJCOPY) -O binary $< $@
 
 $(DA): $(ELF)
-	@echo -e "  OBJDUMP\t$@"
+	@printf "  OBJDUMP\t$@\n"
 	@$(OBJDUMP) -d $< > $@
 
 api/s3k_cap.h: inc/gen/cap.h
-	@echo -e "  GEN\t$@"
+	@printf "  GEN\t$@\n"
 	@sed '/kassert/d' inc/gen/cap.h > api/s3k_cap.h
 
 api/s3k_consts.h: inc/const.h
-	@echo -e "  GEN\t$@"
+	@printf "  GEN\t$@\n"
 	@cp inc/consts.h api/s3k_consts.h
 
 api: api/s3k_consts.h api/s3k_cap.h
