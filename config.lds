@@ -41,7 +41,7 @@ SECTIONS {
         *(.rodata.*)
     } >RAM
     
-    .data : ALIGN(4096) {
-        KEEP(*(.data.payload))
+    .payload : ALIGN(4096) {
+        KEEP(*(.payload))
     } >RAM
 }

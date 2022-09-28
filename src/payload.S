@@ -1,7 +1,9 @@
-// See LICENSE file for copyright and license details.
 .globl root_payload
 
-.section .data.payload
+.section .payload
 root_payload:
-.incbin "../build/root/root.bin"
-
+#ifdef PAYLOAD
+        .incbin PAYLOAD
+#else
+1:      j       1b
+#endif

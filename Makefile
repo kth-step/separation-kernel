@@ -1,4 +1,6 @@
 # See LICENSE file for copyright and license details.
+.POSIX:
+
 PROGRAM ?=separation-kernel
 BUILD   ?=build
 
@@ -10,11 +12,15 @@ LDS        ?=config.lds
 CONFIG_H   ?=config.h
 PLATFORM_H ?=bsp/virt.h
 
-SRCS=$(wildcard src/*.[cS])
-OBJS=$(patsubst %, $(BUILD)/%.o, $(SRCS))
-DEPS=$(patsubst %, $(BUILD)/%.d, $(SRCS))
-GEN_HDRS=inc/gen/cap.h inc/gen/asm_consts.h 
-HDRS=$(wildcard inc/*.h) $(GEN_HDRS) $(CONFIG_H) $(PLATFORM_H)
+C_SRCS=$(wildcard src/*.c)
+S_SRCS=$(wildcard src/*.S)
+OBJS=$(patsubst %.c, $(BUILD)/%.o, $(C_SRCS)) \
+     $(patsubst %.S, $(BUILD)/%.o, $(S_SRCS))
+DEPS=$(patsubst %.c, $(BUILD)/%.d, $(C_SRCS)) \
+     $(patsubst %.S, $(BUILD)/%.d, $(S_SRCS))
+CAP_H=inc/gen/cap.h
+ASM_CONST_H=inc/gen/asm_const.h
+HDRS=$(wildcard inc/*.h) $(CAP_H) $(ASM_CONST_H) $(CONFIG_H) $(PLATFORM_H)
 DA=$(patsubst %, %.da, $(TARGET))
 
 # Tools
@@ -34,9 +40,6 @@ CFLAGS+= -T$(LDS) -nostartfiles
 CFLAGS+=-Wall -fanalyzer -Werror
 CFLAGS+=-gdwarf-2
 CFLAGS+=-Og
-ifneq "$(PAYLOAD)" ""
-CFLAGS+=-DPAYLOAD=\"$(PAYLOAD)\"
-endif
 CFLAGS+=-include $(PLATFORM_H) -include $(CONFIG_H) 
 CFLAGS+=-Iinc
 
@@ -47,25 +50,22 @@ all: target
 
 target: $(TARGET) 
 
-inc/gen/cap.h: gen/cap.yml scripts/cap_gen.py 
+$(CAP_H): gen/cap.yml scripts/cap_gen.py 
 	@printf "  GEN\t$@\n"
 	@mkdir -p $(@D) 
 	@./scripts/cap_gen.py $< > $@
 
-inc/gen/asm_consts.h: gen/asm_consts.c inc/proc.h inc/cap_node.h inc/consts.h
+$(ASM_CONST_H): gen/asm_consts.c inc/proc.h inc/cap_node.h inc/consts.h
 	@printf "  GEN\t$@\n"
 	@mkdir -p $(@D) 
 	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
 
-$(BUILD)/src/payload.S.o: src/payload.S $(PAYLOAD)
-$(BUILD)/%.S.o: %.S inc/gen/asm_consts.h $(CONFIG_H) $(PLATFORM_H)
+$(BUILD)/%.o: %.S $(ASM_CONST_H) $(CONFIG_H) $(PLATFORM_H) $(PAYLOAD)
 	@printf "  CC\t$@\n"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
 
-
-
-$(BUILD)/%.c.o: %.c inc/gen/cap.h $(CONFIG_H) $(PLATFORM_H)
+$(BUILD)/%.o: %.c $(CAP_H) $(CONFIG_H) $(PLATFORM_H)
 	@printf "  CC\t$@\n"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
@@ -73,7 +73,7 @@ $(BUILD)/%.c.o: %.c inc/gen/cap.h $(CONFIG_H) $(PLATFORM_H)
 $(ELF): $(OBJS) $(LDS) 
 	@printf "  CC\t$@\n"
 	@mkdir -p $(@D)
-	@$(CC) $(CFLAGS) -o $@ $(SRCS)
+	@$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 $(BIN): $(ELF)
 	@printf "  OBJCOPY\t$@\n"
@@ -95,7 +95,7 @@ api: api/s3k_consts.h api/s3k_cap.h
 
 clean:
 	@echo "  CLEANING"
-	@rm -f $(OBJS) $(DEPS) $(GEN_HDRS) $(TARGET) $(DA)
+	@rm -f $(OBJS) $(DEPS) $(CAP_H) $(ASM_CONST_H) $(TARGET) $(DA)
 
 size:
 	@$(SIZE) $(OBJS) $(TARGET)
