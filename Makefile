@@ -22,7 +22,7 @@ HDRS=$(wildcard inc/*.h) $(CAP_H) $(ASM_CONST_H) $(CONFIG_H) $(PLATFORM_H)
 DA=$(patsubst %.elf, %.da, $(ELF))
 
 CAP_H=inc/gen/cap.h
-ASM_CONST_H=inc/gen/asm_const.h
+ASM_CONSTS_H=inc/gen/asm_consts.h
 
 # Tools
 RISCV_PREFIX ?=riscv64-unknown-elf
@@ -59,12 +59,12 @@ $(CAP_H): gen/cap.yml scripts/cap_gen.py
 	@mkdir -p $(@D) 
 	@./scripts/cap_gen.py $< > $@
 
-$(ASM_CONST_H): gen/asm_consts.c inc/proc.h inc/cap_node.h inc/consts.h
+$(ASM_CONSTS_H): gen/asm_consts.c inc/proc.h inc/cap_node.h inc/consts.h
 	@printf "GEN\t$@\n"
 	@mkdir -p $(@D) 
 	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
 
-$(BUILD)/%.o: %.S $(ASM_CONST_H) $(CONFIG_H) $(PLATFORM_H) $(PAYLOAD)
+$(BUILD)/%.o: %.S $(ASM_CONSTS_H) $(CONFIG_H) $(PLATFORM_H) $(PAYLOAD)
 	@printf "CC\t$@\n"
 	@mkdir -p $(@D)
 	@$(CC) $(CFLAGS) -MMD -c -o $@ $<
