@@ -3,12 +3,17 @@
 
 #include "preemption.h"
 #include "sched.h"
+#include "kprint.h"
 
 #define MRET 0x0320000073ull
 #define ILLEGAL_INSTRUCTION 2ull
 
 void exception_handler(uint64_t mcause, uint64_t mtval, uint64_t mepc)
 {
+#ifndef NDEBUG
+    kprintf("EXCEPTION pid=%d mcause=%lx mtval=%lx mepc=%lx\n", current->pid, mcause, mtval, mepc);
+    while(1);
+#endif
     if (mcause == ILLEGAL_INSTRUCTION && mtval == MRET) {
         /* Restore sp, pc, a0, a1 */
         current->regs.sp = current->regs.psp;

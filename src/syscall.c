@@ -49,6 +49,9 @@ uint64_t syscall_unimplemented(void)
 uint64_t syscall_read_cap(uint64_t cidx)
 {
     kassert(current != NULL);
+#ifndef NDEBUG
+    kprintf("READ_CAP pid=%d cid=%lx pc=%lx\n", current->pid, cidx, current->regs.pc);
+#endif
     cap_node_t* node = proc_get_cap_node(current, cidx);
     cap_t cap = cap_node_get_cap(node);
     current->regs.a1 = cap.word0;

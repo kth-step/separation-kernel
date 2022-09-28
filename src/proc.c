@@ -89,6 +89,9 @@ static cap_node_t* proc_init_channels(cap_node_t* cn)
 
 void proc_init_proc(proc_t* proc, uint64_t pid)
 {
+#ifndef NDEBUG
+    kprintf("INIT_PROC proc=%lx pid=%lx\n", proc, pid);
+#endif
     /* Set the process id */
     proc->pid = pid;
     /* Capability table. */
@@ -99,6 +102,10 @@ void proc_init_proc(proc_t* proc, uint64_t pid)
 
 void proc_init_root(proc_t* root, uint64_t root_payload)
 {
+#ifndef NDEBUG
+    kprintf("root_proc=%lx\n", root);
+    kprintf("root_payload=%lx\n", root_payload);
+#endif
     cap_node_t* cn;
     cn = proc_init_memory(root->cap_table, root_payload);
     cn = proc_init_channels(cn);

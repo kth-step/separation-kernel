@@ -4,9 +4,10 @@
 PROGRAM ?=separation-kernel
 BUILD   ?=build
 
-TARGET=$(ELF) $(BIN)
+TARGET=$(ELF) $(BIN) $(DA)
 ELF=$(BUILD)/$(PROGRAM).elf
 BIN=$(BUILD)/$(PROGRAM).bin
+DA=$(BUILD)/$(PROGRAM).da
 
 LDS        ?=config.lds
 CONFIG_H   ?=config.h
@@ -38,7 +39,7 @@ CMODEL ?=medany
 
 CFLAGS+=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
-CFLAGS+= -T$(LDS) -nostartfiles
+CFLAGS+= -T$(LDS) -nostartfiles -ffreestanding -static
 CFLAGS+=-Wall -fanalyzer -Werror
 CFLAGS+=-gdwarf-2
 CFLAGS+=-Og
@@ -86,7 +87,7 @@ $(BIN): $(ELF)
 
 $(DA): $(ELF)
 	@printf "OBJDUMP\t$@\n"
-	@$(OBJDUMP) -d $< > $@
+	@$(OBJDUMP) -D $< > $@
 
 api/s3k_cap.h: inc/gen/cap.h
 	@printf "SED\tapi/s3k_cap.h\n"

@@ -39,15 +39,16 @@ initialize_kernel: /*** Initialize kernel ***/
         addi    t0,t0,4
 2:      bne     t0,t1,1b
 
+#ifndef NDEBUG
+        /* Print information about kernel, scheduler, and platform. */
+        call    print_info
+#endif
+
         /* Initializes PCBs. */
         la      a0,root_payload
         call    proc_init
         call    sched_init
 
-#ifndef NDEBUG
-        /* Print information about kernel, scheduler, and platform. */
-        call    print_info
-#endif
 
 wake:   /*** Wake cores MIN_HARTID .. MAX_HARTID. ***/
         li      t2,1
