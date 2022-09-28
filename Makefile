@@ -20,6 +20,7 @@ DEPS=$(patsubst %.c, $(BUILD)/%.d, $(C_SRCS)) \
      $(patsubst %.S, $(BUILD)/%.d, $(S_SRCS))
 HDRS=$(wildcard inc/*.h) $(CAP_H) $(ASM_CONST_H) $(CONFIG_H) $(PLATFORM_H)
 DA=$(patsubst %.elf, %.da, $(ELF))
+API=api/s3k_consts.h api/s3k_cap.h
 
 CAP_H=inc/gen/cap.h
 ASM_CONSTS_H=inc/gen/asm_consts.h
@@ -88,18 +89,16 @@ $(DA): $(ELF)
 	@$(OBJDUMP) -d $< > $@
 
 api/s3k_cap.h: inc/gen/cap.h
-	@printf "GEN\t$@\n"
+	@printf "SED\tapi/s3k_cap.h\n"
 	@sed '/kassert/d' inc/gen/cap.h > api/s3k_cap.h
-
-api/s3k_consts.h: inc/const.h
-	@printf "GEN\t$@\n"
+api/s3k_consts.h: inc/consts.h
+	@printf "CP\tapi/s3k_consts.h\n"
 	@cp inc/consts.h api/s3k_consts.h
-
-api: api/s3k_consts.h api/s3k_cap.h
+api: $(API)
 
 clean:
 	@echo "CLEAN\t$(PROGRAM)"
-	@rm -f $(OBJS) $(DEPS) $(CAP_H) $(ASM_CONST_H) $(TARGET) $(DA)
+	@rm -f $(OBJS) $(DEPS) $(CAP_H) $(ASM_CONST_H) $(TARGET) $(DA) $(API)
 
 size:
 	@printf "SIZE\t$(PROGRAM)\n"
