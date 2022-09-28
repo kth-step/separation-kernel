@@ -25,7 +25,3 @@
 
 /* Set absolute path of payload */
 //#define PAYLOAD "my_payload.bin"
-
-#ifndef __ASSEMBLER__
-/* Non assembly definitions */
-#endif

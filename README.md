@@ -72,7 +72,7 @@ Custom payload, kernel config and platform:
 + Copy `config.h` and configure.
 + Configure the variables in your config file. 
 + Copy `bsp/virt.h` or `bsp/sifive_u.h` and configure it for your platform.
-+ `make CC=riscv64-unknown-elf-gcc CONFIG=path/to/my/config.h PLATFORM=path/to/my/platform.h` PAYLOAD=path/to/my/payload.bin
++ `make CC=riscv64-unknown-elf-gcc CONFIG=path/to/my/config.h PLATFORM=path/to/my/platform.h`
 
 Check https://github.com/kth-step/separation-kernel-example (WIP) for sample application.
 
