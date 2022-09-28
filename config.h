@@ -22,6 +22,3 @@
 
 /* Uncomment to enable memory protection */
 //#define MEMORY_PROTECTION
-
-/* Set absolute path of payload */
-//#define PAYLOAD "my_payload.bin"

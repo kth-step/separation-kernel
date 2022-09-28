@@ -28,7 +28,6 @@ SECTIONS {
         *(.sbss.*)
         *(.bss)
         *(.bss.*)
-        *(COMMON)
         PROVIDE(_ebss = ALIGN(4));
     } >RAM
 
@@ -41,7 +40,7 @@ SECTIONS {
         *(.rodata.*)
     } >RAM
     
-    .payload : ALIGN(4096) {
-        KEEP(*(.payload))
+    .data : ALIGN(4096) {
+        KEEP(*(.data.payload))
     } >RAM
 }

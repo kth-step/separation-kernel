@@ -1,6 +1,6 @@
 .globl root_payload
 
-.section .payload
+.section .data.payload
 root_payload:
 #ifdef PAYLOAD
         .incbin PAYLOAD
