@@ -39,10 +39,10 @@ CMODEL ?=medany
 
 CFLAGS+=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
-CFLAGS+= -T$(LDS) -nostartfiles -ffreestanding -static
+CFLAGS+= -T$(LDS) -nostartfiles -nostdlib -ffreestanding -static
 CFLAGS+=-Wall -fanalyzer -Werror
 CFLAGS+=-gdwarf-2
-CFLAGS+=-Og
+CFLAGS+=-O2
 CFLAGS+=-include $(PLATFORM_H) -include $(CONFIG_H) 
 CFLAGS+=-Iinc
 ifneq "$(PAYLOAD)" ""
@@ -98,7 +98,7 @@ api/s3k_consts.h: inc/consts.h
 api: $(API)
 
 clean:
-	@echo "CLEAN\t$(PROGRAM)"
+	@printf "CLEAN\t$(PROGRAM)\n"
 	@rm -f $(OBJS) $(DEPS) $(CAP_H) $(ASM_CONST_H) $(TARGET) $(DA) $(API)
 
 size:

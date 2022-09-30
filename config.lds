@@ -14,31 +14,36 @@ SECTIONS {
         *(.text.*)
     } >RAM
 
-    .data : ALIGN(4) {
-        __global_pointer$ = . + 0x7bc;
-        *(.sdata)
-        *(.sdata.*)
-        *(.srodata)
-        *(.srodata.*)
-        *(.data)
-        *(.data.*)
-        *(.rdata)
-        *(.rdata.*)
-        *(.rodata)
-        *(.rodata.*)
-    } >RAM
+    _etext = .; PROVIDE(etext = .);
+    .data : ALIGN(8) {
+        __DATA_BEGIN__ = .;
+        *(.rdata*)
+        *(.rodata*)
+        *(.data*)
+    } >RAM 
+    .sdata : ALIGN(8) {
+        __SDATA_BEGIN__ = .;
+        *(.srdata*)
+        *(.srodata*)
+        *(.sdata*)
+    } >RAM 
+    _edata = .; PROVIDE (edata = .);
+    .sbss : ALIGN(8) {
+        *(.sbss .sbss.*)
+    } >RAM 
+    .bss : ALIGN(8) {
+        *(.bss .bss.*)
+        . = ALIGN(8);
+    } >RAM 
+    __BSS_END__ = .;
+    _end = .; PROVIDE (end = .);
 
-    .bss : ALIGN(4) {
-        PROVIDE(_bss = .);
-        *(.sbss)
-        *(.sbss.*)
-        *(.bss)
-        *(.bss.*)
-        PROVIDE(_ebss = ALIGN(4));
-    } >RAM
+    __global_pointer$ = MIN(__SDATA_BEGIN__ + 0x800,
+                            MAX(__DATA_BEGIN__ + 0x800, __BSS_END__ - 0x800));
+
 
     
     .payload : ALIGN(4096) {
         *(.payload)
-    } >RAM AT>RAM
+    } >RAM 
 }

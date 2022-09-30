@@ -32,8 +32,8 @@ _start: /* Start of the kernel */
 
 initialize_kernel: /*** Initialize kernel ***/
         /* Zero bss section */
-        lla     t0,_bss
-        lla     t1,_ebss
+        lla     t0,_edata
+        lla     t1,_end
         j       2f
 1:      sw      x0,0(t0)
         addi    t0,t0,4
@@ -45,7 +45,7 @@ initialize_kernel: /*** Initialize kernel ***/
 #endif
 
         /* Initializes PCBs. */
-        la      a0,root_payload
+        lla      a0,root_payload
         call    proc_init
         call    sched_init
 

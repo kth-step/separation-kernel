@@ -11,7 +11,7 @@
 void exception_handler(uint64_t mcause, uint64_t mtval, uint64_t mepc)
 {
 #ifndef NDEBUG
-    kprintf("EXCEPTION pid=%d mcause=%lx mtval=%lx mepc=%lx\n", current->pid, mcause, mtval, mepc);
+    kprintf("EXCEPTION pid=0x%lx mcause=0x%lx mtval=0x%lx mepc=0x%lx\n", current->pid, mcause, mtval, mepc);
     while(1);
 #endif
     if (mcause == ILLEGAL_INSTRUCTION && mtval == MRET) {
