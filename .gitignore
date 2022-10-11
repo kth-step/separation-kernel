@@ -4,3 +4,4 @@
 *.elf
 *.bin
 inc/gen/*.h
+api/s3k_*.h
