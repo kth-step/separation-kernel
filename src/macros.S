@@ -1,6 +1,6 @@
 // See LICENSE file for copyright and license details.
 
-#include "gen/asm_consts.h"
+#include "asm_consts.h"
 
 .macro zero_state
         li      x1,0
