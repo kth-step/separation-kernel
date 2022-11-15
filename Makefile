@@ -10,22 +10,22 @@ BIN=$(BUILD)/$(PROGRAM).bin
 DA=$(BUILD)/$(PROGRAM).da
 
 LDS        ?=config.lds
-CONFIG_H   ?=config.h
+S3K_CONFIG_H   ?=config.h
 PLATFORM_H ?=bsp/virt.h
 
 OBJS=$(patsubst %.c, build/%.o, $(wildcard src/*.c)) $(patsubst %.S, build/%.o, $(wildcard src/*.S))
 
-GEN_HDRS=inc/cap.h inc/asm_consts.h
-HDRS=$(wildcard inc/*.h) $(GEN_HDRS) $(CONFIG_H) $(PLATFORM_H)
+GEN_HDRS=src/inc/cap.h src/inc/asm_consts.h
+HDRS=$(wildcard src/inc/*.h) $(GEN_HDRS) $(CONFIG_H) $(PLATFORM_H)
 
 API_GEN_HDRS=api/s3k_cap.h api/s3k_consts.h
 
 # Tools
 RISCV_PREFIX ?=riscv64-unknown-elf
-CC=$(RISCV_PREFIX)-gcc
-SIZE=$(RISCV_PREFIX)-size
-OBJCOPY=$(RISCV_PREFIX)-objcopy
-OBJDUMP=$(RISCV_PREFIX)-objdump
+CC 		=$(RISCV_PREFIX)-gcc
+SIZE 	=$(RISCV_PREFIX)-size
+OBJCOPY =$(RISCV_PREFIX)-objcopy
+OBJDUMP =$(RISCV_PREFIX)-objdump
 
 ARCH   ?=rv64imac
 ABI    ?=lp64
@@ -37,66 +37,62 @@ CFLAGS+= -T$(LDS) -nostartfiles -nostdlib -ffreestanding -static
 CFLAGS+=-Wall -fanalyzer -Werror
 CFLAGS+=-gdwarf-2
 CFLAGS+=-O2
-CFLAGS+=-Iinc -include $(PLATFORM_H) -include $(CONFIG_H) 
+CFLAGS+=-Isrc/inc -include $(PLATFORM_H) -include $(S3K_CONFIG_H) 
 
 ifneq "$(PAYLOAD)" ""
 CFLAGS+=-DPAYLOAD=\"$(PAYLOAD)\"
 endif
 
-.PHONY: all target clean size da cloc format api
+.PHONY: all target clean size da cloc format api elf bin da
 .SECONDARY:
 
 all: $(TARGET)
 
-api: $(API_GEN_HDRS)
+elf: $(ELF)
+bin: $(BIN)
+da: $(DA)
+
+api/s3k.h: api
+api: api/s3k_cap.h api/s3k_consts.h
 
 clean:
-	@printf "CLEAN\t$(PROGRAM)\n"
-	@rm -f $(OBJS) $(ELF) $(BIN) $(DA) $(GEN_HDRS) $(API_GEN_HDRS)
+	rm -f $(ELF) $(BIN) $(DA) $(OBJS) $(GEN_HDRS) $(API_GEN_HDRS)
 
 size:
-	@$(SIZE) $(OBJS) $(TARGET)
+	$(SIZE) $(OBJS) $(TARGET)
 
 cloc:
 	cloc $(HDRS) $(SRCS)
 
 format:
-	clang-format -i $(filter inc/%.h, $(HDRS)) $(filter src/%.c, $(SRCS)) $(wildcard api/*.h)
-
+	clang-format -i $(filter src/inc/%.h, $(HDRS)) $(filter src/%.c, $(SRCS)) $(wildcard api/*.h)
 
 $(BUILD):
-	@mkdir -p $(BUILD)
+	mkdir -p $(BUILD)
 
-inc/cap.h: gen/cap.yml scripts/cap_gen.py
-	@printf "GEN\t$@\n"
-	@./scripts/cap_gen.py $< > $@
+src/inc/cap.h: gen/cap.yml
+	./scripts/gen_cap $< $@
 
-inc/asm_consts.h: gen/asm_consts.c $(CAP_H) inc/proc.h inc/cap_node.h inc/consts.h
-	@printf "GEN\t$@\n"
-	@$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@
+src/inc/asm_consts.h: gen/asm_consts.c $(CAP_H) src/inc/proc.h src/inc/cap_node.h src/inc/consts.h
+	CC=$(CC) CFLAGS="$(CFLAGS)" ./scripts/gen_asm_consts $< $@
 
-$(BUILD)/%.o: %.S $(HDRS) inc/asm_consts.h | $(BUILD)
-	@printf "CC\t$@\n"
-	@$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/%.o: %.S $(HDRS) | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/%.o: %.c $(HDRS) inc/cap.h | $(BUILD)
-	@printf "CC\t$@\n"
-	@$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/%.o: %.c $(HDRS) | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(ELF): $(OBJS) $(LDS) $(PAYLOAD)
-	@printf "CC\t$@\n"
-	@$(CC) $(CFLAGS) -o $@ $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 $(BIN): $(ELF)
-	@printf "OBJCOPY\t$@\n"
-	@$(OBJCOPY) -O binary $< $@
+	$(OBJCOPY) -O binary $< $@
 
 $(DA): $(ELF)
-	@printf "OBJDUMP\t$@\n"
-	@$(OBJDUMP) -D $< > $@
+	$(OBJDUMP) -D $< > $@
 
-api/s3k_cap.h: inc/cap.h
-	sed '/kassert/d' inc/cap.h > api/s3k_cap.h
+api/s3k_cap.h: src/inc/cap.h
+	sed '/kassert/d' $< > $@
 
-api/s3k_consts.h: inc/consts.h
-	cp inc/consts.h api/s3k_consts.h
+api/s3k_consts.h: src/inc/consts.h
+	cp $< $@

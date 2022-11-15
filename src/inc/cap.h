@@ -1,0 +1,298 @@
+#pragma once
+#include "kassert.h"
+#include <stdint.h>
+
+#define NULL_CAP ((cap_t){0,0})
+
+typedef enum cap_type cap_type_t;
+typedef struct cap cap_t;
+
+enum cap_type {
+CAP_TYPE_EMPTY, CAP_TYPE_MEMORY, CAP_TYPE_PMP, CAP_TYPE_TIME, CAP_TYPE_CHANNELS, CAP_TYPE_RECEIVER, CAP_TYPE_SENDER, CAP_TYPE_SERVER, CAP_TYPE_CLIENT, CAP_TYPE_SUPERVISOR, NUM_OF_CAP_TYPES
+};
+
+struct cap {
+unsigned long long word0, word1;
+};
+
+
+static inline uint64_t pmp_napot_begin(uint64_t addr) {
+    return addr & (addr + 1);
+}
+
+static inline uint64_t pmp_napot_end(uint64_t addr) {
+    return addr | (addr + 1);
+}
+
+static inline cap_type_t cap_get_type(cap_t cap) {
+return 0xffull & cap.word0;
+}
+
+static inline int cap_is_type(cap_t cap, cap_type_t t) {
+    return cap_get_type(cap) == t;
+}
+
+
+static inline cap_t cap_mk_memory(uint64_t begin, uint64_t end, uint64_t rwx, uint64_t free, uint64_t pmp) {
+cap_t c;
+c.word0 = (uint64_t)CAP_TYPE_MEMORY;
+c.word1 = 0;
+c.word0 |= pmp << 8;
+c.word0 |= rwx << 16;
+c.word0 |= begin << 24;
+c.word1 |= free;
+c.word1 |= end << 32;
+return c;
+}
+static inline uint64_t cap_memory_get_begin(cap_t cap) {
+return (cap.word0 >> 24) & 0xffffffffull;
+}
+static inline cap_t cap_memory_set_begin(cap_t cap, uint64_t begin) {
+cap.word0 = (cap.word0 & ~0xffffffff000000ull) | begin << 24;
+return cap;
+}
+static inline uint64_t cap_memory_get_end(cap_t cap) {
+return (cap.word1 >> 32) & 0xffffffffull;
+}
+static inline cap_t cap_memory_set_end(cap_t cap, uint64_t end) {
+cap.word1 = (cap.word1 & ~0xffffffff00000000ull) | end << 32;
+return cap;
+}
+static inline uint64_t cap_memory_get_rwx(cap_t cap) {
+return (cap.word0 >> 16) & 0xffull;
+}
+static inline cap_t cap_memory_set_rwx(cap_t cap, uint64_t rwx) {
+cap.word0 = (cap.word0 & ~0xff0000ull) | rwx << 16;
+return cap;
+}
+static inline uint64_t cap_memory_get_free(cap_t cap) {
+return cap.word1 & 0xffffffffull;
+}
+static inline cap_t cap_memory_set_free(cap_t cap, uint64_t free) {
+cap.word1 = (cap.word1 & ~0xffffffffull) | free;
+return cap;
+}
+static inline uint64_t cap_memory_get_pmp(cap_t cap) {
+return (cap.word0 >> 8) & 0xffull;
+}
+static inline cap_t cap_memory_set_pmp(cap_t cap, uint64_t pmp) {
+cap.word0 = (cap.word0 & ~0xff00ull) | pmp << 8;
+return cap;
+}
+static inline cap_t cap_mk_pmp(uint64_t addr, uint64_t rwx) {
+cap_t c;
+c.word0 = (uint64_t)CAP_TYPE_PMP;
+c.word1 = 0;
+c.word0 |= rwx << 8;
+c.word0 |= addr << 16;
+return c;
+}
+static inline uint64_t cap_pmp_get_addr(cap_t cap) {
+return (cap.word0 >> 16) & 0xffffffffull;
+}
+static inline cap_t cap_pmp_set_addr(cap_t cap, uint64_t addr) {
+cap.word0 = (cap.word0 & ~0xffffffff0000ull) | addr << 16;
+return cap;
+}
+static inline uint64_t cap_pmp_get_rwx(cap_t cap) {
+return (cap.word0 >> 8) & 0xffull;
+}
+static inline cap_t cap_pmp_set_rwx(cap_t cap, uint64_t rwx) {
+cap.word0 = (cap.word0 & ~0xff00ull) | rwx << 8;
+return cap;
+}
+static inline cap_t cap_mk_time(uint64_t hartid, uint64_t begin, uint64_t end, uint64_t free) {
+cap_t c;
+c.word0 = (uint64_t)CAP_TYPE_TIME;
+c.word1 = 0;
+c.word0 |= free << 8;
+c.word0 |= end << 24;
+c.word0 |= begin << 40;
+c.word0 |= hartid << 56;
+return c;
+}
+static inline uint64_t cap_time_get_hartid(cap_t cap) {
+return (cap.word0 >> 56) & 0xffull;
+}
+static inline cap_t cap_time_set_hartid(cap_t cap, uint64_t hartid) {
+cap.word0 = (cap.word0 & ~0xff00000000000000ull) | hartid << 56;
+return cap;
+}
+static inline uint64_t cap_time_get_begin(cap_t cap) {
+return (cap.word0 >> 40) & 0xffffull;
+}
+static inline cap_t cap_time_set_begin(cap_t cap, uint64_t begin) {
+cap.word0 = (cap.word0 & ~0xffff0000000000ull) | begin << 40;
+return cap;
+}
+static inline uint64_t cap_time_get_end(cap_t cap) {
+return (cap.word0 >> 24) & 0xffffull;
+}
+static inline cap_t cap_time_set_end(cap_t cap, uint64_t end) {
+cap.word0 = (cap.word0 & ~0xffff000000ull) | end << 24;
+return cap;
+}
+static inline uint64_t cap_time_get_free(cap_t cap) {
+return (cap.word0 >> 8) & 0xffffull;
+}
+static inline cap_t cap_time_set_free(cap_t cap, uint64_t free) {
+cap.word0 = (cap.word0 & ~0xffff00ull) | free << 8;
+return cap;
+}
+static inline cap_t cap_mk_channels(uint64_t begin, uint64_t end, uint64_t free) {
+cap_t c;
+c.word0 = (uint64_t)CAP_TYPE_CHANNELS;
+c.word1 = 0;
+c.word0 |= free << 8;
+c.word0 |= end << 24;
+c.word0 |= begin << 40;
+return c;
+}
+static inline uint64_t cap_channels_get_begin(cap_t cap) {
+return (cap.word0 >> 40) & 0xffffull;
+}
+static inline cap_t cap_channels_set_begin(cap_t cap, uint64_t begin) {
+cap.word0 = (cap.word0 & ~0xffff0000000000ull) | begin << 40;
+return cap;
+}
+static inline uint64_t cap_channels_get_end(cap_t cap) {
+return (cap.word0 >> 24) & 0xffffull;
+}
+static inline cap_t cap_channels_set_end(cap_t cap, uint64_t end) {
+cap.word0 = (cap.word0 & ~0xffff000000ull) | end << 24;
+return cap;
+}
+static inline uint64_t cap_channels_get_free(cap_t cap) {
+return (cap.word0 >> 8) & 0xffffull;
+}
+static inline cap_t cap_channels_set_free(cap_t cap, uint64_t free) {
+cap.word0 = (cap.word0 & ~0xffff00ull) | free << 8;
+return cap;
+}
+static inline cap_t cap_mk_receiver(uint64_t channel, uint64_t grant) {
+cap_t c;
+c.word0 = (uint64_t)CAP_TYPE_RECEIVER;
+c.word1 = 0;
+c.word0 |= grant << 8;
+c.word0 |= channel << 16;
+return c;
+}
+static inline uint64_t cap_receiver_get_channel(cap_t cap) {
+return (cap.word0 >> 16) & 0xffffull;
+}
+static inline cap_t cap_receiver_set_channel(cap_t cap, uint64_t channel) {
+cap.word0 = (cap.word0 & ~0xffff0000ull) | channel << 16;
+return cap;
+}
+static inline uint64_t cap_receiver_get_grant(cap_t cap) {
+return (cap.word0 >> 8) & 0xffull;
+}
+static inline cap_t cap_receiver_set_grant(cap_t cap, uint64_t grant) {
+cap.word0 = (cap.word0 & ~0xff00ull) | grant << 8;
+return cap;
+}
+static inline cap_t cap_mk_sender(uint64_t channel, uint64_t grant) {
+cap_t c;
+c.word0 = (uint64_t)CAP_TYPE_SENDER;
+c.word1 = 0;
+c.word0 |= grant << 8;
+c.word0 |= channel << 16;
+return c;
+}
+static inline uint64_t cap_sender_get_channel(cap_t cap) {
+return (cap.word0 >> 16) & 0xffffull;
+}
+static inline cap_t cap_sender_set_channel(cap_t cap, uint64_t channel) {
+cap.word0 = (cap.word0 & ~0xffff0000ull) | channel << 16;
+return cap;
+}
+static inline uint64_t cap_sender_get_grant(cap_t cap) {
+return (cap.word0 >> 8) & 0xffull;
+}
+static inline cap_t cap_sender_set_grant(cap_t cap, uint64_t grant) {
+cap.word0 = (cap.word0 & ~0xff00ull) | grant << 8;
+return cap;
+}
+static inline cap_t cap_mk_server(uint64_t channel, uint64_t grant) {
+cap_t c;
+c.word0 = (uint64_t)CAP_TYPE_SERVER;
+c.word1 = 0;
+c.word0 |= grant << 8;
+c.word0 |= channel << 16;
+return c;
+}
+static inline uint64_t cap_server_get_channel(cap_t cap) {
+return (cap.word0 >> 16) & 0xffffull;
+}
+static inline cap_t cap_server_set_channel(cap_t cap, uint64_t channel) {
+cap.word0 = (cap.word0 & ~0xffff0000ull) | channel << 16;
+return cap;
+}
+static inline uint64_t cap_server_get_grant(cap_t cap) {
+return (cap.word0 >> 8) & 0xffull;
+}
+static inline cap_t cap_server_set_grant(cap_t cap, uint64_t grant) {
+cap.word0 = (cap.word0 & ~0xff00ull) | grant << 8;
+return cap;
+}
+static inline cap_t cap_mk_client(uint64_t channel, uint64_t grant) {
+cap_t c;
+c.word0 = (uint64_t)CAP_TYPE_CLIENT;
+c.word1 = 0;
+c.word0 |= grant << 8;
+c.word0 |= channel << 16;
+return c;
+}
+static inline uint64_t cap_client_get_channel(cap_t cap) {
+return (cap.word0 >> 16) & 0xffffull;
+}
+static inline cap_t cap_client_set_channel(cap_t cap, uint64_t channel) {
+cap.word0 = (cap.word0 & ~0xffff0000ull) | channel << 16;
+return cap;
+}
+static inline uint64_t cap_client_get_grant(cap_t cap) {
+return (cap.word0 >> 8) & 0xffull;
+}
+static inline cap_t cap_client_set_grant(cap_t cap, uint64_t grant) {
+cap.word0 = (cap.word0 & ~0xff00ull) | grant << 8;
+return cap;
+}
+static inline cap_t cap_mk_supervisor(uint64_t begin, uint64_t end, uint64_t free) {
+cap_t c;
+c.word0 = (uint64_t)CAP_TYPE_SUPERVISOR;
+c.word1 = 0;
+c.word0 |= free << 8;
+c.word0 |= end << 16;
+c.word0 |= begin << 24;
+return c;
+}
+static inline uint64_t cap_supervisor_get_begin(cap_t cap) {
+return (cap.word0 >> 24) & 0xffull;
+}
+static inline cap_t cap_supervisor_set_begin(cap_t cap, uint64_t begin) {
+cap.word0 = (cap.word0 & ~0xff000000ull) | begin << 24;
+return cap;
+}
+static inline uint64_t cap_supervisor_get_end(cap_t cap) {
+return (cap.word0 >> 16) & 0xffull;
+}
+static inline cap_t cap_supervisor_set_end(cap_t cap, uint64_t end) {
+cap.word0 = (cap.word0 & ~0xff0000ull) | end << 16;
+return cap;
+}
+static inline uint64_t cap_supervisor_get_free(cap_t cap) {
+return (cap.word0 >> 8) & 0xffull;
+}
+static inline cap_t cap_supervisor_set_free(cap_t cap, uint64_t free) {
+cap.word0 = (cap.word0 & ~0xff00ull) | free << 8;
+return cap;
+}
+static inline int cap_is_revokable(cap_t cap) {
+return cap_is_type(cap, CAP_TYPE_MEMORY)&&cap_is_type(cap, CAP_TYPE_TIME)&&cap_is_type(cap, CAP_TYPE_CHANNELS)&&cap_is_type(cap, CAP_TYPE_RECEIVER)&&cap_is_type(cap, CAP_TYPE_SENDER)&&cap_is_type(cap, CAP_TYPE_SERVER)&&cap_is_type(cap, CAP_TYPE_CLIENT)&&cap_is_type(cap, CAP_TYPE_SUPERVISOR);
+}
+static inline int cap_is_child(cap_t p, cap_t c) {
+return 0;
+}
+static inline int cap_can_derive(cap_t p, cap_t c) {
+return 0;
+}

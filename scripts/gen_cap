@@ -2,8 +2,8 @@
 # See LICENSE file for copyright and license details.
 import yaml
 from yaml.loader import SafeLoader
+import argparse
 import re
-import sys
 
 def binpack(bins, fields):
     if len(fields) == 0:
@@ -34,27 +34,30 @@ def get_bin(bins, f):
                 return i, b
 
 def make_assert(s):
-    print(f"kassert({s});")
+    return f"kassert({s});"
 
 def make_getter(cap_name, name, size, bins):
+    output = list()
     if name == 'padd':
         return
-    print(f"static inline uint64_t cap_{cap_name}_get_{name}(cap_t cap) {{")
+    output.append(f"static inline uint64_t cap_{cap_name}_get_{name}(cap_t cap) {{")
     make_assert(f"cap_is_type(cap, CAP_TYPE_{cap_name.upper()})")
     i, b = get_bin(bins, name)
     offset = get_offset(b, name)
     if i == 0:
         offset += 8
     if offset:
-        print(f"return (cap.word{i} >> {offset}) & 0x{'ff'*size}ull;")
+        output.append(f"return (cap.word{i} >> {offset}) & 0x{'ff'*size}ull;")
     else:
-        print(f"return cap.word{i} & 0x{'ff'*size}ull;")
-    print('}')
+        output.append(f"return cap.word{i} & 0x{'ff'*size}ull;")
+    output.append('}')
+    return "\n".join(output)
 
 def make_setter(cap_name, name, size, bins):
+    output = list()
     if name == 'padd':
         return
-    print(f'static inline cap_t cap_{cap_name}_set_{name}(cap_t cap, uint64_t {name}) {{')
+    output.append(f'static inline cap_t cap_{cap_name}_set_{name}(cap_t cap, uint64_t {name}) {{')
     make_assert(f"cap_is_type(cap, CAP_TYPE_{cap_name.upper()})")
     make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")
     i, b = get_bin(bins, name)
@@ -63,23 +66,25 @@ def make_setter(cap_name, name, size, bins):
         offset += 8
     mask = f"0x{'ff'*size + '00'*(offset//8)}ull"
     if offset:
-        print(f"cap.word{i} = (cap.word{i} & ~{mask}) | {name} << {offset};")
+        output.append(f"cap.word{i} = (cap.word{i} & ~{mask}) | {name} << {offset};")
     else:
-        print(f"cap.word{i} = (cap.word{i} & ~{mask}) | {name};")
-    print("return cap;")
-    print("}")
+        output.append(f"cap.word{i} = (cap.word{i} & ~{mask}) | {name};")
+    output.append("return cap;")
+    output.append("}")
+    return "\n".join(output)
 
 def make_constructor(cap_name, fields, asserts, bins):
+    output = list()
     parameters = [f"uint64_t {name}" for (name, size) in fields if name != 'padd']
-    print(f"static inline cap_t cap_mk_{cap_name}({', '.join(parameters)}) {{")
+    output.append(f"static inline cap_t cap_mk_{cap_name}({', '.join(parameters)}) {{")
     for (name, size) in fields:
         if name != 'padd':
             make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")
     for a in asserts:
         make_assert(a)
-    print("cap_t c;")
-    print(f"c.word0 = (uint64_t)CAP_TYPE_{cap_name.upper()};")
-    print(f"c.word1 = 0;")
+    output.append("cap_t c;")
+    output.append(f"c.word0 = (uint64_t)CAP_TYPE_{cap_name.upper()};")
+    output.append(f"c.word1 = 0;")
     for (i,b) in enumerate(bins):
         for (f, s) in b:
             if f == 'padd':
@@ -88,30 +93,35 @@ def make_constructor(cap_name, fields, asserts, bins):
             if i == 0:
                 offset += 8
             if offset:
-                print(f"c.word{i} |= {f} << {offset};")
+                output.append(f"c.word{i} |= {f} << {offset};")
             else:
-                print(f"c.word{i} |= {f};")
-    print("return c;")
-    print("}")
+                output.append(f"c.word{i} |= {f};")
+    output.append("return c;")
+    output.append("}")
+    return "\n".join(output)
 
 def make_revokable(caps):
-    print("static inline int cap_is_revokable(cap_t cap) {")
+    output = list()
+    output.append("static inline int cap_is_revokable(cap_t cap) {")
     p = [f"cap_is_type(cap, CAP_TYPE_{cap['name'].upper()})" for cap in caps if cap['revokable']]
-    print(f"return {'&&'.join(p)};")
-    print("}")
+    output.append(f"return {'&&'.join(p)};")
+    output.append("}")
+    return "\n".join(output)
 
 def make_cap_functions(data):
+    output = list()
     if 'fields' not in data:
-        return
+        return ""
     cap_name = data['name']
     fields = [tuple(f.split()) for f in data['fields']]
     fields = [(n, int(s)) for n, s in fields]
     bins = binpack([7,8], fields)
     asserts = data['asserts'] if 'asserts' in data else []
-    make_constructor(cap_name, fields, asserts, bins)
+    output.append(make_constructor(cap_name, fields, asserts, bins))
     for (f, s) in fields:
-        make_getter(cap_name, f, s, bins)
-        make_setter(cap_name, f, s, bins)
+        output.append(make_getter(cap_name, f, s, bins))
+        output.append(make_setter(cap_name, f, s, bins))
+    return "\n".join(output)
 
 def make_translator(case):
     pairs = []
@@ -133,30 +143,33 @@ def make_translator(case):
     case['conditions'] = rels
 
 def make_pred_case(case):
+    output = list()
     parent_type = f"CAP_TYPE_{case['parent'].upper()}"
     child_type = f"CAP_TYPE_{case['child'].upper()}"
     make_translator(case)
-    print(f"if (cap_is_type(p,{parent_type}) && cap_is_type(c, {child_type}))")
-    print(f"return {'&&'.join(case['conditions'])};")
+    output.append(f"if (cap_is_type(p,{parent_type}) && cap_is_type(c, {child_type}))")
+    output.append(f"return {'&&'.join(case['conditions'])};")
+    return "\n".join(output)
 
 def make_pred(p):
+    output = list()
     name=p['name']
-    print(f"static inline int cap_{name}(cap_t p, cap_t c) {{")
+    output.append(f"static inline int cap_{name}(cap_t p, cap_t c) {{")
     for case in p['cases']:
         make_pred_case(case)
-    print("return 0;")
-    print("}")
-    
+    output.append("return 0;")
+    output.append("}")
+    return "\n".join(output)
+
 
 # Open the file and load the file
 
-with open(sys.argv[1]) as f:
-    data = yaml.load(f, Loader=SafeLoader)
+def main(data):
 
-caps = data['caps']
-enums = ", ".join([f"CAP_TYPE_{d['name'].upper()}"  for d in caps])
-
-print(f"""\
+    caps = data['caps']
+    enums = ", ".join([f"CAP_TYPE_{d['name'].upper()}"  for d in caps])
+    
+    hdr = f"""\
 #pragma once
 #include "kassert.h"
 #include <stdint.h>
@@ -190,12 +203,34 @@ return 0xffull & cap.word0;
 static inline int cap_is_type(cap_t cap, cap_type_t t) {{
     return cap_get_type(cap) == t;
 }}
-""")
+"""
 
-for i in caps:
-    make_cap_functions(i)
+    output = list()
+    output.append(hdr)
+    
+    for i in caps:
+        output.append(make_cap_functions(i))
+    
+    output.append(make_revokable(caps))
+    
+    for p in data['predicates']:
+        output.append(make_pred(p))
 
-make_revokable(caps)
+    return "\n".join(output)
 
-for p in data['predicates']:
-    make_pred(p)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+            prog = "gen_cap",
+            description = "Generate capability header file from yaml description")
+    parser.add_argument("yaml")
+    parser.add_argument("output")
+    args = parser.parse_args()
+    with open(args.yaml, 'r') as f:
+        data = yaml.safe_load(f)
+    output = main(data)
+    if args.output == "-":
+        print(output)
+    else:
+        with open(args.output, "w") as f:
+            print(output, file=f)
+    
