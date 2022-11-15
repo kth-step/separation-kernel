@@ -3,5 +3,6 @@
 *.da
 *.elf
 *.bin
-inc/gen/*.h
+inc/cap.h
+inc/asm_consts.h
 api/s3k_*.h
