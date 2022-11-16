@@ -156,7 +156,7 @@ def make_pred(p):
     name=p['name']
     output.append(f"static inline int cap_{name}(cap_t p, cap_t c) {{")
     for case in p['cases']:
-        make_pred_case(case)
+        output.append(make_pred_case(case))
     output.append("return 0;")
     output.append("}")
     return "\n".join(output)
@@ -176,9 +176,6 @@ def main(data):
 
 #define NULL_CAP ((cap_t){{0,0}})
 
-typedef enum cap_type cap_type_t;
-typedef struct cap cap_t;
-
 enum cap_type {{
 {enums}, NUM_OF_CAP_TYPES
 }};
@@ -187,6 +184,8 @@ struct cap {{
 unsigned long long word0, word1;
 }};
 
+typedef enum cap_type cap_type_t;
+typedef struct cap cap_t;
 
 static inline uint64_t pmp_napot_begin(uint64_t addr) {{
     return addr & (addr + 1);

@@ -31,7 +31,7 @@ caps:
       - free 2
     asserts:
       - 'MIN_HARTID <= hartid'
-      - 'hartid <= MAX_HARTID'
+      - 'hartid <= MAX_HARTID' 
       - 'begin == free'
       - 'begin < end'
       - 'end <= N_QUANTUM'
@@ -165,9 +165,9 @@ predicates:
       - parent: time
         child: time
         conditions:
+          - 'p:hartid == c:hartid'
           - 'p:free == c:begin'
           - 'c:end <= p:end'
-          - 'p:hartid == c:hartid'
           - 'c:free == c:begin'
           - 'c:begin < c:end'
       - parent: channels

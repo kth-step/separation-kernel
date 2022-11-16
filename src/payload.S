@@ -1,5 +1,5 @@
-.globl payload
-.section .payload, "a"
+.section .payload, "ax"
+payload:
 #ifndef PAYLOAD
 1:      j       1b
 #else

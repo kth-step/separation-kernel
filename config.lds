@@ -3,46 +3,45 @@ OUTPUT_ARCH("riscv")
 
 ENTRY(_start)
 
-MEMORY {
-    RAM (rwx) : ORIGIN = 0x80000000, LENGTH = 0x80000000
-}
-
 SECTIONS {
+    . = 0x80000000;
     .text : {
-        KEEP(*(.init))
+        _text = .;
+        *(.init)
         *(.text)
         *(.text.*)
-    } >RAM
+        _etext = .;
+    }
 
-    _etext = .; PROVIDE(etext = .);
-    .data : ALIGN(8) {
-        __DATA_BEGIN__ = .;
-        *(.rdata*)
-        *(.rodata*)
+    .data : ALIGN(4K) {
+        _data = .;
         *(.data*)
-    } >RAM 
-    .sdata : ALIGN(8) {
-        __SDATA_BEGIN__ = .;
-        *(.srdata*)
-        *(.srodata*)
-        *(.sdata*)
-    } >RAM 
-    _edata = .; PROVIDE (edata = .);
-    .sbss : ALIGN(8) {
-        *(.sbss .sbss.*)
-    } >RAM 
-    .bss : ALIGN(8) {
-        *(.bss .bss.*)
+        *(.rdata .rdata.*)
+        *(.rodata .rodata.*)
+        *(COMMON)
+        _sdata = .;
+        *(.sdata .sdata.*)
+        *(.srdata .srdata.*)
+        *(.srodata .srodata*)
         . = ALIGN(8);
-    } >RAM 
-    __BSS_END__ = .;
-    _end = .; PROVIDE (end = .);
+        _edata = .;
+    }
 
-    __global_pointer$ = MIN(__SDATA_BEGIN__ + 0x800,
-                            MAX(__DATA_BEGIN__ + 0x800, __BSS_END__ - 0x800));
+    .bss : ALIGN(8) {
+        _bss = .;
+        _sbss = .;
+        *(.sbss)
+        *(.sbss.*)
+        *(.bss)
+        *(.bss.*)
+        . = ALIGN(8);
+        _ebss = .;
+    } 
 
-    .payload : ALIGN(4096) {
-        _init_payload = .;
+    __global_pointer$ = MIN(_sbss + 0x800, MAX(_data + 0x800, _ebss - 0x800));
+
+    .payload : ALIGN(16K) {
+        _payload = .;
         *(.payload)
-    } >RAM
+    }
 }

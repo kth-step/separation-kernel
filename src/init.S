@@ -3,7 +3,6 @@
 #include "macros.S"
 
 .globl _start
-.globl hang
 
 .section .init
 /*** This is the kernel's entry point ***/
@@ -17,13 +16,19 @@ _start: /* Start of the kernel */
         /* No machine-mode preemption */
         csrw    mstatus,x0
 
-        lla     t0,hang
+        lla     t0,_hang
         csrw    mtvec,t0
 
         /* make memory accessible */
-        csrw    pmpcfg0,0x0f
-        li      t0,0xfffffffffffull
+        lla     t0,_payload
+        srli    t0,t0,2
+        li      t1,-1
+        li      t2,0x1F0F00
+        li      t3,(0x10000FFF >> 2)
         csrw    pmpaddr0,t0
+        csrw    pmpaddr1,t1
+        csrw    pmpaddr2,t3
+        csrw    pmpcfg0,t2
 
         /* If hartid != MIN_HARTID, then jump to __wait. */
         csrr    t0,mhartid
@@ -32,19 +37,19 @@ _start: /* Start of the kernel */
 
 initialize_kernel: /*** Initialize kernel ***/
         /* Zero bss section */
-        lla     t0,_edata
-        lla     t1,_end
+        lla     t0,_bss
+        lla     t1,_ebss
         j       2f
-1:      sw      x0,0(t0)
-        addi    t0,t0,4
-2:      bne     t0,t1,1b
+1:      sd      x0,0(t0)
+        addi    t0,t0,8
+2:      blt     t0,t1,1b
 
 #ifndef NDEBUG
         /* Print information about kernel, scheduler, and platform. */
         call    print_info
 #endif
         /* Initializes PCBs. */
-        lla      a0,_init_payload
+        lla     a0,_payload
         call    proc_init
         call    sched_init
 
@@ -79,9 +84,8 @@ wait:   /*** Wait for initilization to finish. ***/
         csrw    mtvec,t0
 
         /*** Here we start the processes. ***/
-        la      ra,trap_resume_proc
+        lla     ra,trap_resume_proc
         tail    sched_start
 
-hang:
-        wfi
-        j       hang
+_hang:
+        j       _hang

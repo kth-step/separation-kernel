@@ -3,24 +3,23 @@
 
 #include "lock.h"
 #include "snprintf.h"
-
-int kprintf(const char* format, ...)
-{
-    va_list args;
-    char buf[128];
-    va_start(args, format);
-    vsnprintf(buf, 128, format, args);
-    return puts(buf);
-}
+#include "uart.h"
 
 int puts(const char* s)
 {
-    static lock_t lock = INIT_LOCK;
-    int i;
-    lock_acquire(&lock);
-    for (i = 0; s[i] != '\0'; i++) {
-        uart_putchar(s[i]);
-    }
-    lock_release(&lock);
-    return i;
+        static lock_t lock = INIT_LOCK;
+        lock_acquire(&lock);
+        int i = uart_puts(s);
+        lock_release(&lock);
+        return i;
+}
+
+int kprintf(const char* format, ...)
+{
+        va_list args;
+        char buf[256];
+        va_start(args, format);
+        vsnprintf(buf, 256, format, args);
+        va_end(args);
+        return puts(buf);
 }

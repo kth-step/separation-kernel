@@ -15,20 +15,23 @@ API=api
 
 LDS        ?=config.lds
 CONFIG_H   ?=config.h
-PLATFORM_H ?=bsp/virt.h
+BSP        ?=bsp/virt
 
-OBJS=$(patsubst $(SRC)/%.c, $(BUILD)/%.o, $(wildcard $(SRC)/*.c)) \
-	$(patsubst $(SRC)/%.S, $(BUILD)/%.o, $(wildcard $(SRC)/*.S))
+C_SRCS=$(wildcard $(SRC)/*.c)
+S_SRCS=$(wildcard $(SRC)/*.S)
+OBJS=$(patsubst $(SRC)/%.c, $(BUILD)/%.o, $(C_SRCS)) \
+     $(patsubst $(SRC)/%.S, $(BUILD)/%.o, $(S_SRCS))
 DEPS=$(OBJS:.o=.d)
 HDRS=$(wildcard $(INC)/*.h) $(CAP_H) $(ASM_CONST_H) $(CONFIG_H) $(PLATFORM_H)
-DA=$(patsubst %.elf, %.da, $(ELF))
+DA=$(OBJS:.p=.da) $(ELF:.elf=.da)
 
 CAP_H=$(INC)/cap.h
-ASM_CONST_H=$(INC)/asm_const.h
+ASM_CONSTS_H=$(INC)/asm_consts.h
 
 # Tools
 RISCV_PREFIX ?=riscv64-unknown-elf
 CC=$(RISCV_PREFIX)-gcc
+#CC=ccomp
 LD=$(RISCV_PREFIX)-ld
 SIZE=$(RISCV_PREFIX)-size
 OBJCOPY=$(RISCV_PREFIX)-objcopy
@@ -38,17 +41,15 @@ ARCH   ?=rv64imac
 ABI    ?=lp64
 CMODEL ?=medany
 
-CFLAGS+=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
+CFLAGS =-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
-CFLAGS+=-Wall -fanalyzer -Werror
-CFLAGS+=-gdwarf-2
-CFLAGS+=-Og
+CFLAGS+=-Wall
+CFLAGS+=-gdwarf-2 -O0
 CFLAGS+=-MMD
-CFLAGS+=-c
-CFLAGS+=-I$(INC) -include $(PLATFORM_H) -include $(CONFIG_H) 
+CFLAGS+=-nostdlib
+CFLAGS+=-I$(INC) -I$(BSP) -include $(BSP).h -include $(CONFIG_H) 
 
-LDFLAGS+=-static -no-pie --relax -nostdlib
-LDFLAGS+=-T$(LDS)
+CFLAGS+=-T$(LDS) -ffreestanding -no-pie
 
 .PHONY: all target clean size da cloc format elf bin da api
 .SECONDARY:
@@ -64,13 +65,13 @@ clean:
 	rm -f $(OBJS) $(DEPS) $(CAP_H) $(ASM_CONST_H) $(ELF) $(BIN) $(DA)
 
 size:
-	$(SIZE) $(OBJS) $(TARGET)
+	$(SIZE) $(OBJS) $(ELF)
 
 cloc:
 	cloc $(HDRS) $(SRCS)
 
 format:
-	clang-format -i $(filter src/inc/%.h, $(HDRS)) $(filter src/%.c, $(SRCS)) $(wildcard api/*.h)
+	clang-format -i $(wildcard inc/*.h) $(wildcard src/*.c) $(wildcard api/*.h)
 
 $(BUILD):
 	mkdir -p $(BUILD)
@@ -80,7 +81,7 @@ $(CAP_H): $(GEN)/cap.yml
 	$(SCRIPTS)/gen_cap $< $@
 
 $(ASM_CONSTS_H): $(GEN)/asm_consts.c $(INC)/proc.h $(INC)/cap_node.h $(INC)/consts.h
-	CC=$(CC) CFLAGS="$(CFLAGS)" $(SCRIPTS)/gen_asm_consts $< $@
+	$(CC) $(CFLAGS) -S -o - $< | grep -oE "#\w+ .*" > $@ 
 
 # Payload
 ifneq ("$(PAYLOAD)","")
@@ -89,19 +90,22 @@ $(BUILD)/payload.o: $(SRC)/payload.S $(PAYLOAD) | $(BUILD)
 endif
 
 # Kernel
-$(BUILD)/%.o: $(SRC)/%.S $(INC)/asm_consts.h $(CONFIG_H) $(PLATFORM_H) | $(BUILD)
-	$(CC) $(CFLAGS) -o $@ $<
+$(BUILD)/%.o: $(SRC)/%.S $(ASM_CONSTS_H) $(CONFIG_H) $(PLATFORM_H) | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: $(SRC)/%.c $(CAP_H) $(CONFIG_H) $(PLATFORM_H) | $(BUILD)
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(ELF): $(OBJS) $(LDS)
-	$(LD) $(LDFLAGS) -o $@ $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 $(BIN): $(ELF)
 	$(OBJCOPY) -O binary $< $@
 
-$(DA): $(ELF)
+$(BUILD)/%.da: $(BUILD)/%.o
+	$(OBJDUMP) -d $< > $@
+
+$(BUILD)/%.da: $(BUILD)/%.elf
 	$(OBJDUMP) -d $< > $@
 
 # API
@@ -113,3 +117,5 @@ $(API)/s3k_cap.h: $(INC)/cap.h
 
 $(API)/s3k_consts.h: $(INC)/consts.h
 	cp $< $@
+
+-include $(DEPS)

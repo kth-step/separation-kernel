@@ -51,4 +51,4 @@
 #define CAP_NODE_CAP 16
 #define CAP_WORD0 0
 #define CAP_WORD1 8
-#define NUM_OF_SYSNR 11
+#define NUM_OF_SYSNR 16
