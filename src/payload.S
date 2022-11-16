@@ -1,9 +1,7 @@
-.globl root_payload
-
+.globl payload
 .section .payload, "a"
-root_payload:
-#ifdef PAYLOAD
-        .incbin PAYLOAD
-#else
+#ifndef PAYLOAD
 1:      j       1b
+#else
+        .incbin PAYLOAD
 #endif

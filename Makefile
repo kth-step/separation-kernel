@@ -1,31 +1,38 @@
 # See LICENSE file for copyright and license details.
 .POSIX:
 
-PROGRAM ?= separation-kernel
-BUILD ?= build
+PROGRAM ?=separation-kernel
 
-TARGET=$(ELF) $(BIN) $(DA)
+BUILD=build
+SRC=src
+INC=inc
+GEN=gen
+SCRIPTS=scripts
+
 ELF=$(BUILD)/$(PROGRAM).elf
 BIN=$(BUILD)/$(PROGRAM).bin
-DA=$(BUILD)/$(PROGRAM).da
+API=api
 
 LDS        ?=config.lds
-S3K_CONFIG_H   ?=config.h
+CONFIG_H   ?=config.h
 PLATFORM_H ?=bsp/virt.h
 
-OBJS=$(patsubst %.c, build/%.o, $(wildcard src/*.c)) $(patsubst %.S, build/%.o, $(wildcard src/*.S))
+OBJS=$(patsubst $(SRC)/%.c, $(BUILD)/%.o, $(wildcard $(SRC)/*.c)) \
+	$(patsubst $(SRC)/%.S, $(BUILD)/%.o, $(wildcard $(SRC)/*.S))
+DEPS=$(OBJS:.o=.d)
+HDRS=$(wildcard $(INC)/*.h) $(CAP_H) $(ASM_CONST_H) $(CONFIG_H) $(PLATFORM_H)
+DA=$(patsubst %.elf, %.da, $(ELF))
 
-GEN_HDRS=src/inc/cap.h src/inc/asm_consts.h
-HDRS=$(wildcard src/inc/*.h) $(GEN_HDRS) $(CONFIG_H) $(PLATFORM_H)
-
-API_GEN_HDRS=api/s3k_cap.h api/s3k_consts.h
+CAP_H=$(INC)/cap.h
+ASM_CONST_H=$(INC)/asm_const.h
 
 # Tools
 RISCV_PREFIX ?=riscv64-unknown-elf
-CC 		=$(RISCV_PREFIX)-gcc
-SIZE 	=$(RISCV_PREFIX)-size
-OBJCOPY =$(RISCV_PREFIX)-objcopy
-OBJDUMP =$(RISCV_PREFIX)-objdump
+CC=$(RISCV_PREFIX)-gcc
+LD=$(RISCV_PREFIX)-ld
+SIZE=$(RISCV_PREFIX)-size
+OBJCOPY=$(RISCV_PREFIX)-objcopy
+OBJDUMP=$(RISCV_PREFIX)-objdump
 
 ARCH   ?=rv64imac
 ABI    ?=lp64
@@ -33,30 +40,28 @@ CMODEL ?=medany
 
 CFLAGS+=-march=$(ARCH) -mabi=$(ABI) -mcmodel=$(CMODEL)
 CFLAGS+=-std=gnu18
-CFLAGS+= -T$(LDS) -nostartfiles -nostdlib -ffreestanding -static
 CFLAGS+=-Wall -fanalyzer -Werror
 CFLAGS+=-gdwarf-2
-CFLAGS+=-O2
-CFLAGS+=-Isrc/inc -include $(PLATFORM_H) -include $(S3K_CONFIG_H) 
+CFLAGS+=-Og
+CFLAGS+=-MMD
+CFLAGS+=-c
+CFLAGS+=-I$(INC) -include $(PLATFORM_H) -include $(CONFIG_H) 
 
-ifneq "$(PAYLOAD)" ""
-CFLAGS+=-DPAYLOAD=\"$(PAYLOAD)\"
-endif
+LDFLAGS+=-static -no-pie --relax -nostdlib
+LDFLAGS+=-T$(LDS)
 
-.PHONY: all target clean size da cloc format api elf bin da
+.PHONY: all target clean size da cloc format elf bin da api
 .SECONDARY:
 
-all: $(TARGET)
+all: $(ELF)
 
 elf: $(ELF)
 bin: $(BIN)
 da: $(DA)
 
-api/s3k.h: api
-api: api/s3k_cap.h api/s3k_consts.h
 
 clean:
-	rm -f $(ELF) $(BIN) $(DA) $(OBJS) $(GEN_HDRS) $(API_GEN_HDRS)
+	rm -f $(OBJS) $(DEPS) $(CAP_H) $(ASM_CONST_H) $(ELF) $(BIN) $(DA)
 
 size:
 	$(SIZE) $(OBJS) $(TARGET)
@@ -70,29 +75,41 @@ format:
 $(BUILD):
 	mkdir -p $(BUILD)
 
-src/inc/cap.h: gen/cap.yml
-	./scripts/gen_cap $< $@
+# Generated headers
+$(CAP_H): $(GEN)/cap.yml
+	$(SCRIPTS)/gen_cap $< $@
 
-src/inc/asm_consts.h: gen/asm_consts.c $(CAP_H) src/inc/proc.h src/inc/cap_node.h src/inc/consts.h
-	CC=$(CC) CFLAGS="$(CFLAGS)" ./scripts/gen_asm_consts $< $@
+$(ASM_CONSTS_H): $(GEN)/asm_consts.c $(INC)/proc.h $(INC)/cap_node.h $(INC)/consts.h
+	CC=$(CC) CFLAGS="$(CFLAGS)" $(SCRIPTS)/gen_asm_consts $< $@
 
-$(BUILD)/%.o: %.S $(HDRS) | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
+# Payload
+ifneq ("$(PAYLOAD)","")
+$(BUILD)/payload.o: $(SRC)/payload.S $(PAYLOAD) | $(BUILD)
+	$(CC) $(CFLAGS) -DPAYLOAD=\"$(PAYLOAD)\" -MMD -c -o $@ $<
+endif
 
-$(BUILD)/%.o: %.c $(HDRS) | $(BUILD)
-	$(CC) $(CFLAGS) -c -o $@ $<
+# Kernel
+$(BUILD)/%.o: $(SRC)/%.S $(INC)/asm_consts.h $(CONFIG_H) $(PLATFORM_H) | $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $<
 
-$(ELF): $(OBJS) $(LDS) $(PAYLOAD)
-	$(CC) $(CFLAGS) -o $@ $(OBJS)
+$(BUILD)/%.o: $(SRC)/%.c $(CAP_H) $(CONFIG_H) $(PLATFORM_H) | $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $<
+
+$(ELF): $(OBJS) $(LDS)
+	$(LD) $(LDFLAGS) -o $@ $(OBJS)
 
 $(BIN): $(ELF)
 	$(OBJCOPY) -O binary $< $@
 
 $(DA): $(ELF)
-	$(OBJDUMP) -D $< > $@
+	$(OBJDUMP) -d $< > $@
 
-api/s3k_cap.h: src/inc/cap.h
-	sed '/kassert/d' $< > $@
+# API
+api: $(API)/s3k_consts.h $(API)/s3k_cap.h
 
-api/s3k_consts.h: src/inc/consts.h
+$(API)/s3k_cap.h: $(INC)/cap.h
+	cp $< $@
+	sed -i '/kassert/d' $@
+
+$(API)/s3k_consts.h: $(INC)/consts.h
 	cp $< $@
