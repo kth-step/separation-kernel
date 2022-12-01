@@ -83,7 +83,7 @@ void wait_and_set_timeout(uint64_t time, uint64_t length, uint64_t timeout)
                 start_time = timeout;
         write_timeout(hartid, start_time);
         while (!(read_csr(mip) & 128))
-                asm volatile("wfi");
+                __asm__ volatile("wfi");
         write_timeout(hartid, end_time);
 }
 

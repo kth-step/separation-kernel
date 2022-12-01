@@ -3,7 +3,7 @@
 
 #define read_csr(reg)                                          \
         ({                                                     \
-                register unsigned long out;                    \
+                register uint64_t out;                         \
                 __asm__ volatile("csrr %0," #reg : "=r"(out)); \
                 out;                                           \
         })
@@ -12,11 +12,11 @@
 
 #define swap_csr(reg, in)                                                       \
         ({                                                                      \
-                register unsigned long _out;                                    \
+                register uint64_t out;                                          \
                 __asm__ volatile("csrr %0," #reg ",%1" : "=r"(_out) : "r"(in)); \
-                _out;                                                           \
+                out;                                                            \
         })
 
-#define set_csr(reg, in) ({ __asm__ volatile("csrs " #reg ",%0" ::"r"(in)); })
+#define set_csr(reg, in) __asm__ volatile("csrs " #reg ",%0" ::"r"(in))
 
-#define clear_csr(reg, in) ({ __asm__ volatile("csrc " #reg ",%0" ::"r"(in)); })
+#define clear_csr(reg, in) __asm__ volatile("csrc " #reg ",%0" ::"r"(in))

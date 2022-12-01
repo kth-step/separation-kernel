@@ -54,7 +54,7 @@ proc_t* syscall_get_pid(proc_t* current)
 proc_t* syscall_get_reg(proc_t* current, uint64_t reg)
 {
         if (reg < N_REGISTERS)
-                proc_get_reg(current, reg);
+                current->regs.a1 = proc_get_reg(current, reg);
         return proc_set_code(current, reg < N_REGISTERS ? S3K_OK : S3K_ERROR);
 }
 
@@ -67,7 +67,8 @@ proc_t* syscall_set_reg(proc_t* current, uint64_t reg, uint64_t val)
 
 proc_t* syscall_yield(proc_t* current)
 {
-        current->regs.timeout = read_timeout(read_csr(mhartid));
+        uint64_t hartid = read_csr(mhartid);
+        current->regs.timeout = read_timeout(hartid);
         return sched_yield(current);
 }
 

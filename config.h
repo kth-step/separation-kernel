@@ -2,7 +2,7 @@
 #pragma once
 
 /* Number of processes. */
-#define N_PROC 6
+#define N_PROC 8
 
 /* Number of capabilities per process */
 #define N_CAPS 64
@@ -22,6 +22,3 @@
 
 /* Uncomment to enable memory protection */
 //#define MEMORY_PROTECTION
-
-/* For payload */
-//#define PAYLOAD "path/to/my/payload.bin"

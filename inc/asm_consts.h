@@ -1,4 +1,3 @@
-#pragma once
 #define REGS_PC 0
 #define REGS_RA 8
 #define REGS_SP 16

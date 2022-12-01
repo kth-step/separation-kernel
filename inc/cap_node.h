@@ -39,7 +39,7 @@ bool cap_node_is_deleted(cap_node_t* cn)
 cap_t cap_node_get_cap(cap_node_t* cn)
 {
         cap_t cap = cn->cap;
-        __sync_synchronize();
+        synchronize();
         if (cap_node_is_deleted(cn))
                 return NULL_CAP;
         return cap;
@@ -59,11 +59,11 @@ bool cap_node_delete(cap_node_t* node)
 bool cap_node_delete2(cap_node_t* node, cap_node_t* prev)
 {
         cap_node_t* next;
-        if (!compare_and_set(&node->prev, prev, NULL))
+        if (!compare_and_swap(&node->prev, prev, NULL))
                 return false;
         do {
                 next = node->next;
-        } while (!compare_and_set(&next->prev, node, prev));
+        } while (!compare_and_swap(&next->prev, node, prev));
         prev->next = next;
         return true;
 }
@@ -79,7 +79,7 @@ bool cap_node_insert(cap_t cap, cap_node_t* node, cap_node_t* prev)
         cap_node_t* next = prev->next;
         while (prev->prev != NULL) {
                 node->next = next;
-                if (compare_and_set(&next->prev, prev, node)) {
+                if (compare_and_swap(&next->prev, prev, node)) {
                         prev->next = node;
                         node->prev = prev;
                         return true;

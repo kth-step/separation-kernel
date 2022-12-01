@@ -65,10 +65,7 @@ def make_setter(cap_name, name, size, bins):
     if i == 0:
         offset += 8
     mask = f"0x{'ff'*size + '00'*(offset//8)}ull"
-    if offset:
-        output.append(f"cap.word{i} = (cap.word{i} & ~{mask}) | {name} << {offset};")
-    else:
-        output.append(f"cap.word{i} = (cap.word{i} & ~{mask}) | {name};")
+    output.append(f"cap.word{i} = (cap.word{i} & ~{mask}) | {name} << {offset};")
     output.append("return cap;")
     output.append("}")
     return "\n".join(output)
@@ -82,9 +79,9 @@ def make_constructor(cap_name, fields, asserts, bins):
             make_assert(f"({name} & 0x{'ff'*size}ull) == {name}")
     for a in asserts:
         make_assert(a)
-    output.append("cap_t c;")
-    output.append(f"c.word0 = (uint64_t)CAP_TYPE_{cap_name.upper()};")
-    output.append(f"c.word1 = 0;")
+    output.append("cap_t cap;")
+    output.append(f"cap.word0 = (uint64_t)CAP_TYPE_{cap_name.upper()};")
+    output.append(f"cap.word1 = 0;")
     for (i,b) in enumerate(bins):
         for (f, s) in b:
             if f == 'padd':
@@ -93,10 +90,10 @@ def make_constructor(cap_name, fields, asserts, bins):
             if i == 0:
                 offset += 8
             if offset:
-                output.append(f"c.word{i} |= {f} << {offset};")
+                output.append(f"cap.word{i} |= {f} << {offset};")
             else:
-                output.append(f"c.word{i} |= {f};")
-    output.append("return c;")
+                output.append(f"cap.word{i} |= {f};")
+    output.append("return cap;")
     output.append("}")
     return "\n".join(output)
 
@@ -176,16 +173,13 @@ def main(data):
 
 #define NULL_CAP ((cap_t){{0,0}})
 
-enum cap_type {{
+typedef enum cap_type {{
 {enums}, NUM_OF_CAP_TYPES
-}};
+}} cap_type_t;
 
-struct cap {{
-unsigned long long word0, word1;
-}};
-
-typedef enum cap_type cap_type_t;
-typedef struct cap cap_t;
+typedef struct cap {{
+uint64_t word0, word1;
+}} cap_t;
 
 static inline uint64_t pmp_napot_begin(uint64_t addr) {{
     return addr & (addr + 1);

@@ -3,7 +3,7 @@
 
 #include "kprint.h"
 
-void print_info()
+void print_info(void)
 {
         kprintf("===================================================\n");
         kprintf("S3K Information\n");
